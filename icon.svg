@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 배경 -->
+  <rect width="512" height="512" rx="96" fill="#0A0B0F"/>
+  <!-- 골드 보더 -->
+  <rect x="6" y="6" width="500" height="500" rx="90" fill="none" stroke="#E5C158" stroke-width="6" opacity="0.35"/>
+  <!-- F 마크 (Fraunces 느낌) -->
+  <g fill="#E5C158">
+    <!-- F 세로획 -->
+    <rect x="170" y="128" width="44" height="256" rx="4"/>
+    <!-- F 윗가로획 -->
+    <rect x="170" y="128" width="180" height="44" rx="4"/>
+    <!-- F 중간가로획 (살짝 짧게) -->
+    <rect x="170" y="234" width="130" height="40" rx="4"/>
+    <!-- 작은 세리프 점 (Fraunces 디테일) -->
+    <circle cx="358" cy="150" r="6"/>
+    <circle cx="308" cy="254" r="5"/>
+    <circle cx="222" cy="384" r="5"/>
+  </g>
+</svg>

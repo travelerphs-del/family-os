@@ -1,0 +1,175 @@
+/* =====================================================================
+ * Family OS — Design Tokens
+ * =====================================================================
+ *
+ * 사용법:
+ *   <link rel="stylesheet" href="design-tokens.css">
+ *
+ * 이 파일은 메인 허브 + 4개 서브 대시보드 모두가 공유하는
+ * 단일 소스 오브 트루스. 토큰만 바꾸면 전체 시스템 일관 변경됨.
+ *
+ * 기반: Family Wealth Dashboard 디자인 토큰 (다크 + 골드)
+ * 확장: 4개 대시보드별 악센트 컬러 추가
+ *
+ * ===================================================================== */
+
+/* ─── 웹폰트 ─────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css');
+
+:root {
+  /* ─── 표면 색상 (다크) ─────────────────────────────────────────── */
+  --canvas:      #0A0B0F;   /* 최하단 배경 */
+  --surface:     #131419;   /* 카드/패널 */
+  --elevated:    #1C1D24;   /* 떠 있는 요소 */
+  --elevated-2:  #242530;   /* 더 떠 있는 요소 */
+  --border:      rgba(255, 255, 255, 0.08);
+  --border-hi:   rgba(255, 255, 255, 0.18);
+  --border-active: rgba(229, 193, 88, 0.5);
+
+  /* ─── 텍스트 (계조 4단계) ──────────────────────────────────────── */
+  --text-primary:   #FAFAFA;
+  --text-secondary: #D4D4D8;
+  --text-tertiary:  #A1A1AA;
+  --text-quiet:     #71717A;
+
+  /* ─── 시맨틱 컬러 (전 대시보드 공통) ──────────────────────────── */
+  --gain:       #4ADE80;   /* 상승/긍정 */
+  --gain-soft:  rgba(74, 222, 128, 0.14);
+  --loss:       #FB7185;   /* 하락/부정 */
+  --loss-soft:  rgba(251, 113, 133, 0.14);
+  --neutral:    #FCD34D;   /* 중립 경고 */
+  --info:       #7DD3FC;
+
+  /* ─── 대시보드별 악센트 (카드 식별용) ──────────────────────────── */
+  --acc-wealth:       #E5C158;   /* 골드 */
+  --acc-wealth-soft:  rgba(229, 193, 88, 0.16);
+  --acc-expense:      #818CF8;   /* 인디고 */
+  --acc-expense-soft: rgba(129, 140, 248, 0.16);
+  --acc-health:       #34D399;   /* 민트 */
+  --acc-health-soft:  rgba(52, 211, 153, 0.16);
+  --acc-future:       #C084FC;   /* 라벤더 */
+  --acc-future-soft:  rgba(192, 132, 252, 0.16);
+
+  /* 메인 시그니처 컬러 (브랜드 골드, Wealth와 동일) */
+  --accent:       var(--acc-wealth);
+  --accent-soft:  var(--acc-wealth-soft);
+
+  /* ─── 타이포그래피 ────────────────────────────────────────────── */
+  --font-display: 'Fraunces', 'Pretendard Variable', Georgia, serif;
+  --font-body:    'Pretendard Variable', -apple-system, BlinkMacSystemFont,
+                   system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+
+  /* ─── 간격 스케일 ─────────────────────────────────────────────── */
+  --s1:  4px;
+  --s2:  8px;
+  --s3:  12px;
+  --s4:  16px;
+  --s5:  20px;
+  --s6:  24px;
+  --s7:  32px;
+  --s8:  48px;
+  --s9:  64px;
+  --s10: 96px;
+
+  /* ─── 라운드 ─────────────────────────────────────────────────── */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-full: 999px;
+
+  /* ─── 트랜지션 ───────────────────────────────────────────────── */
+  --t-fast:  150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-med:   300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow:  600ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-sheet: 380ms cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ─── 모바일 세이프 에어리어 ─────────────────────────────────── */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+
+  /* ─── 그림자 (다크 모드용, 거의 안 쓰지만 필요 시) ──────────── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* ─── 기본 리셋 + 글로벌 스타일 ─────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--canvas);
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 숫자 표시용 유틸 */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.serif {
+  font-family: var(--font-display);
+}
+
+/* 스크롤바 (다크 톤 일관성) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--elevated-2);
+  border-radius: var(--r-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-quiet);
+}

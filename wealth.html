@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0B0F">
+  <title>Wealth — Family OS</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="./design-tokens.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+/* ─── 공통 레이아웃 (서브 대시보드 공유) ───────────────────────── */
+body {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  overflow-x: hidden;
+}
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--s6);
+}
+@media (max-width: 767px) {
+  .app { padding: 0 var(--s4); }
+}
+
+/* 헤더 */
+header.hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s6) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--s5);
+}
+@media (max-width: 767px) {
+  header.hdr { padding: var(--s4) 0; margin-bottom: var(--s4); }
+}
+.brand { display: flex; align-items: baseline; gap: var(--s3); }
+.brand-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.brand-sub {
+  font-size: 12px;
+  color: var(--text-quiet);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+@media (max-width: 480px) {
+  .brand-title { font-size: 20px; }
+  .brand-sub { display: none; }
+}
+.hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+.icon-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); color: var(--text-tertiary);
+  background: transparent; border: none; cursor: pointer;
+  transition: all var(--t-fast);
+}
+.icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+.last-sync {
+  font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+  padding-right: var(--s2);
+}
+@media (max-width: 480px) { .last-sync { display: none; } }
+
+/* 푸터 */
+footer.ftr {
+  padding: var(--s5) 0 var(--s7);
+  margin-top: var(--s6);
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-quiet);
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--s2);
+}
+footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+/* 설정 모달 */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 11, 15, 0.7);
+  backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100; padding: var(--s4);
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg); padding: var(--s6);
+  width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+  animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-title {
+  font-family: var(--font-display); font-size: 20px; font-weight: 500;
+  margin-bottom: var(--s2);
+}
+.modal-desc {
+  font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
+  margin-bottom: var(--s5);
+}
+.modal-field { margin-bottom: var(--s4); }
+.modal-label {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: var(--s2);
+}
+.modal-input {
+  width: 100%; background: var(--canvas);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 12px; font-size: 12px; color: var(--text-primary);
+  font-family: var(--font-mono); transition: border-color var(--t-fast);
+}
+.modal-input:focus { outline: none; border-color: var(--accent); }
+.modal-input::placeholder { color: var(--text-quiet); }
+.modal-actions {
+  display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
+}
+.btn {
+  padding: 10px 18px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500;
+  transition: all var(--t-fast); border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: var(--canvas); }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border-color: var(--border);
+}
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+/* 빈 상태 */
+.state-empty {
+  padding: var(--s8) var(--s5);
+  display: flex; flex-direction: column; gap: var(--s2);
+  align-items: center; text-align: center;
+}
+.state-empty .ico {
+  width: 32px; height: 32px; border-radius: var(--r-md);
+  background: var(--elevated);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: var(--s2); color: var(--text-tertiary);
+}
+.state-empty .msg { color: var(--text-tertiary); font-size: 12px; }
+.state-empty button {
+  font-size: 12px; color: var(--accent);
+  padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: transparent;
+  margin-top: var(--s2); transition: all var(--t-fast); cursor: pointer;
+}
+.state-empty button:hover { border-color: var(--accent); background: var(--elevated); }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--elevated-2);
+  border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.gain  { color: var(--gain); }
+.loss  { color: var(--loss); }
+.muted { color: var(--text-quiet); }
+
+/* ─── Wealth 고유 스타일 ────────────────────────────────────── */
+
+/* 가족 필터 바 */
+.fam-bar {
+  display: flex; gap: var(--s2);
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.fam-bar::-webkit-scrollbar { display: none; }
+.fam-chip {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: var(--s2);
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  font-size: 12px; color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.fam-chip:hover { border-color: var(--border-hi); color: var(--text-primary); }
+.fam-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.fam-chip .fam-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+}
+
+/* 그리드 */
+.w-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s5);
+}
+@media (max-width: 900px) {
+  .w-grid { grid-template-columns: 1fr; }
+}
+
+/* 좌측 영웅 카드: 두 칸 너비 */
+.w-hero-card { grid-column: span 2; }
+@media (max-width: 900px) {
+  .w-hero-card { grid-column: span 1; }
+}
+
+/* 카드 기본 */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s5);
+  position: relative;
+}
+.card-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: var(--s4);
+}
+.card-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-quiet);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 2px;
+}
+.card-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.card-action {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  transition: opacity var(--t-fast);
+  padding: 4px 0;
+}
+.card-action:hover { opacity: 0.7; }
+
+/* Hero 영웅 숫자 */
+.hero-block {
+  padding-bottom: var(--s5);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--s5);
+}
+.hero-label {
+  font-size: 11px;
+  color: var(--text-quiet);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--s2);
+}
+.hero-value {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(36px, 6vw, 56px);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.05;
+  margin-bottom: var(--s3);
+}
+.hero-value .currency {
+  font-size: 0.6em;
+  color: var(--text-tertiary);
+  margin-right: 0.15em;
+  vertical-align: 0.05em;
+}
+.hero-deltas {
+  display: flex; gap: var(--s5); flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.hero-delta-item {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.hero-delta-item .lbl {
+  font-size: 10px; color: var(--text-quiet); text-transform: uppercase;
+}
+.hero-delta-item .val { font-weight: 500; }
+
+/* Hero 내부 2-col: 좌측 도넛 / 우측 막대차트 */
+.hero-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: var(--s6);
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .hero-charts { grid-template-columns: 1fr; gap: var(--s5); }
+}
+
+/* 도넛 */
+.donut-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 240px;
+  margin: 0 auto;
+}
+.donut-wrap canvas { width: 100% !important; height: 100% !important; }
+.donut-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.donut-center .lbl {
+  font-size: 10px; color: var(--text-quiet);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 2px;
+}
+.donut-center .val {
+  font-family: var(--font-display);
+  font-size: 28px; font-weight: 400; color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+.donut-center .val .unit {
+  font-size: 0.5em; color: var(--text-tertiary); margin-left: 0.1em;
+}
+.legend {
+  margin-top: var(--s3);
+  display: flex; flex-direction: column; gap: var(--s2);
+  font-size: 11px;
+}
+.legend-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s2);
+}
+.legend-l {
+  display: flex; align-items: center; gap: var(--s2);
+  color: var(--text-secondary);
+}
+.legend-dot {
+  width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+}
+.legend-r {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+/* 막대차트 영역 */
+.bars-block { min-width: 0; }
+.bars-tabs {
+  display: flex; gap: 4px;
+  margin-bottom: var(--s3);
+  overflow-x: auto; scrollbar-width: none;
+}
+.bars-tabs::-webkit-scrollbar { display: none; }
+.bars-tab {
+  flex-shrink: 0;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono); font-size: 10px;
+  padding: 6px 10px; border-radius: var(--r-sm);
+  cursor: pointer; letter-spacing: 0.08em;
+  transition: all var(--t-fast);
+}
+.bars-tab:hover { color: var(--text-primary); border-color: var(--border-hi); }
+.bars-tab.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bars-canvas-wrap {
+  position: relative;
+  height: 200px;
+  width: 100%;
+}
+.bars-canvas-wrap canvas { width: 100% !important; height: 100% !important; }
+
+/* Insights */
+.insights {
+  margin-top: var(--s5);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: var(--s4);
+}
+.insight {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.insight-label {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+.insight-values {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--s4); flex-wrap: wrap;
+}
+.iv-main {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.iv-sub {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--text-tertiary);
+  text-align: right;
+}
+.progress-bg {
+  width: 100%; height: 4px;
+  background: var(--elevated-2);
+  border-radius: 2px; overflow: hidden;
+}
+.progress-bar {
+  height: 100%; border-radius: 2px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.progress-bar.loss   { background: var(--loss); }
+.progress-bar.gain   { background: var(--gain); }
+.progress-bar.accent { background: var(--accent); }
+
+/* Holdings (요약) */
+.hold-group { margin-bottom: var(--s4); }
+.hold-group:last-child { margin-bottom: 0; }
+.hold-group-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: var(--s2);
+}
+.hold-group-name {
+  font-size: 12px; color: var(--text-secondary); font-weight: 500;
+}
+.hold-group-val {
+  font-family: var(--font-mono);
+  font-size: 12px; color: var(--text-tertiary);
+}
+.stack-bar {
+  display: flex; height: 8px; border-radius: 2px; overflow: hidden;
+  background: var(--elevated-2);
+}
+.stack-seg {
+  height: 100%;
+  transition: width var(--t-med);
+  position: relative;
+}
+.hold-list {
+  margin-top: var(--s3);
+  display: flex; flex-direction: column; gap: var(--s2);
+  font-size: 11px;
+}
+.hold-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0;
+}
+.hold-row .l { display: flex; align-items: center; gap: var(--s2); min-width: 0; flex: 1; }
+.hold-row .l .name {
+  font-weight: 500; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hold-row .r {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.hold-row .pct-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* Real Estate */
+.re-name {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 500;
+  margin-bottom: 2px;
+}
+.re-spec {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: var(--s4);
+}
+.re-avg-label {
+  font-size: 10px; color: var(--text-quiet);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+.re-avg-value {
+  font-family: var(--font-display);
+  font-size: 24px; font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: var(--s4);
+}
+.re-trans-list {
+  display: flex; flex-direction: column; gap: var(--s2);
+  margin-bottom: var(--s5);
+}
+.re-trans {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-tertiary);
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+.re-trans:last-child { border-bottom: none; }
+.re-reconstr-label {
+  font-size: 10px; color: var(--text-quiet);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: var(--s2);
+}
+.re-steps {
+  display: flex; gap: 2px; flex-wrap: wrap;
+}
+.re-step {
+  flex: 1; min-width: 60px;
+  text-align: center;
+  padding: 6px 4px;
+  font-size: 10px;
+  background: var(--elevated);
+  border-radius: var(--r-sm);
+  color: var(--text-quiet);
+  border: 1px solid transparent;
+  position: relative;
+}
+.re-step.done {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.re-step.current {
+  background: var(--accent);
+  color: var(--canvas);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Cash */
+.cash-list { display: flex; flex-direction: column; gap: var(--s2); }
+.cash-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cash-row:last-child { border-bottom: none; }
+.cash-l {
+  display: flex; flex-direction: column; min-width: 0; flex: 1;
+}
+.cash-type {
+  font-size: 9px; color: var(--text-quiet);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.cash-label {
+  font-size: 12px; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cash-r {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  flex-shrink: 0; padding-left: var(--s2);
+}
+.cash-r.loss { color: var(--loss); }
+.cash-total {
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border-hi);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.cash-total .lbl {
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.cash-total .val {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 500;
+}
+
+/* ─── 상세 뷰 ─────────────────────────────────────────────── */
+.view.hidden { display: none; }
+.detail-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  margin-bottom: var(--s4);
+  transition: all var(--t-fast);
+}
+.detail-back:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+.detail-controls {
+  display: flex; gap: var(--s2); margin-bottom: var(--s4);
+  flex-wrap: wrap;
+}
+.detail-search {
+  flex: 1; min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+}
+.detail-search:focus { outline: none; border-color: var(--accent); }
+.detail-search::placeholder { color: var(--text-quiet); }
+
+.detail-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow-x: auto;
+}
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 700px;
+}
+.detail-table th {
+  background: var(--elevated);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  cursor: pointer;
+  user-select: none;
+}
+.detail-table th.sortable:hover { color: var(--text-primary); }
+.detail-table th .sort-ind { opacity: 0.4; margin-left: 4px; font-size: 9px; }
+.detail-table th.sorted .sort-ind { opacity: 1; color: var(--accent); }
+.detail-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.detail-table td.name-col {
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.detail-table tr:last-child td { border-bottom: none; }
+.detail-table tr:hover td { background: var(--elevated); }
+.detail-table .num { text-align: right; }
+.detail-table .pl-pos { color: var(--gain); }
+.detail-table .pl-neg { color: var(--loss); }
+
+/* 종목 행 클릭 시 자세히 펼치는 row (옵션) */
+.detail-meta {
+  margin-top: var(--s4);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--s3);
+  font-size: 11px;
+}
+.meta-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--s3);
+}
+.meta-card .lbl {
+  font-size: 10px; color: var(--text-quiet);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.meta-card .val {
+  font-family: var(--font-mono);
+  font-size: 14px; color: var(--text-primary);
+}
+
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- 헤더 (common.js 동적 렌더링) -->
+  <div id="hdr-mount"></div>
+
+  <!-- 가족 필터 바 -->
+  <div class="fam-bar" id="fam-bar"></div>
+
+  <main>
+    <!-- 메인 뷰 -->
+    <div id="main-view" class="view">
+      <div id="main-mount"></div>
+    </div>
+
+    <!-- 종목 상세 뷰 (숨김) -->
+    <div id="detail-view" class="view hidden">
+      <button class="detail-back" id="detail-back">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        전체 자산으로
+      </button>
+      <div id="detail-mount"></div>
+    </div>
+  </main>
+
+  <!-- 푸터 (common.js 동적 렌더링) -->
+  <div id="ftr-mount"></div>
+</div>
+
+<!-- 설정 모달 (common.js 동적 렌더링) -->
+<div id="modal-mount"></div>
+
+<script src="./common.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+ * Wealth 대시보드 로직
+ * ════════════════════════════════════════════════════════════════ */
+
+const DASHBOARD_ID = 'wealth';
+const meta = FamilyOS.getDashboardMeta(DASHBOARD_ID);
+
+/* ─── 상태 ─────────────────────────────────────────────────── */
+const state = {
+  data: null,             // 백엔드 full payload
+  ownerFilter: 'all',     // 'all' | 'dad' | 'mom' | 'son1' | 'son2'
+  view: 'main',           // 'main' | 'detail'
+  barPeriod: 'month',     // 'day' | 'week' | 'month' | 'quarter' | 'year'
+  detailSort: { key: 'eval', dir: 'desc' },
+  detailQuery: ''
+};
+
+/* ─── 차트 인스턴스 ────────────────────────────────────────── */
+let donutChart = null;
+let barsChart = null;
+
+/* ─── 헤더/푸터/모달 마운트 ───────────────────────────────── */
+document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+  title: 'Wealth', sub: '자산'
+});
+document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+  left: 'Family OS · Wealth', right: 'v0.2.0'
+});
+document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML({
+  fields: [{ id: DASHBOARD_ID, label: 'Wealth (자산)' }],
+  title: 'Wealth Web App URL 설정',
+  desc: '이 대시보드의 Apps Script Web App URL을 입력하세요. 이 정보는 이 기기 브라우저에만 저장됩니다.'
+});
+
+FamilyOS.attachSettingsModal({ fieldIds: [DASHBOARD_ID], onSave: refresh });
+
+document.getElementById('fos-btn-refresh')?.addEventListener('click', refresh);
+
+document.getElementById('detail-back').addEventListener('click', () => {
+  showView('main');
+});
+
+// main-mount 내부 위임 (재시도, 설정 열기, 상세보기 진입 등)
+document.getElementById('main-mount').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (action === 'open-settings') document.getElementById('fos-btn-settings')?.click();
+  else if (action === 'retry') refresh();
+  else if (action === 'goto-detail') showView('detail');
+});
+
+/* ─── 데이터 로드 + 라우팅 ────────────────────────────────── */
+async function refresh() {
+  const mount = document.getElementById('main-mount');
+
+  if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+    mount.innerHTML = FamilyOS.renderUnsetStateHTML();
+    FamilyOS.setLastSync('—');
+    renderFamilyBar();  // 비활성 상태
+    return;
+  }
+
+  mount.innerHTML = FamilyOS.renderLoadingStateHTML();
+  FamilyOS.setLastSync('동기화 중…');
+
+  try {
+    const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+    state.data = data;
+    renderFamilyBar();
+    renderMainView();
+    FamilyOS.setSyncedNow();
+  } catch (err) {
+    console.error('[wealth] fetch failed:', err);
+    const msg = err.message === 'UNSET' ? 'URL 미설정' : err.message;
+    mount.innerHTML = FamilyOS.renderErrorStateHTML(msg, { retryId: DASHBOARD_ID });
+    FamilyOS.setLastSync('동기화 실패');
+  }
+}
+
+function showView(name) {
+  state.view = name;
+  document.getElementById('main-view').classList.toggle('hidden', name !== 'main');
+  document.getElementById('detail-view').classList.toggle('hidden', name !== 'detail');
+  if (name === 'detail') renderDetailView();
+  // 스크롤 위로
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── 가족 필터 바 ────────────────────────────────────────── */
+function renderFamilyBar() {
+  const bar = document.getElementById('fam-bar');
+  const family = (state.data && state.data.family) || [];
+  // 전체 + 가족 멤버
+  const chips = [{ id: 'all', label: '전체', color: 'var(--accent)' }]
+    .concat(family.map(f => ({
+      id: f.id, label: f.label,
+      color: f.color || 'var(--accent)'
+    })));
+
+  bar.innerHTML = chips.map(c => `
+    <button class="fam-chip ${c.id === state.ownerFilter ? 'active' : ''}" data-owner="${FamilyOS.escapeHtml(c.id)}">
+      <span class="fam-dot" style="background: ${FamilyOS.escapeHtml(c.color)};"></span>
+      ${FamilyOS.escapeHtml(c.label)}
+    </button>
+  `).join('');
+
+  bar.querySelectorAll('.fam-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.ownerFilter = chip.dataset.owner;
+      renderFamilyBar();
+      if (state.data) {
+        if (state.view === 'main') renderMainView();
+        else renderDetailView();
+      }
+    });
+  });
+}
+
+/* ─── 메인 뷰 렌더링 ──────────────────────────────────────── */
+function renderMainView() {
+  const data = state.data;
+  if (!data) return;
+  const owner = state.ownerFilter;
+
+  // 자산 합계 계산 (필터 반영)
+  const t = computeTotalsForOwner(data, owner);
+  const insights = computeInsights(data, t);
+
+  const html = `
+    <div class="w-grid">
+      <!-- 영웅 카드 (좌측, 두 칸 너비) -->
+      <section class="card w-hero-card">
+        <div class="card-header">
+          <div>
+            <div class="card-eyebrow">Overview</div>
+            <div class="card-title">Total Net Worth</div>
+          </div>
+        </div>
+
+        <div class="hero-block">
+          <div class="hero-label">${FamilyOS.escapeHtml(ownerLabel(owner, data))} 기준 총 순자산</div>
+          <div class="hero-value">
+            <span class="currency">₩</span><span>${formatFull(t.total)}</span>
+          </div>
+          <div class="hero-deltas">
+            <div class="hero-delta-item">
+              <span class="lbl">자산 (주식+부동산)</span>
+              <span class="val">${FamilyOS.fmtKRW(t.stock + t.re)}</span>
+            </div>
+            <div class="hero-delta-item">
+              <span class="lbl">현금 Net</span>
+              <span class="val ${t.cashNet < 0 ? 'loss' : ''}">${FamilyOS.fmtKRW(t.cashNet)}</span>
+            </div>
+            ${insights.todayDelta !== null ? `
+              <div class="hero-delta-item">
+                <span class="lbl">전일比</span>
+                <span class="val ${insights.todayDelta >= 0 ? 'gain' : 'loss'}">${FamilyOS.fmtPct(insights.todayDelta)}</span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="hero-charts">
+          <!-- 도넛 -->
+          <div>
+            <div class="donut-wrap">
+              <canvas id="donut-chart"></canvas>
+              <div class="donut-center">
+                <div class="lbl">Total</div>
+                <div class="val">
+                  <span>${(t.total / 100000000).toFixed(t.total >= 1e10 ? 0 : 1)}</span><span class="unit">억</span>
+                </div>
+              </div>
+            </div>
+            <div class="legend" id="legend"></div>
+          </div>
+
+          <!-- 막대차트 -->
+          <div class="bars-block">
+            <div class="bars-tabs">
+              ${['day','week','month','quarter','year'].map(p => `
+                <button class="bars-tab ${p === state.barPeriod ? 'active' : ''}" data-period="${p}">${p.toUpperCase()}</button>
+              `).join('')}
+            </div>
+            <div class="bars-canvas-wrap"><canvas id="bars-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="insights">
+          <div class="insight">
+            <div class="insight-label">가계 레버리지 — 부채 / 총자산 (가족 전체)</div>
+            <div class="insight-values">
+              <span class="iv-main">${insights.debtRatio.toFixed(1)}%</span>
+              <span class="iv-sub">총자산 ${FamilyOS.fmtKRW(insights.grossAssets)} · 부채 ${FamilyOS.fmtKRW(insights.liabilities)}</span>
+            </div>
+            <div class="progress-bg"><div class="progress-bar loss" style="width: ${Math.min(insights.debtRatio, 100)}%"></div></div>
+          </div>
+          <div class="insight">
+            <div class="insight-label">올해 수익 달성 (배당 + 실현손익)</div>
+            <div class="insight-values">
+              <span class="iv-main">${insights.cashflowPct.toFixed(1)}%${insights.cashflowPct >= 100 ? ' ✦' : ''}</span>
+              <span class="iv-sub">달성 ${FamilyOS.fmtKRW(insights.cashflow)} · 목표 ${FamilyOS.fmtKRW(insights.cashflowTarget)}</span>
+            </div>
+            <div class="progress-bg"><div class="progress-bar ${insights.cashflowPct >= 100 ? 'accent' : 'gain'}" style="width: ${Math.min(insights.cashflowPct, 100)}%"></div></div>
+          </div>
+          <div class="insight">
+            <div class="insight-label">장기 순자산 목표 (가족 전체)</div>
+            <div class="insight-values">
+              <span class="iv-main">${insights.netPct.toFixed(1)}%${insights.netPct >= 100 ? ' ✦' : ''}</span>
+              <span class="iv-sub">현재 ${FamilyOS.fmtKRW(insights.totalAll)} · 목표 ${FamilyOS.fmtKRW(insights.netTarget)}</span>
+            </div>
+            <div class="progress-bg"><div class="progress-bar accent" style="width: ${Math.min(insights.netPct, 100)}%"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Holdings 카드 -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-eyebrow">Equities</div>
+            <div class="card-title">Holdings</div>
+          </div>
+          <button class="card-action" data-action="goto-detail">상세 보기 →</button>
+        </div>
+        <div id="holdings-body">${renderHoldingsSummary(data, owner, t)}</div>
+      </section>
+
+      <!-- 부동산 카드 -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-eyebrow">Real Estate</div>
+            <div class="card-title">Property</div>
+          </div>
+        </div>
+        ${renderRealestate(data, owner)}
+      </section>
+
+      <!-- 현금 카드 -->
+      <section class="card" style="grid-column: span 2;">
+        <div class="card-header">
+          <div>
+            <div class="card-eyebrow">Liquidity</div>
+            <div class="card-title">Cash &amp; Liabilities</div>
+          </div>
+        </div>
+        ${renderCash(data, owner)}
+      </section>
+    </div>
+  `;
+
+  document.getElementById('main-mount').innerHTML = html;
+
+  // 차트 그리기 (innerHTML 삽입 후)
+  renderDonut(t);
+  renderBars();
+
+  // 막대 탭 이벤트
+  document.querySelectorAll('.bars-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      state.barPeriod = tab.dataset.period;
+      document.querySelectorAll('.bars-tab').forEach(t => t.classList.toggle('active', t === tab));
+      renderBars();
+    });
+  });
+}
+
+/* ─── 자산 합계 계산 ──────────────────────────────────────── */
+function computeTotalsForOwner(data, owner) {
+  const fx = data.fx || { KRW: 1 };
+  const filt = h => owner === 'all' || h.owner === owner;
+
+  let stock = 0, stockDomestic = 0, stockForeign = 0;
+  (data.holdings || []).filter(filt).forEach(h => {
+    const rate = fx[h.ccy] || 1;
+    const val = (h.qty || 0) * (h.cur || 0) * rate;
+    stock += val;
+    if (h.mkt === '국내') stockDomestic += val;
+    else stockForeign += val;
+  });
+
+  // 부동산: 소유자가 owner와 일치할 때만 (또는 all)
+  let re = 0;
+  if (data.realestate && data.realestate.recent && data.realestate.recent.length > 0) {
+    if (owner === 'all' || data.realestate.owner === owner) {
+      const avg = data.realestate.recent.reduce((s, r) => s + r.amount, 0) / data.realestate.recent.length;
+      re = Math.max(0, avg - (data.realestate.jeonse || 0));
+    }
+  }
+
+  // 현금: filter
+  let cashNet = 0, cashPositive = 0, liabilities = 0;
+  (data.cash || []).filter(c => owner === 'all' || c.owner === owner).forEach(c => {
+    cashNet += c.amount;
+    if (c.amount > 0) cashPositive += c.amount;
+    else liabilities += Math.abs(c.amount);
+  });
+
+  return {
+    total: stock + re + cashNet,
+    stock, stockDomestic, stockForeign,
+    re, cashNet, cashPositive, liabilities
+  };
+}
+
+/* ─── Insights 계산 ───────────────────────────────────────── */
+function computeInsights(data, t) {
+  // 부채·레버리지는 "가정 단위" 지표 → 필터 무관 항상 가족 전체 기준
+  // (예: mom 필터 시 dad 명의 주담대가 사라져 0% 나오는 직관 어긋남 방지)
+  const tAll = (state.ownerFilter === 'all') ? t : computeTotalsForOwner(data, 'all');
+  const grossAssets = tAll.stock + tAll.re + tAll.cashPositive;
+  const debtRatio = grossAssets > 0 ? (tAll.liabilities / grossAssets) * 100 : 0;
+
+  // 올해 수익 (배당 + 실현손익): 필터 반영
+  const owner = state.ownerFilter;
+  const year = new Date().getFullYear().toString();
+  let passiveIncome = 0;
+  (data.dividends || []).filter(d => owner === 'all' || d.owner === owner).forEach(d => {
+    if (d.date && d.date.startsWith(year)) {
+      const rate = (data.fx || {})[d.ccy] || 1;
+      passiveIncome += (d.amount || 0) * rate;
+    }
+  });
+  let realizedProfit = 0;
+  (data.realized || []).filter(r => owner === 'all' || r.owner === owner).forEach(r => {
+    if (r.date && r.date.startsWith(year)) realizedProfit += (r.amount || 0);
+  });
+  const cashflow = passiveIncome + realizedProfit;
+  const cashflowTarget = (data.goals && data.goals['단기수익']) || 50000000;
+  const cashflowPct = cashflowTarget > 0 ? (cashflow / cashflowTarget) * 100 : 0;
+
+  // 장기 순자산 목표 — 가족 단위 목표이므로 항상 전체 기준
+  const netTarget = (data.goals && data.goals['장기순자산']) || 10000000000;
+  const totalAll = (state.ownerFilter === 'all') ? t.total : tAll.total;
+  const netPct = netTarget > 0 ? (totalAll / netTarget) * 100 : 0;
+
+  // 전일比 (history 기반, 전체)
+  let todayDelta = null;
+  const hist = data.history || [];
+  if (hist.length >= 2) {
+    const last = hist[hist.length - 1];
+    const prev = hist[hist.length - 2];
+    if (last.value && prev.value && prev.value > 0) {
+      todayDelta = (last.value - prev.value) / prev.value * 100;
+    }
+  }
+
+  return {
+    grossAssets, liabilities: tAll.liabilities, debtRatio,
+    cashflow, cashflowTarget, cashflowPct,
+    netTarget, netPct, totalAll,
+    todayDelta
+  };
+}
+
+/* ─── Holdings 요약 (메인 뷰 카드) ──────────────────────── */
+function renderHoldingsSummary(data, owner, t) {
+  // 그룹: 국내 / 해외 — owner별 합계
+  const holdings = (data.holdings || []).filter(h => owner === 'all' || h.owner === owner);
+  if (holdings.length === 0) return '<div class="state-empty"><div class="msg">보유 종목 없음</div></div>';
+
+  const fx = data.fx || { KRW: 1 };
+  const groups = { '국내': [], '해외': [] };
+  holdings.forEach(h => {
+    if (groups[h.mkt]) groups[h.mkt].push(h);
+  });
+
+  // 색상 팔레트 — 그룹 내 종목 색상
+  const palette = [
+    'var(--gain)', 'var(--accent)', 'var(--info)', 'var(--asset-re)',
+    '#F472B6', '#FB923C', '#A78BFA', '#34D399', '#22D3EE', '#FBBF24'
+  ];
+
+  let html = '';
+  Object.keys(groups).forEach(mkt => {
+    const items = groups[mkt];
+    if (items.length === 0) return;
+    // 종목별 평가액 계산 & 정렬
+    const enriched = items.map(h => ({
+      ...h,
+      eval: (h.qty || 0) * (h.cur || 0) * (fx[h.ccy] || 1)
+    })).sort((a, b) => b.eval - a.eval);
+
+    const groupTotal = enriched.reduce((s, h) => s + h.eval, 0);
+
+    // stacked bar segs (상위 7개 + 기타)
+    const top = enriched.slice(0, 7);
+    const rest = enriched.slice(7);
+    const restTotal = rest.reduce((s, h) => s + h.eval, 0);
+
+    const segs = top.map((h, i) => ({
+      name: h.name, val: h.eval, color: palette[i % palette.length],
+      pct: groupTotal > 0 ? (h.eval / groupTotal * 100) : 0
+    }));
+    if (restTotal > 0) {
+      segs.push({
+        name: '기타 (' + rest.length + ')',
+        val: restTotal, color: 'var(--text-quiet)',
+        pct: groupTotal > 0 ? (restTotal / groupTotal * 100) : 0
+      });
+    }
+
+    html += `
+      <div class="hold-group">
+        <div class="hold-group-head">
+          <span class="hold-group-name">${FamilyOS.escapeHtml(mkt)}주식 (${items.length})</span>
+          <span class="hold-group-val">${FamilyOS.fmtKRW(groupTotal)}</span>
+        </div>
+        <div class="stack-bar">
+          ${segs.map(s => `<div class="stack-seg" style="width: ${s.pct}%; background: ${s.color};" title="${FamilyOS.escapeHtml(s.name)} · ${s.pct.toFixed(1)}%"></div>`).join('')}
+        </div>
+        <div class="hold-list">
+          ${segs.slice(0, 5).map(s => `
+            <div class="hold-row">
+              <div class="l">
+                <span class="pct-dot" style="background: ${s.color};"></span>
+                <span class="name">${FamilyOS.escapeHtml(s.name)}</span>
+              </div>
+              <div class="r">${s.pct.toFixed(1)}% · ${FamilyOS.fmtKRW(s.val)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  return html || '<div class="state-empty"><div class="msg">보유 종목 없음</div></div>';
+}
+
+/* ─── 부동산 카드 ───────────────────────────────────────── */
+function renderRealestate(data, owner) {
+  const re = data.realestate;
+  if (!re || !re.recent || re.recent.length === 0) {
+    return '<div class="state-empty"><div class="msg">부동산 데이터 없음</div></div>';
+  }
+  // owner 필터: re는 1개 (잠실우성). owner 일치 안 하면 비활성 메시지
+  if (owner !== 'all' && re.owner !== owner) {
+    return `<div class="state-empty"><div class="msg">${FamilyOS.escapeHtml(ownerLabel(owner, data))} 소유 부동산 없음</div></div>`;
+  }
+
+  const avg = re.recent.reduce((s, r) => s + r.amount, 0) / re.recent.length;
+  const net = Math.max(0, avg - (re.jeonse || 0));
+
+  return `
+    <div class="re-name">${FamilyOS.escapeHtml(re.name)}</div>
+    <div class="re-spec">${FamilyOS.escapeHtml(re.spec)}</div>
+
+    <div class="re-avg-label">${re.recent.length}건 평균 실거래가</div>
+    <div class="re-avg-value">₩${formatFull(avg)}</div>
+
+    <div class="re-trans-list">
+      ${re.recent.slice(0, 5).map(r => `
+        <div class="re-trans">
+          <span>${FamilyOS.escapeHtml(r.date)} · ${FamilyOS.escapeHtml(r.floor || '-')}</span>
+          <span>${FamilyOS.fmtKRW(r.amount)}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline;">
+      <span style="font-size: 11px; color: var(--text-secondary);">전세금 차감 후 순자산</span>
+      <span style="font-family: var(--font-mono); font-weight: 500; font-size: 14px;">${FamilyOS.fmtKRW(net)}</span>
+    </div>
+
+    ${re.steps && re.steps.length > 0 ? `
+      <div style="margin-top: var(--s4);">
+        <div class="re-reconstr-label">재건축 단계</div>
+        <div class="re-steps">
+          ${re.steps.map((s, i) => `
+            <div class="re-step ${i < re.currentStep ? 'done' : i === re.currentStep ? 'current' : ''}">${FamilyOS.escapeHtml(s)}</div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+/* ─── 현금 카드 ─────────────────────────────────────────── */
+function renderCash(data, owner) {
+  const cash = (data.cash || []).filter(c => owner === 'all' || c.owner === owner);
+  if (cash.length === 0) {
+    return '<div class="state-empty"><div class="msg">현금 데이터 없음</div></div>';
+  }
+  // 정렬: 양수 먼저, 그 안에선 금액 큰 순. 부채는 맨 아래
+  const sorted = [...cash].sort((a, b) => {
+    if ((a.amount >= 0) !== (b.amount >= 0)) return a.amount >= 0 ? -1 : 1;
+    return Math.abs(b.amount) - Math.abs(a.amount);
+  });
+  const net = cash.reduce((s, c) => s + c.amount, 0);
+
+  return `
+    <div class="cash-list">
+      ${sorted.map(c => `
+        <div class="cash-row">
+          <div class="cash-l">
+            <span class="cash-type">${FamilyOS.escapeHtml(c.type)}</span>
+            <span class="cash-label">${FamilyOS.escapeHtml(c.label)}</span>
+          </div>
+          <div class="cash-r ${c.amount < 0 ? 'loss' : ''}">${formatCashAmount(c.amount)}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="cash-total">
+      <span class="lbl">Net</span>
+      <span class="val ${net < 0 ? 'loss' : ''}">${formatCashAmount(net)}</span>
+    </div>
+  `;
+}
+
+function formatCashAmount(n) {
+  if (n == null) return '—';
+  const sign = n < 0 ? '−' : '';
+  return sign + '₩' + Math.abs(n).toLocaleString('ko-KR');
+}
+
+function formatFull(n) {
+  if (n == null || isNaN(n)) return '0';
+  return Math.round(n).toLocaleString('ko-KR');
+}
+
+function ownerLabel(id, data) {
+  if (id === 'all') return '가족 전체';
+  const m = (data.family || []).find(f => f.id === id);
+  return m ? m.label : id;
+}
+
+/* ─── 도넛 차트 ────────────────────────────────────────── */
+function renderDonut(t) {
+  const ctx = document.getElementById('donut-chart');
+  if (!ctx) return;
+  if (donutChart) donutChart.destroy();
+
+  const css = getComputedStyle(document.documentElement);
+  const cGain = css.getPropertyValue('--gain').trim();
+  const cAccent = css.getPropertyValue('--accent').trim();
+  const cInfo = css.getPropertyValue('--info').trim();
+  const cAssetRe = css.getPropertyValue('--asset-re').trim() || '#818CF8';
+
+  // 비중 계산 (부채 제외 자산만)
+  const segments = [
+    { label: '국내주식', value: t.stockDomestic, color: cGain },
+    { label: '해외주식', value: t.stockForeign,  color: cInfo },
+    { label: '부동산',   value: t.re,            color: cAssetRe },
+    { label: '현금',     value: Math.max(0, t.cashNet), color: cAccent }
+  ].filter(s => s.value > 0);
+
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: segments.map(s => s.label),
+      datasets: [{
+        data: segments.map(s => s.value),
+        backgroundColor: segments.map(s => s.color),
+        borderWidth: 0,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      cutout: '72%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed;
+              const total = ctx.dataset.data.reduce((s, x) => s + x, 0);
+              const pct = total > 0 ? (v / total * 100).toFixed(1) : 0;
+              return ctx.label + ': ' + FamilyOS.fmtKRW(v) + ' (' + pct + '%)';
+            }
+          }
+        }
+      },
+      animation: { animateRotate: true, duration: 800 }
+    }
+  });
+
+  // Legend 채우기
+  const legendEl = document.getElementById('legend');
+  if (legendEl) {
+    const total = segments.reduce((s, x) => s + x.value, 0);
+    legendEl.innerHTML = segments.map(s => {
+      const pct = total > 0 ? (s.value / total * 100).toFixed(1) : '0.0';
+      return `
+        <div class="legend-row">
+          <div class="legend-l">
+            <span class="legend-dot" style="background: ${s.color};"></span>
+            <span>${s.label}</span>
+          </div>
+          <div class="legend-r">${pct}% · ${FamilyOS.fmtKRW(s.value)}</div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+/* ─── 기간 막대차트 ────────────────────────────────────── */
+function renderBars() {
+  const ctx = document.getElementById('bars-chart');
+  if (!ctx) return;
+  if (barsChart) barsChart.destroy();
+
+  const series = buildBarSeries(state.data, state.barPeriod);
+
+  const css = getComputedStyle(document.documentElement);
+  const cAccent = css.getPropertyValue('--accent').trim();
+  const cGain = css.getPropertyValue('--gain').trim();
+  const cLoss = css.getPropertyValue('--loss').trim();
+  const cText = css.getPropertyValue('--text-tertiary').trim();
+
+  // 색상: 증감에 따라 (전일比가 양수면 gain, 음수면 loss 톤다운)
+  const colors = series.deltas.map(d => {
+    if (d == null) return cAccent;
+    return d >= 0 ? cGain : cLoss;
+  });
+
+  barsChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: series.labels,
+      datasets: [{
+        label: '총자산',
+        data: series.values,
+        backgroundColor: colors,
+        borderRadius: 3,
+        barThickness: 'flex',
+        maxBarThickness: 32
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              const d = series.deltas[ctx.dataIndex];
+              const dStr = d == null ? '' : ' (' + (d >= 0 ? '+' : '') + d.toFixed(2) + '%)';
+              return FamilyOS.fmtKRW(v) + dStr;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: cText, font: { family: 'JetBrains Mono', size: 9 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: cText,
+            font: { family: 'JetBrains Mono', size: 9 },
+            callback: v => FamilyOS.fmtKRW(v)
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * 기간별 막대차트용 데이터 series.
+ * history는 일일 스냅샷 배열. 각 row: {date, value, stock, re, cash}
+ * period에 따라 적절히 집계/샘플링.
+ */
+function buildBarSeries(data, period) {
+  const hist = (data && data.history) || [];
+  if (hist.length === 0) {
+    return { labels: ['데이터 없음'], values: [0], deltas: [null] };
+  }
+  // 정렬 (안전)
+  const sorted = [...hist].sort((a, b) => a.date < b.date ? -1 : 1);
+
+  let points;
+  if (period === 'day') {
+    points = sorted.slice(-14);  // 최근 14일
+  } else if (period === 'week') {
+    points = takeNthFromEnd(sorted, 7, 10);  // 7일 간격 10개
+  } else if (period === 'month') {
+    points = takeNthFromEnd(sorted, 30, 12);  // 월 간격 12개
+  } else if (period === 'quarter') {
+    points = takeNthFromEnd(sorted, 90, 8);
+  } else {
+    points = takeNthFromEnd(sorted, 365, 5);
+  }
+
+  const labels = points.map(p => {
+    const d = p.date || '';
+    if (period === 'day' || period === 'week') return d.substring(5);
+    if (period === 'month' || period === 'quarter') return d.substring(0, 7);
+    return d.substring(0, 4);
+  });
+  const values = points.map(p => p.value);
+  const deltas = points.map((p, i) => {
+    if (i === 0) return null;
+    const prev = points[i - 1].value;
+    if (!prev || prev <= 0) return null;
+    return (p.value - prev) / prev * 100;
+  });
+
+  return { labels, values, deltas };
+}
+
+function takeNthFromEnd(arr, gapDays, maxCount) {
+  if (arr.length === 0) return [];
+  const out = [arr[arr.length - 1]];
+  let lastTaken = new Date(arr[arr.length - 1].date).getTime();
+  for (let i = arr.length - 2; i >= 0 && out.length < maxCount; i--) {
+    const t = new Date(arr[i].date).getTime();
+    if (lastTaken - t >= gapDays * 86400000 * 0.85) {  // 0.85 margin (정확히 N일 없을 수 있어서)
+      out.unshift(arr[i]);
+      lastTaken = t;
+    }
+  }
+  return out;
+}
+
+/* ─── 상세 뷰 (전체 보유종목 테이블) ──────────────────── */
+function renderDetailView() {
+  const mount = document.getElementById('detail-mount');
+  const data = state.data;
+  if (!data) {
+    mount.innerHTML = FamilyOS.renderLoadingStateHTML();
+    return;
+  }
+
+  const owner = state.ownerFilter;
+  const fx = data.fx || { KRW: 1 };
+  let holdings = (data.holdings || []).filter(h => owner === 'all' || h.owner === owner);
+
+  // 검색 필터
+  if (state.detailQuery) {
+    const q = state.detailQuery.toLowerCase();
+    holdings = holdings.filter(h =>
+      (h.name || '').toLowerCase().includes(q) ||
+      (h.code || '').toLowerCase().includes(q) ||
+      (h.ticker || '').toLowerCase().includes(q)
+    );
+  }
+
+  // enrichment + 정렬
+  const enriched = holdings.map(h => {
+    const rate = fx[h.ccy] || 1;
+    const eval_ = (h.qty || 0) * (h.cur || 0) * rate;
+    const cost = (h.qty || 0) * (h.avg || 0) * rate;
+    const pl = eval_ - cost;
+    const plPct = cost > 0 ? (pl / cost * 100) : 0;
+    return { ...h, eval: eval_, cost, pl, plPct };
+  });
+
+  const { key, dir } = state.detailSort;
+  enriched.sort((a, b) => {
+    const va = a[key], vb = b[key];
+    if (typeof va === 'string') {
+      return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    return dir === 'asc' ? (va - vb) : (vb - va);
+  });
+
+  // 합계
+  const sumEval = enriched.reduce((s, h) => s + h.eval, 0);
+  const sumCost = enriched.reduce((s, h) => s + h.cost, 0);
+  const sumPl = sumEval - sumCost;
+  const sumPlPct = sumCost > 0 ? (sumPl / sumCost * 100) : 0;
+
+  // 컬럼 정의
+  const cols = [
+    { key: 'name',    label: '종목',  sortable: true,  cls: 'name-col' },
+    { key: 'mkt',     label: '시장',  sortable: true,  cls: '' },
+    { key: 'qty',     label: '수량',  sortable: true,  cls: 'num' },
+    { key: 'avg',     label: '평균단가', sortable: true, cls: 'num' },
+    { key: 'cur',     label: '현재가', sortable: true, cls: 'num' },
+    { key: 'eval',    label: '평가액 (₩)', sortable: true, cls: 'num' },
+    { key: 'pl',      label: '평가손익', sortable: true, cls: 'num' },
+    { key: 'plPct',   label: '%',     sortable: true, cls: 'num' }
+  ];
+
+  mount.innerHTML = `
+    <div class="card" style="margin-bottom: var(--s4); padding: var(--s4) var(--s5);">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: var(--s3);">
+        <div>
+          <div class="card-eyebrow">${FamilyOS.escapeHtml(ownerLabel(owner, data))} · ${enriched.length}종목</div>
+          <div class="card-title">All Holdings</div>
+        </div>
+        <div style="display: flex; gap: var(--s5); align-items: baseline; font-family: var(--font-mono); font-size: 12px;">
+          <div><span style="color: var(--text-quiet); font-size: 10px;">평가</span> ${FamilyOS.fmtKRW(sumEval)}</div>
+          <div class="${sumPl >= 0 ? 'gain' : 'loss'}">${sumPl >= 0 ? '+' : ''}${FamilyOS.fmtKRW(sumPl)} (${sumPlPct.toFixed(2)}%)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-controls">
+      <input class="detail-search" id="detail-search" placeholder="종목명, 코드, 티커로 검색…" value="${FamilyOS.escapeHtml(state.detailQuery)}">
+    </div>
+
+    <div class="detail-table-wrap">
+      <table class="detail-table">
+        <thead>
+          <tr>
+            ${cols.map(c => `
+              <th class="${c.sortable ? 'sortable' : ''} ${state.detailSort.key === c.key ? 'sorted' : ''} ${c.cls.includes('num') ? 'num' : ''}" data-key="${c.key}">
+                ${FamilyOS.escapeHtml(c.label)}${c.sortable ? `<span class="sort-ind">${state.detailSort.key === c.key ? (state.detailSort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>` : ''}
+              </th>
+            `).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${enriched.map(h => `
+            <tr>
+              <td class="name-col">${FamilyOS.escapeHtml(h.name)}</td>
+              <td>${FamilyOS.escapeHtml(h.mkt)}</td>
+              <td class="num">${(h.qty || 0).toLocaleString()}</td>
+              <td class="num">${formatPrice(h.avg, h.ccy)}</td>
+              <td class="num">${formatPrice(h.cur, h.ccy)}</td>
+              <td class="num">${FamilyOS.fmtKRW(h.eval)}</td>
+              <td class="num ${h.pl >= 0 ? 'pl-pos' : 'pl-neg'}">${h.pl >= 0 ? '+' : ''}${FamilyOS.fmtKRW(h.pl)}</td>
+              <td class="num ${h.plPct >= 0 ? 'pl-pos' : 'pl-neg'}">${h.plPct >= 0 ? '+' : ''}${h.plPct.toFixed(2)}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // 검색 이벤트
+  const searchEl = document.getElementById('detail-search');
+  searchEl?.addEventListener('input', (e) => {
+    state.detailQuery = e.target.value;
+    renderDetailView();
+    // input focus 복원
+    const newEl = document.getElementById('detail-search');
+    if (newEl) {
+      newEl.focus();
+      newEl.setSelectionRange(state.detailQuery.length, state.detailQuery.length);
+    }
+  });
+
+  // 정렬 클릭
+  mount.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.key;
+      if (state.detailSort.key === k) {
+        state.detailSort.dir = state.detailSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.detailSort.key = k;
+        state.detailSort.dir = 'desc';
+      }
+      renderDetailView();
+    });
+  });
+}
+
+function formatPrice(p, ccy) {
+  if (p == null) return '—';
+  if (ccy === 'KRW' || ccy === 'VND') return Math.round(p).toLocaleString('ko-KR');
+  return p.toFixed(2);
+}
+
+/* ─── 부팅 ────────────────────────────────────────────────── */
+refresh();
+FamilyOS.registerServiceWorker();
+</script>
+</body>
+</html>

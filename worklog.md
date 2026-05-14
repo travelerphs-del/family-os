@@ -79,3 +79,96 @@
 - 외부 폰트 (Google Fonts, Pretendard CDN): 무료, 캐시되면 로딩 빠름
 
 - [완료] Phase 1 작업 종료
+
+---
+
+## Session 1.5 — 구조 통일 (Phase 1 추가 작업)
+
+**날짜**: 2026-05-14 (동일 세션 연장)
+**범위**: 4개 서브 대시보드가 공유할 코드 골격 표준화
+
+### 배경
+
+사용자가 "기능은 그대로 두되 구조는 통일하고 싶다"고 요청.
+시트 스키마는 건드리지 않고, Apps Script + HTML/JS 레이어에서만 통일.
+
+### 추가 산출물
+
+8. ✅ `common.js` (16KB) — 4개 대시보드 + 메인이 공유하는 공통 모듈 (window.FamilyOS)
+9. ✅ `dashboard-template.html` (14KB) — 서브 대시보드 시작점 HTML
+10. ✅ `apps-script-template.gs` (9KB) — 서브 대시보드 백엔드 시작점
+
+### 추가 변경
+
+- ✅ `index.html` 리팩토링 — common.js 사용. 코드 중복 제거. 동작 동일.
+
+### common.js 공개 API (총 26개)
+
+**상수**: `DASHBOARDS`, `STORAGE_PREFIX`, `getDashboardMeta(id)`
+**포맷터**: `fmtKRW`, `fmtKRWFull`, `fmtPct`, `fmtPctNoSign`, `deltaClass`, `timeAgo`, `escapeHtml`
+**URL 관리**: `getWebAppUrl(id)`, `setWebAppUrl(id, url)`, `getAllWebAppUrls()`
+**Fetch**: `fetchDashboardData(id, mode)` — 타임아웃 15s, 스키마 검증, 에러 표준화
+**UI 렌더링**: `renderHeaderHTML`, `renderFooterHTML`, `renderSettingsModalHTML`, `attachSettingsModal`, `renderUnsetStateHTML`, `renderLoadingStateHTML`, `renderErrorStateHTML`
+**헤더 sync**: `setLastSync`, `setSyncedNow`
+**PWA**: `registerServiceWorker`
+
+### 통일된 범위 / 안 된 범위
+
+| 통일됨 ✅ | 통일 안 됨 (각자 자유) |
+|---|---|
+| HTML 골격 (헤더/푸터/모달 위치) | 시트 스키마 |
+| 응답 envelope (`{ok, data:{...}}`) | KPI 내부 산출 로직 |
+| 유틸 함수 시그니처 | 외부 API 호출 방식 |
+| LocalStorage 키 컨벤션 | 캐시 전략 |
+| 빈 상태 UI (unset/loading/error) | 대시보드 본문 콘텐츠 |
+| Apps Script 헬퍼 (`readSheetAsObjects` 등) | 시트 권한 / 트리거 |
+
+### 검증 결과
+
+- ✅ common.js 문법 (node --check)
+- ✅ index.html 내부 JS 문법
+- ✅ dashboard-template.html 내부 JS 문법
+- ✅ apps-script-template.gs 문법
+- ✅ manifest.json 유효성
+- ✅ common.js export 26개와 호출처 매칭 (index.html / template.html 모두)
+
+### 최종 산출물 목록 (10개)
+
+```
+family-os/
+├── index.html              ← 메인 허브 (브라우저로 여는 페이지)
+├── design-tokens.css       ← 공통 CSS 변수
+├── common.js               ← 공통 JS 모듈 (window.FamilyOS)
+├── manifest.json           ← PWA 매니페스트
+├── icon.svg                ← PWA 아이콘
+├── dashboard-template.html ← 서브 대시보드 시작점 (다음 세션 시작 시 복사)
+├── apps-script-template.gs ← 백엔드 시작점 (다음 세션 시작 시 복사)
+├── design-system.md        ← 디자인 가이드 (다음 세션에 첨부)
+├── backend-spec.md         ← 백엔드 규격 (다음 세션에 첨부)
+└── worklog.md              ← 이 파일 (누적 기록, 다음 세션에 첨부)
+```
+
+### 다음 세션 시작 매뉴얼
+
+새 채팅 세션 시작 시 사용자가 첨부할 파일:
+1. **재개발할 기존 대시보드 HTML** (예: Family_Wealth_Dashboard.html)
+2. **연결된 Apps Script 코드** (예: 첨부받은 apps_script_gs.txt)
+3. **`worklog.md`** (이 파일. 누적 기록)
+4. **`design-system.md`**
+5. **`backend-spec.md`**
+6. **`common.js`**
+7. **`dashboard-template.html`**
+8. **`apps-script-template.gs`**
+
+위 8개를 첨부하면 다음 세션 Claude는 즉시 작업 가능.
+
+### 다음 세션 추천 순서
+
+1. **Wealth 재개발** (가장 자산 많음, Apps Script `?mode=summary` 추가)
+2. **Expense 재개발**
+3. **Health 재개발**
+4. **Future 재개발**
+
+각 세션 종료 시 worklog에 누적 기록.
+
+- [완료] Session 1.5 종료

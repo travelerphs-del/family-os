@@ -19,27 +19,21 @@
   <link rel="stylesheet" href="./design-tokens.css">
 
   <style>
-    /* ─── 페이지 전용 레이아웃 ─────────────────────────────────── */
     body {
       padding-top: var(--safe-top);
       padding-bottom: var(--safe-bottom);
       overflow-x: hidden;
     }
-
     .app {
       max-width: 1200px;
       margin: 0 auto;
       padding: 0 var(--s6);
     }
-    @media (max-width: 767px) {
-      .app { padding: 0 var(--s4); }
-    }
+    @media (max-width: 767px) { .app { padding: 0 var(--s4); } }
 
-    /* ─── 헤더 ─────────────────────────────────────────────────── */
+    /* ─── 헤더 (common.js 출력과 짝) ─────────────────────────── */
     header.hdr {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: var(--s6) 0;
       border-bottom: 1px solid var(--border);
       margin-bottom: var(--s7);
@@ -47,49 +41,30 @@
     @media (max-width: 767px) {
       header.hdr { padding: var(--s4) 0; margin-bottom: var(--s5); }
     }
-
-    .brand {
-      display: flex;
-      align-items: baseline;
-      gap: var(--s3);
-    }
+    .brand { display: flex; align-items: baseline; gap: var(--s3); }
     .brand-title {
-      font-family: var(--font-display);
-      font-weight: 500;
-      font-size: 24px;
-      letter-spacing: -0.01em;
-      color: var(--text-primary);
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 24px; letter-spacing: -0.01em; color: var(--text-primary);
     }
     .brand-sub {
-      font-size: 12px;
-      color: var(--text-quiet);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
+      font-size: 12px; color: var(--text-quiet);
+      letter-spacing: 0.05em; text-transform: uppercase;
     }
     @media (max-width: 480px) {
       .brand-title { font-size: 20px; }
       .brand-sub { display: none; }
     }
-
     .hdr-actions { display: flex; gap: var(--s2); align-items: center; }
-
     .icon-btn {
       width: 40px; height: 40px;
       display: flex; align-items: center; justify-content: center;
-      border-radius: var(--r-md);
-      color: var(--text-tertiary);
-      transition: all var(--t-fast);
+      border-radius: var(--r-md); color: var(--text-tertiary);
+      transition: all var(--t-fast); cursor: pointer;
     }
-    .icon-btn:hover {
-      background: var(--elevated);
-      color: var(--text-primary);
-    }
+    .icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
     .icon-btn svg { display: block; }
-
     .last-sync {
-      font-size: 11px;
-      color: var(--text-quiet);
-      font-family: var(--font-mono);
+      font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
       padding-right: var(--s2);
     }
     @media (max-width: 480px) { .last-sync { display: none; } }
@@ -119,12 +94,10 @@
     .card:nth-child(2) { animation-delay: 0.10s; }
     .card:nth-child(3) { animation-delay: 0.15s; }
     .card:nth-child(4) { animation-delay: 0.20s; }
-
     @keyframes cardIn {
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-
     .card::before {
       content: '';
       position: absolute;
@@ -133,359 +106,211 @@
       background: var(--card-accent);
       opacity: 0.85;
     }
-
     .card[data-id="wealth"]  { --card-accent: var(--acc-wealth); }
     .card[data-id="expense"] { --card-accent: var(--acc-expense); }
     .card[data-id="health"]  { --card-accent: var(--acc-health); }
     .card[data-id="future"]  { --card-accent: var(--acc-future); }
-
     .card-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       margin-bottom: var(--s5);
     }
-    .card-label {
-      display: flex;
-      align-items: center;
-      gap: var(--s2);
-    }
+    .card-label { display: flex; align-items: center; gap: var(--s2); }
     .card-dot {
       width: 6px; height: 6px; border-radius: var(--r-full);
       background: var(--card-accent);
     }
     .card-title {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--text-secondary);
     }
-    .card-kr {
-      font-size: 10px;
-      color: var(--text-quiet);
-      letter-spacing: 0.04em;
-    }
+    .card-kr { font-size: 10px; color: var(--text-quiet); letter-spacing: 0.04em; }
     .card-open {
-      color: var(--text-quiet);
-      transition: color var(--t-fast);
-      padding: var(--s1);
-      margin: calc(-1 * var(--s1));
+      color: var(--text-quiet); transition: color var(--t-fast);
+      padding: var(--s1); margin: calc(-1 * var(--s1));
       border-radius: var(--r-sm);
     }
     .card-open:hover { color: var(--card-accent); }
 
     /* ─── 카드 본문 공통 ─────────────────────────────────────── */
     .hero-num {
-      display: flex;
-      align-items: baseline;
-      gap: var(--s3);
-      flex-wrap: wrap;
-      margin-bottom: var(--s3);
+      display: flex; align-items: baseline; gap: var(--s3);
+      flex-wrap: wrap; margin-bottom: var(--s3);
     }
     .hero-num-value {
-      font-family: var(--font-display);
-      font-weight: 500;
-      font-size: 36px;
-      letter-spacing: -0.02em;
-      color: var(--text-primary);
-      font-variant-numeric: tabular-nums;
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 36px; letter-spacing: -0.02em;
+      color: var(--text-primary); font-variant-numeric: tabular-nums;
       line-height: 1.1;
     }
     @media (max-width: 480px) { .hero-num-value { font-size: 28px; } }
     .hero-num-unit {
-      font-size: 13px;
-      color: var(--text-tertiary);
-      font-family: var(--font-body);
-      font-weight: 500;
+      font-size: 13px; color: var(--text-tertiary);
+      font-family: var(--font-body); font-weight: 500;
     }
     .hero-num-delta {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 500;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 500;
     }
-
-    .gain { color: var(--gain); }
-    .loss { color: var(--loss); }
-    .neutral-c { color: var(--neutral); }
+    .gain  { color: var(--gain); }
+    .loss  { color: var(--loss); }
     .muted { color: var(--text-quiet); }
-
     .card-meta {
-      font-size: 11px;
-      color: var(--text-quiet);
-      margin-top: var(--s4);
-      padding-top: var(--s3);
+      font-size: 11px; color: var(--text-quiet);
+      margin-top: var(--s4); padding-top: var(--s3);
       border-top: 1px dashed var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    .card-meta .time {
-      font-family: var(--font-mono);
-    }
+    .card-meta .time { font-family: var(--font-mono); }
 
-    /* ─── Wealth 카드 펼치기 (details) ──────────────────────── */
-    details.wealth-expand {
-      margin-top: var(--s3);
-    }
+    /* ─── Wealth 카드 펼치기 ──────────────────────────────────── */
+    details.wealth-expand { margin-top: var(--s3); }
     details.wealth-expand summary {
-      list-style: none;
-      cursor: pointer;
-      font-size: 11px;
-      color: var(--text-tertiary);
-      display: inline-flex;
-      align-items: center;
-      gap: var(--s1);
-      padding: var(--s1) 0;
-      user-select: none;
+      list-style: none; cursor: pointer;
+      font-size: 11px; color: var(--text-tertiary);
+      display: inline-flex; align-items: center; gap: var(--s1);
+      padding: var(--s1) 0; user-select: none;
     }
     details.wealth-expand summary::-webkit-details-marker { display: none; }
     details.wealth-expand summary:hover { color: var(--text-primary); }
-    details.wealth-expand summary .chev {
-      transition: transform var(--t-fast);
-    }
-    details.wealth-expand[open] summary .chev {
-      transform: rotate(180deg);
-    }
-
+    details.wealth-expand summary .chev { transition: transform var(--t-fast); }
+    details.wealth-expand[open] summary .chev { transform: rotate(180deg); }
     .breakdown-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: var(--s3);
-      margin-top: var(--s3);
-      padding-top: var(--s3);
+      display: grid; grid-template-columns: 1fr; gap: var(--s3);
+      margin-top: var(--s3); padding-top: var(--s3);
       border-top: 1px solid var(--border);
     }
     .bd-row {
-      display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: var(--s3);
-      font-size: 12px;
+      display: grid; grid-template-columns: 90px 1fr;
+      gap: var(--s3); font-size: 12px;
     }
-    .bd-name {
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
+    .bd-name { color: var(--text-secondary); font-weight: 500; }
     .bd-stats {
-      display: flex;
-      gap: var(--s3);
-      align-items: baseline;
-      flex-wrap: wrap;
-      font-family: var(--font-mono);
-      font-size: 11px;
+      display: flex; gap: var(--s3); align-items: baseline;
+      flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px;
     }
-    .bd-weight {
-      color: var(--text-primary);
-      font-weight: 600;
-    }
-    .bd-delta {
-      font-size: 10px;
-    }
-    .bd-label {
-      color: var(--text-quiet);
-      font-size: 10px;
-    }
+    .bd-weight { color: var(--text-primary); font-weight: 600; }
+    .bd-delta { font-size: 10px; }
 
-    /* ─── Expense 카드 ─────────────────────────────────────── */
+    /* ─── Expense 카드 ───────────────────────────────────────── */
     .cat-chips {
-      display: flex;
-      gap: var(--s2);
-      flex-wrap: wrap;
-      margin-top: var(--s4);
+      display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s4);
     }
     .cat-chip {
-      background: var(--elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--r-full);
-      padding: 4px 10px;
-      font-size: 11px;
-      color: var(--text-secondary);
-      display: inline-flex;
-      align-items: baseline;
-      gap: 6px;
+      background: var(--elevated); border: 1px solid var(--border);
+      border-radius: var(--r-full); padding: 4px 10px;
+      font-size: 11px; color: var(--text-secondary);
+      display: inline-flex; align-items: baseline; gap: 6px;
     }
     .cat-chip .pct {
       font-family: var(--font-mono);
-      color: var(--text-tertiary);
-      font-size: 10px;
+      color: var(--text-tertiary); font-size: 10px;
     }
 
-    /* ─── Health 카드 ─────────────────────────────────────── */
+    /* ─── Health 카드 ────────────────────────────────────────── */
     .health-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--s3);
-      margin-top: var(--s2);
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: var(--s3); margin-top: var(--s2);
     }
-    @media (max-width: 480px) {
-      .health-list { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 480px) { .health-list { grid-template-columns: 1fr; } }
     .health-row {
-      display: flex;
-      align-items: center;
-      gap: var(--s3);
-      padding: var(--s2) 0;
+      display: flex; align-items: center; gap: var(--s3); padding: var(--s2) 0;
     }
-    .dot {
-      width: 8px; height: 8px; border-radius: var(--r-full);
-      flex-shrink: 0;
-    }
+    .dot { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; }
     .dot-ok   { background: var(--gain); }
     .dot-warn { background: var(--neutral); box-shadow: 0 0 0 4px var(--gain-soft); }
     .dot-bad  { background: var(--loss); box-shadow: 0 0 0 4px var(--loss-soft); }
     .dot-unknown { background: var(--text-quiet); }
-    .health-name {
-      font-size: 13px;
-      color: var(--text-primary);
-      font-weight: 500;
-    }
+    .health-name { font-size: 13px; color: var(--text-primary); font-weight: 500; }
     .health-status {
-      font-size: 10px;
-      color: var(--text-tertiary);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-left: auto;
+      font-size: 10px; color: var(--text-tertiary);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-left: auto;
     }
 
-    /* ─── Future 카드 (progress bar) ─────────────────────── */
+    /* ─── Future 카드 (progress bar) ─────────────────────────── */
     .progress-track {
-      width: 100%;
-      height: 6px;
-      background: var(--elevated);
-      border-radius: var(--r-full);
-      overflow: hidden;
-      margin-top: var(--s4);
+      width: 100%; height: 6px;
+      background: var(--elevated); border-radius: var(--r-full);
+      overflow: hidden; margin-top: var(--s4);
     }
     .progress-fill {
-      height: 100%;
-      background: var(--card-accent);
-      border-radius: var(--r-full);
-      transition: width var(--t-slow);
+      height: 100%; background: var(--card-accent);
+      border-radius: var(--r-full); transition: width var(--t-slow);
     }
     .progress-label {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 11px;
-      color: var(--text-tertiary);
-      margin-top: var(--s2);
-      font-family: var(--font-mono);
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: 11px; color: var(--text-tertiary);
+      margin-top: var(--s2); font-family: var(--font-mono);
     }
     .milestone {
-      margin-top: var(--s3);
-      padding-top: var(--s3);
-      border-top: 1px solid var(--border);
-      font-size: 12px;
+      margin-top: var(--s3); padding-top: var(--s3);
+      border-top: 1px solid var(--border); font-size: 12px;
     }
     .milestone-label {
-      color: var(--text-quiet);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      color: var(--text-quiet); font-size: 10px;
+      text-transform: uppercase; letter-spacing: 0.06em;
       margin-bottom: 2px;
     }
-    .milestone-text {
-      color: var(--text-primary);
-      font-weight: 500;
-    }
+    .milestone-text { color: var(--text-primary); font-weight: 500; }
     .milestone-date {
-      color: var(--text-tertiary);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      margin-left: var(--s2);
+      color: var(--text-tertiary); font-family: var(--font-mono);
+      font-size: 11px; margin-left: var(--s2);
     }
 
-    /* ─── 빈 상태 (unset/loading/error) ───────────────────── */
+    /* ─── 빈 상태 (common.js 출력과 짝) ──────────────────────── */
     .state-empty {
       padding: var(--s4) 0;
-      color: var(--text-quiet);
-      font-size: 13px;
-      display: flex;
-      flex-direction: column;
-      gap: var(--s2);
+      color: var(--text-quiet); font-size: 13px;
+      display: flex; flex-direction: column; gap: var(--s2);
       align-items: flex-start;
     }
     .state-empty .ico {
       width: 32px; height: 32px;
-      border-radius: var(--r-md);
-      background: var(--elevated);
+      border-radius: var(--r-md); background: var(--elevated);
       display: flex; align-items: center; justify-content: center;
-      margin-bottom: var(--s2);
-      color: var(--text-tertiary);
+      margin-bottom: var(--s2); color: var(--text-tertiary);
     }
-    .state-empty .msg {
-      color: var(--text-tertiary);
-      font-size: 12px;
-    }
+    .state-empty .msg { color: var(--text-tertiary); font-size: 12px; }
     .state-empty button {
-      font-size: 12px;
-      color: var(--card-accent);
-      padding: 6px 10px;
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      background: transparent;
-      margin-top: var(--s2);
-      transition: all var(--t-fast);
+      font-size: 12px; color: var(--card-accent);
+      padding: 6px 10px; border: 1px solid var(--border);
+      border-radius: var(--r-sm); background: transparent;
+      margin-top: var(--s2); transition: all var(--t-fast); cursor: pointer;
     }
     .state-empty button:hover {
-      border-color: var(--card-accent);
-      background: var(--elevated);
+      border-color: var(--card-accent); background: var(--elevated);
     }
-
     .spinner {
       width: 18px; height: 18px;
       border: 2px solid var(--elevated-2);
       border-top-color: var(--card-accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ─── Tasks 섹션 ─────────────────────────────────────── */
-    .tasks-section {
-      margin-bottom: var(--s8);
-    }
+    /* ─── Tasks 섹션 ─────────────────────────────────────────── */
+    .tasks-section { margin-bottom: var(--s8); }
     .tasks-head {
-      display: flex;
-      align-items: baseline;
-      gap: var(--s3);
+      display: flex; align-items: baseline; gap: var(--s3);
       margin-bottom: var(--s4);
     }
     .tasks-head h2 {
-      font-family: var(--font-display);
-      font-weight: 500;
-      font-size: 18px;
-      color: var(--text-primary);
-      letter-spacing: -0.01em;
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 18px; color: var(--text-primary); letter-spacing: -0.01em;
     }
-    .tasks-head .count {
-      font-size: 12px;
-      color: var(--text-quiet);
-      font-family: var(--font-mono);
-    }
+    .tasks-head .count { font-size: 12px; color: var(--text-quiet); font-family: var(--font-mono); }
     .tasks-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-      background: var(--border);
-      border-radius: var(--r-md);
-      overflow: hidden;
-      border: 1px solid var(--border);
+      list-style: none; display: flex; flex-direction: column; gap: 1px;
+      background: var(--border); border-radius: var(--r-md);
+      overflow: hidden; border: 1px solid var(--border);
     }
     .task-item {
       background: var(--surface);
       padding: var(--s4) var(--s5);
-      display: flex;
-      align-items: center;
-      gap: var(--s4);
-      cursor: pointer;
-      transition: background var(--t-fast);
+      display: flex; align-items: center; gap: var(--s4);
+      cursor: pointer; transition: background var(--t-fast);
     }
     .task-item:hover { background: var(--elevated); }
-    .task-urgency {
-      width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0;
-    }
+    .task-urgency { width: 8px; height: 8px; border-radius: var(--r-full); flex-shrink: 0; }
     .u-info { background: var(--info); }
     .u-warn { background: var(--neutral); }
     .u-bad  { background: var(--loss); animation: pulse 1.6s ease-in-out infinite; }
@@ -495,144 +320,91 @@
     }
     .task-text { flex: 1; font-size: 13px; color: var(--text-primary); }
     .task-tag {
-      font-size: 10px;
-      color: var(--text-quiet);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 2px 8px;
-      border: 1px solid var(--border);
+      font-size: 10px; color: var(--text-quiet);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 2px 8px; border: 1px solid var(--border);
       border-radius: var(--r-full);
     }
     .task-due {
-      font-size: 11px;
-      color: var(--text-tertiary);
-      font-family: var(--font-mono);
+      font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);
     }
     .task-empty {
-      background: var(--surface);
-      padding: var(--s6);
-      text-align: center;
-      color: var(--text-quiet);
-      font-size: 13px;
-      border: 1px dashed var(--border);
-      border-radius: var(--r-md);
+      background: var(--surface); padding: var(--s6);
+      text-align: center; color: var(--text-quiet); font-size: 13px;
+      border: 1px dashed var(--border); border-radius: var(--r-md);
     }
 
-    /* ─── 설정 모달 ──────────────────────────────────────── */
+    /* ─── 설정 모달 (common.js 출력과 짝) ────────────────────── */
     .modal-backdrop {
       position: fixed; inset: 0;
       background: rgba(10, 11, 15, 0.7);
       backdrop-filter: blur(8px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      padding: var(--s4);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: var(--s4);
     }
     .modal-backdrop.open { display: flex; }
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border-hi);
-      border-radius: var(--r-lg);
-      padding: var(--s6);
-      width: 100%;
-      max-width: 480px;
-      max-height: 90vh;
-      overflow-y: auto;
+      background: var(--surface); border: 1px solid var(--border-hi);
+      border-radius: var(--r-lg); padding: var(--s6);
+      width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
       animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
     }
     @keyframes modalIn {
       from { opacity: 0; transform: scale(0.96) translateY(8px); }
-      to { opacity: 1; transform: scale(1) translateY(0); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
     }
     .modal-title {
-      font-family: var(--font-display);
-      font-size: 20px;
-      font-weight: 500;
+      font-family: var(--font-display); font-size: 20px; font-weight: 500;
       margin-bottom: var(--s2);
     }
     .modal-desc {
-      font-size: 12px;
-      color: var(--text-tertiary);
-      line-height: 1.6;
+      font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
       margin-bottom: var(--s5);
     }
-    .modal-field {
-      margin-bottom: var(--s4);
-    }
+    .modal-field { margin-bottom: var(--s4); }
     .modal-label {
-      display: flex;
-      align-items: center;
-      gap: var(--s2);
-      font-size: 11px;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      display: flex; align-items: center; gap: var(--s2);
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em;
       margin-bottom: var(--s2);
     }
     .modal-input {
-      width: 100%;
-      background: var(--canvas);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 10px 12px;
-      font-size: 12px;
-      color: var(--text-primary);
-      font-family: var(--font-mono);
-      transition: border-color var(--t-fast);
+      width: 100%; background: var(--canvas);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; font-size: 12px; color: var(--text-primary);
+      font-family: var(--font-mono); transition: border-color var(--t-fast);
     }
     .modal-input:focus { border-color: var(--accent); }
     .modal-input::placeholder { color: var(--text-quiet); }
     .modal-actions {
-      display: flex;
-      gap: var(--s2);
-      justify-content: flex-end;
-      margin-top: var(--s5);
+      display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
     }
     .btn {
-      padding: 10px 18px;
-      border-radius: var(--r-sm);
-      font-size: 13px;
-      font-weight: 500;
-      transition: all var(--t-fast);
-      border: 1px solid transparent;
+      padding: 10px 18px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+      transition: all var(--t-fast); border: 1px solid transparent; cursor: pointer;
     }
-    .btn-primary {
-      background: var(--accent);
-      color: var(--canvas);
-    }
+    .btn-primary { background: var(--accent); color: var(--canvas); }
     .btn-primary:hover { background: #F5D175; }
     .btn-ghost {
-      background: transparent;
-      color: var(--text-secondary);
+      background: transparent; color: var(--text-secondary);
       border-color: var(--border);
     }
-    .btn-ghost:hover {
-      border-color: var(--border-hi);
-      color: var(--text-primary);
-    }
+    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
 
-    /* ─── 푸터 ────────────────────────────────────────────── */
+    /* ─── 푸터 ──────────────────────────────────────────────── */
     footer.ftr {
       padding: var(--s5) 0 var(--s8);
       border-top: 1px solid var(--border);
-      font-size: 11px;
-      color: var(--text-quiet);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: var(--s2);
+      font-size: 11px; color: var(--text-quiet);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: var(--s2);
     }
-    footer.ftr .ftr-r {
-      font-family: var(--font-mono);
-    }
+    footer.ftr .ftr-r { font-family: var(--font-mono); }
 
-    /* 카드 클릭 영역 - 전체 카드를 링크처럼 */
+    /* 카드 전체 클릭 영역 */
     .card a.card-link-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
+      position: absolute; inset: 0; z-index: 1;
     }
     .card .card-interactive { position: relative; z-index: 2; }
     .card:hover { border-color: var(--border-hi); }
@@ -643,31 +415,10 @@
 <body>
   <div class="app">
 
-    <!-- ─── 헤더 ───────────────────────────────────────────── -->
-    <header class="hdr">
-      <div class="brand">
-        <span class="brand-title serif">Family OS</span>
-        <span class="brand-sub">통합 대시보드</span>
-      </div>
-      <div class="hdr-actions">
-        <span class="last-sync" id="last-sync">—</span>
-        <button class="icon-btn" id="btn-refresh" title="새로고침" aria-label="새로고침">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-        </button>
-        <button class="icon-btn" id="btn-settings" title="설정" aria-label="설정">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-      </div>
-    </header>
+    <!-- 헤더 (common.js 마운트) -->
+    <div id="hdr-mount"></div>
 
-    <!-- ─── 4개 KPI 카드 ──────────────────────────────────── -->
+    <!-- 메인 -->
     <main>
       <section class="cards" id="cards">
         <article class="card" data-id="wealth" id="card-wealth"></article>
@@ -676,7 +427,6 @@
         <article class="card" data-id="future" id="card-future"></article>
       </section>
 
-      <!-- ─── Tasks ───────────────────────────────────────── -->
       <section class="tasks-section">
         <div class="tasks-head">
           <h2>할 일</h2>
@@ -689,188 +439,82 @@
       </section>
     </main>
 
-    <!-- ─── 푸터 ──────────────────────────────────────────── -->
-    <footer class="ftr">
-      <span>Family OS · Phase 1 · Hub</span>
-      <span class="ftr-r" id="ftr-version">v0.1.0</span>
-    </footer>
+    <!-- 푸터 (common.js 마운트) -->
+    <div id="ftr-mount"></div>
   </div>
 
-  <!-- ─── 설정 모달 ───────────────────────────────────────── -->
-  <div class="modal-backdrop" id="modal-backdrop">
-    <div class="modal">
-      <div class="modal-title serif">Web App URL 설정</div>
-      <div class="modal-desc">
-        각 대시보드의 Apps Script Web App URL을 입력하세요.
-        이 정보는 이 기기 브라우저에만 저장됩니다 (LocalStorage).
-        기기마다 한 번씩 입력해야 합니다.
-      </div>
+  <!-- 모달 (common.js 마운트) -->
+  <div id="modal-mount"></div>
 
-      <div class="modal-field">
-        <label class="modal-label">
-          <span class="dot" style="background: var(--acc-wealth);"></span>
-          Wealth (자산)
-        </label>
-        <input class="modal-input" type="url" id="url-wealth"
-               placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">
-          <span class="dot" style="background: var(--acc-expense);"></span>
-          Expense (지출)
-        </label>
-        <input class="modal-input" type="url" id="url-expense"
-               placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">
-          <span class="dot" style="background: var(--acc-health);"></span>
-          Health (건강)
-        </label>
-        <input class="modal-input" type="url" id="url-health"
-               placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
-      </div>
-      <div class="modal-field">
-        <label class="modal-label">
-          <span class="dot" style="background: var(--acc-future);"></span>
-          Future (미래)
-        </label>
-        <input class="modal-input" type="url" id="url-future"
-               placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="btn-modal-close">취소</button>
-        <button class="btn btn-primary" id="btn-modal-save">저장 후 새로고침</button>
-      </div>
-    </div>
-  </div>
+  <!-- 공통 모듈 -->
+  <script src="./common.js"></script>
 
   <script>
   /* ════════════════════════════════════════════════════════
-   * Family OS — Main Hub Logic
+   * Family OS — 메인 허브 페이지 로직
+   * 메인은 4개 카드를 동시에 관리 (서브 대시보드는 자기 1개만)
    * ════════════════════════════════════════════════════════ */
 
-  /* ─── 메타데이터 ─────────────────────────────────────── */
-  const DASHBOARDS = [
-    { id: 'wealth',  label: 'Wealth',  kr: '자산', href: './wealth.html'  },
-    { id: 'expense', label: 'Expense', kr: '지출', href: './expense.html' },
-    { id: 'health',  label: 'Health',  kr: '건강', href: './health.html'  },
-    { id: 'future',  label: 'Future',  kr: '미래', href: './future.html'  }
-  ];
-  const STORAGE_PREFIX = 'familyOS.webAppUrl.';
+  const { DASHBOARDS, fmtKRWFull, fmtPct, fmtPctNoSign, deltaClass, timeAgo, escapeHtml } = FamilyOS;
 
-  /* ─── 상태 ───────────────────────────────────────────── */
+  /* ─── 헤더/푸터/모달 마운트 ───────────────────────────── */
+  document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+    title: 'Family OS',
+    sub: '통합 대시보드'
+  });
+  document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+    left: 'Family OS · Phase 1 · Hub',
+    right: 'v0.1.0'
+  });
+  document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
+  FamilyOS.attachSettingsModal({ onSave: refreshAll });
+  document.getElementById('fos-btn-refresh').addEventListener('click', refreshAll);
+
+  /* ─── 상태 ────────────────────────────────────────────── */
   const state = {
     data:   { wealth: null, expense: null, health: null, future: null },
     status: { wealth: 'unset', expense: 'unset', health: 'unset', future: 'unset' },
     error:  { wealth: null,   expense: null,   health: null,   future: null }
   };
-  // status: 'unset' | 'loading' | 'ok' | 'error'
-
-  /* ─── 유틸 ───────────────────────────────────────────── */
-  const fmtKRW = (n) => {
-    if (n == null || isNaN(n)) return '—';
-    if (Math.abs(n) >= 100000000) {
-      return (n / 100000000).toFixed(2).replace(/\.?0+$/, '') + '억';
-    }
-    if (Math.abs(n) >= 10000) {
-      return (n / 10000).toFixed(0) + '만';
-    }
-    return n.toLocaleString('ko-KR');
-  };
-  const fmtKRWFull = (n) => {
-    if (n == null || isNaN(n)) return '—';
-    return '₩' + n.toLocaleString('ko-KR');
-  };
-  const fmtPct = (n, withSign = true) => {
-    if (n == null || isNaN(n)) return '—';
-    const sign = withSign && n > 0 ? '+' : '';
-    return sign + n.toFixed(2) + '%';
-  };
-  const fmtPctNoSign = (n) => {
-    if (n == null || isNaN(n)) return '—';
-    return n.toFixed(1) + '%';
-  };
-  const deltaClass = (n) => {
-    if (n == null || isNaN(n)) return 'muted';
-    if (n > 0) return 'gain';
-    if (n < 0) return 'loss';
-    return 'muted';
-  };
-  const timeAgo = (isoStr) => {
-    if (!isoStr) return '—';
-    const t = new Date(isoStr).getTime();
-    const diff = Date.now() - t;
-    if (diff < 0) return '방금';
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return '방금';
-    if (m < 60) return m + '분 전';
-    const h = Math.floor(m / 60);
-    if (h < 24) return h + '시간 전';
-    const d = Math.floor(h / 24);
-    return d + '일 전';
-  };
-  const escapeHtml = (s) => {
-    if (s == null) return '';
-    return String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  };
 
   /* ─── 데이터 fetch ───────────────────────────────────── */
   async function refreshOne(id) {
-    const url = localStorage.getItem(STORAGE_PREFIX + id);
-    if (!url) {
+    if (!FamilyOS.getWebAppUrl(id)) {
       state.status[id] = 'unset';
       renderCard(id);
       return;
     }
     state.status[id] = 'loading';
     renderCard(id);
-
     try {
-      const fullUrl = url + (url.includes('?') ? '&' : '?') + 'mode=summary&_=' + Date.now();
-      const res = await fetch(fullUrl, { method: 'GET', redirect: 'follow' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'Backend error');
-      // 가벼운 스키마 검증
-      if (!json.data || json.data.dashboard !== id) {
-        throw new Error('응답 스키마 불일치 (dashboard 필드 누락 또는 불일치)');
-      }
-      state.data[id] = json.data;
+      state.data[id] = await FamilyOS.fetchDashboardData(id, 'summary');
       state.status[id] = 'ok';
       state.error[id] = null;
     } catch (err) {
       console.error('[' + id + '] fetch failed:', err);
       state.error[id] = err.message;
-      state.status[id] = 'error';
+      state.status[id] = err.message === 'UNSET' ? 'unset' : 'error';
     }
     renderCard(id);
   }
 
   async function refreshAll() {
-    setLastSync('동기화 중…');
+    FamilyOS.setLastSync('동기화 중…');
     await Promise.allSettled(DASHBOARDS.map(d => refreshOne(d.id)));
-    setLastSync('동기화: ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }));
+    FamilyOS.setSyncedNow();
     renderTasks();
   }
 
-  function setLastSync(text) {
-    document.getElementById('last-sync').textContent = text;
-  }
-
-  /* ─── 카드 렌더링 (디스패치) ───────────────────────── */
+  /* ─── 카드 렌더링 ────────────────────────────────────── */
   function renderCard(id) {
     const el = document.getElementById('card-' + id);
-    const meta = DASHBOARDS.find(d => d.id === id);
+    const meta = FamilyOS.getDashboardMeta(id);
     const status = state.status[id];
 
     let bodyHtml = '';
-    if (status === 'unset')   bodyHtml = renderUnset(id);
-    else if (status === 'loading') bodyHtml = renderLoading();
-    else if (status === 'error')   bodyHtml = renderError(id);
+    if (status === 'unset')        bodyHtml = FamilyOS.renderUnsetStateHTML();
+    else if (status === 'loading') bodyHtml = FamilyOS.renderLoadingStateHTML();
+    else if (status === 'error')   bodyHtml = FamilyOS.renderErrorStateHTML(state.error[id], { retryId: id });
     else if (status === 'ok') {
       switch (id) {
         case 'wealth':  bodyHtml = renderWealth(state.data[id]); break;
@@ -907,52 +551,15 @@
     `;
   }
 
-  /* ─── 상태별 빈 카드 ─────────────────────────────────── */
-  function renderUnset(id) {
-    return `
-      <div class="state-empty">
-        <div class="ico">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-        <div class="msg">Web App URL이 아직 설정되지 않았어요.</div>
-        <button class="card-interactive" data-action="open-settings">URL 설정하기</button>
-      </div>
-    `;
-  }
-  function renderLoading() {
-    return `
-      <div class="state-empty">
-        <div class="spinner"></div>
-        <div class="msg">불러오는 중…</div>
-      </div>
-    `;
-  }
-  function renderError(id) {
-    return `
-      <div class="state-empty">
-        <div class="ico" style="color: var(--loss);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-        </div>
-        <div class="msg">데이터 불러오기 실패</div>
-        <div class="msg" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-quiet);">${escapeHtml(state.error[id] || 'unknown')}</div>
-        <button class="card-interactive" data-action="retry" data-id="${id}">재시도</button>
-      </div>
-    `;
-  }
-
-  /* ─── Wealth 카드 ─────────────────────────────────────── */
+  /* ─── 카드별 본문 렌더링 ────────────────────────────── */
   function renderWealth(data) {
     const k = data.kpi || {};
     const bd = k.breakdown || {};
     const rows = [
-      { id: 'domestic_stock', name: '국내주식', d: bd.domestic_stock },
-      { id: 'foreign_stock',  name: '해외주식', d: bd.foreign_stock },
-      { id: 'realestate',     name: '부동산',   d: bd.realestate },
-      { id: 'cash',           name: '현금',     d: bd.cash }
+      { name: '국내주식', d: bd.domestic_stock },
+      { name: '해외주식', d: bd.foreign_stock },
+      { name: '부동산',   d: bd.realestate },
+      { name: '현금',     d: bd.cash }
     ].filter(r => r.d);
 
     const rowsHtml = rows.map(r => `
@@ -989,7 +596,6 @@
     `;
   }
 
-  /* ─── Expense 카드 ────────────────────────────────────── */
   function renderExpense(data) {
     const k = data.kpi || {};
     const cats = k.top_categories || [];
@@ -1012,7 +618,6 @@
     `;
   }
 
-  /* ─── Health 카드 ─────────────────────────────────────── */
   function renderHealth(data) {
     const k = data.kpi || {};
     const members = k.members || [];
@@ -1024,25 +629,21 @@
         <span class="health-status">${escapeHtml(statusLabel[m.status] || '—')}</span>
       </div>
     `).join('');
-    return `
-      <div class="health-list">${html}</div>
-    `;
+    return `<div class="health-list">${html}</div>`;
   }
 
-  /* ─── Future 카드 ─────────────────────────────────────── */
   function renderFuture(data) {
     const k = data.kpi || {};
     const yrs = k.years_to_retirement;
     const prog = k.goal_progress_pct;
     const ms = k.next_milestone;
     const msDate = k.next_milestone_date;
-
     return `
       <div class="hero-num">
         <span class="hero-num-value">${yrs != null ? yrs.toFixed(1) : '—'}</span>
         <span class="hero-num-unit">년 남음</span>
       </div>
-      <div style="font-size: 11px; color: var(--text-quiet); margin-bottom: 0;">은퇴까지</div>
+      <div style="font-size: 11px; color: var(--text-quiet);">은퇴까지</div>
       ${prog != null ? `
         <div class="progress-track">
           <div class="progress-fill" style="width: ${Math.min(100, Math.max(0, prog))}%"></div>
@@ -1062,7 +663,7 @@
     `;
   }
 
-  /* ─── Tasks 통합 렌더링 ─────────────────────────────── */
+  /* ─── Tasks 통합 ────────────────────────────────────── */
   function renderTasks() {
     const ul = document.getElementById('tasks-list');
     const empty = document.getElementById('task-empty');
@@ -1075,7 +676,6 @@
         data.tasks.forEach(t => all.push({ ...t, _dash: d }));
       }
     }
-    // urgency 정렬: bad > warn > info
     const order = { bad: 0, warn: 1, info: 2 };
     all.sort((a, b) => (order[a.urgency] ?? 9) - (order[b.urgency] ?? 9));
 
@@ -1099,7 +699,6 @@
       </li>
     `).join('');
 
-    // 클릭 시 해당 대시보드 열기
     ul.querySelectorAll('.task-item').forEach(li => {
       li.addEventListener('click', () => {
         const href = li.dataset.href;
@@ -1108,65 +707,25 @@
     });
   }
 
-  /* ─── 설정 모달 ──────────────────────────────────────── */
-  const modalBg = document.getElementById('modal-backdrop');
-
-  function openSettings() {
-    DASHBOARDS.forEach(d => {
-      const el = document.getElementById('url-' + d.id);
-      el.value = localStorage.getItem(STORAGE_PREFIX + d.id) || '';
-    });
-    modalBg.classList.add('open');
-  }
-  function closeSettings() {
-    modalBg.classList.remove('open');
-  }
-  function saveSettings() {
-    DASHBOARDS.forEach(d => {
-      const val = document.getElementById('url-' + d.id).value.trim();
-      if (val) localStorage.setItem(STORAGE_PREFIX + d.id, val);
-      else     localStorage.removeItem(STORAGE_PREFIX + d.id);
-    });
-    closeSettings();
-    refreshAll();
-  }
-
-  /* ─── 이벤트 바인딩 ──────────────────────────────────── */
-  document.getElementById('btn-settings').addEventListener('click', openSettings);
-  document.getElementById('btn-modal-close').addEventListener('click', closeSettings);
-  document.getElementById('btn-modal-save').addEventListener('click', saveSettings);
-  document.getElementById('btn-refresh').addEventListener('click', refreshAll);
-  modalBg.addEventListener('click', (e) => {
-    if (e.target === modalBg) closeSettings();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modalBg.classList.contains('open')) closeSettings();
-  });
-
-  // 카드 내부 버튼 위임 (state-empty 안의 버튼들)
+  /* ─── 카드 내부 빈상태 버튼 위임 ──────────────────── */
   document.getElementById('cards').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
+    const btn = e.target.closest('button[data-fos-action]');
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
-    const action = btn.dataset.action;
-    if (action === 'open-settings') openSettings();
-    else if (action === 'retry') {
+    const action = btn.dataset.fosAction;
+    if (action === 'open-settings') {
+      document.getElementById('fos-btn-settings').click();
+    } else if (action === 'retry') {
       const id = btn.dataset.id;
       if (id) refreshOne(id);
     }
   });
 
   /* ─── 부팅 ───────────────────────────────────────────── */
-  DASHBOARDS.forEach(d => renderCard(d.id));  // 초기 빈 카드 그리기
+  DASHBOARDS.forEach(d => renderCard(d.id));
   refreshAll();
-
-  // PWA service worker 등록 (선택 - sw.js 없으면 조용히 패스)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => { /* 1단계엔 sw.js 없음. 무시 */ });
-    });
-  }
+  FamilyOS.registerServiceWorker();
   </script>
 </body>
 </html>

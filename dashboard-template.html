@@ -1,0 +1,334 @@
+<!--
+  ════════════════════════════════════════════════════════════════════
+  Family OS — Dashboard Template
+  ════════════════════════════════════════════════════════════════════
+
+  다음 세션의 Claude가 서브 대시보드를 만들 때 시작점으로 사용.
+  이 템플릿을 그대로 복사한 뒤 다음을 수행:
+
+    1. <html> 의 lang 유지
+    2. <title> 변경
+    3. <script> 안의 DASHBOARD_ID 설정 ('wealth' | 'expense' | 'health' | 'future')
+    4. <main> 안에 대시보드 고유 콘텐츠 채우기 (디자인 토큰 사용)
+    5. renderDashboard(data) 함수에 KPI 렌더링 로직 작성
+
+  필수 준수:
+    - design-tokens.css 사용. hex 값 직접 박지 말 것
+    - common.js 사용. 포맷/fetch/URL 관리는 FamilyOS.* 호출
+    - 4가지 데이터 상태 모두 처리 (unset / loading / ok / error)
+    - 반응형: 모바일에서도 자연스럽게
+
+  자세한 가이드는 design-system.md, backend-spec.md 참고.
+  ════════════════════════════════════════════════════════════════════
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0B0F">
+
+  <!-- TODO: 대시보드 이름으로 변경. 예: "Wealth — Family OS" -->
+  <title>[Dashboard Name] — Family OS</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- 공통 자원 (수정 금지) -->
+  <link rel="stylesheet" href="./design-tokens.css">
+
+  <style>
+    /*
+      ─── 공통 레이아웃 스타일 (서브 대시보드 모두 동일) ──────────
+      이 블록은 4개 대시보드 모두 동일하게 사용. 수정 시 모든 대시보드에 반영해야 함.
+      대시보드 고유 스타일은 아래 [대시보드 고유 스타일] 영역에만 작성.
+    */
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      overflow-x: hidden;
+    }
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--s6);
+    }
+    @media (max-width: 767px) {
+      .app { padding: 0 var(--s4); }
+    }
+    header.hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--s6) 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--s7);
+    }
+    @media (max-width: 767px) {
+      header.hdr { padding: var(--s4) 0; margin-bottom: var(--s5); }
+    }
+    .brand { display: flex; align-items: baseline; gap: var(--s3); }
+    .brand-title {
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 24px; letter-spacing: -0.01em; color: var(--text-primary);
+    }
+    .brand-sub {
+      font-size: 12px; color: var(--text-quiet);
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    @media (max-width: 480px) {
+      .brand-title { font-size: 20px; }
+      .brand-sub { display: none; }
+    }
+    .hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+    .icon-btn {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-md); color: var(--text-tertiary);
+      transition: all var(--t-fast);
+    }
+    .icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+    .last-sync {
+      font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+      padding-right: var(--s2);
+    }
+    @media (max-width: 480px) { .last-sync { display: none; } }
+
+    footer.ftr {
+      padding: var(--s5) 0 var(--s8);
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-quiet);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: var(--s2);
+    }
+    footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+    /* 모달 (common.js의 renderSettingsModalHTML 출력과 짝) */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(10, 11, 15, 0.7);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: var(--s4);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border-hi);
+      border-radius: var(--r-lg); padding: var(--s6);
+      width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+      animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-title {
+      font-family: var(--font-display); font-size: 20px; font-weight: 500;
+      margin-bottom: var(--s2);
+    }
+    .modal-desc {
+      font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
+      margin-bottom: var(--s5);
+    }
+    .modal-field { margin-bottom: var(--s4); }
+    .modal-label {
+      display: flex; align-items: center; gap: var(--s2);
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: var(--s2);
+    }
+    .modal-input {
+      width: 100%; background: var(--canvas);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; font-size: 12px; color: var(--text-primary);
+      font-family: var(--font-mono); transition: border-color var(--t-fast);
+    }
+    .modal-input:focus { border-color: var(--accent); }
+    .modal-input::placeholder { color: var(--text-quiet); }
+    .modal-actions {
+      display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
+    }
+    .btn {
+      padding: 10px 18px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+      transition: all var(--t-fast); border: 1px solid transparent;
+    }
+    .btn-primary { background: var(--accent); color: var(--canvas); }
+    .btn-primary:hover { background: #F5D175; }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+    /* 빈 상태 (common.js의 renderUnset/Loading/ErrorStateHTML 출력과 짝) */
+    .state-empty {
+      padding: var(--s8) var(--s5);
+      color: var(--text-quiet); font-size: 13px;
+      display: flex; flex-direction: column; gap: var(--s2);
+      align-items: center; text-align: center;
+    }
+    .state-empty .ico {
+      width: 32px; height: 32px; border-radius: var(--r-md);
+      background: var(--elevated);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: var(--s2); color: var(--text-tertiary);
+    }
+    .state-empty .msg { color: var(--text-tertiary); font-size: 12px; }
+    .state-empty button {
+      font-size: 12px; color: var(--accent);
+      padding: 6px 10px; border: 1px solid var(--border);
+      border-radius: var(--r-sm); background: transparent;
+      margin-top: var(--s2); transition: all var(--t-fast); cursor: pointer;
+    }
+    .state-empty button:hover { border-color: var(--accent); background: var(--elevated); }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--elevated-2);
+      border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .gain  { color: var(--gain); }
+    .loss  { color: var(--loss); }
+    .muted { color: var(--text-quiet); }
+
+    /*
+      ─── [대시보드 고유 스타일] ────────────────────────────────
+      이 아래에 대시보드별 스타일 작성. 다른 대시보드와 클래스명 충돌 주의:
+      .card, .hero-num 같은 일반적인 이름은 .wealth-card, .wealth-hero 식으로 prefix 권장.
+    */
+
+    /* TODO: 대시보드 고유 스타일 여기에 */
+
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <!-- 헤더 (common.js로 동적 렌더링) -->
+    <div id="hdr-mount"></div>
+
+    <main id="main-mount">
+      <!-- 초기엔 빈 상태. 데이터 로드 후 renderDashboard(data)가 채움 -->
+    </main>
+
+    <!-- 푸터 (common.js로 동적 렌더링) -->
+    <div id="ftr-mount"></div>
+  </div>
+
+  <!-- 모달 (common.js로 동적 렌더링) -->
+  <div id="modal-mount"></div>
+
+  <!-- 공통 모듈 (수정 금지) -->
+  <script src="./common.js"></script>
+
+  <script>
+  /* ════════════════════════════════════════════════════════════
+   * 대시보드 고유 로직
+   * ════════════════════════════════════════════════════════════ */
+
+  /* ─── 1. 메타 설정 (필수 변경) ──────────────────────────── */
+  // TODO: 'wealth' | 'expense' | 'health' | 'future' 중 하나로 변경
+  const DASHBOARD_ID = 'XXX';
+
+  const meta = FamilyOS.getDashboardMeta(DASHBOARD_ID);
+  if (!meta) {
+    document.body.innerHTML = '<p style="padding:40px;color:#fb7185;">잘못된 DASHBOARD_ID</p>';
+    throw new Error('Invalid DASHBOARD_ID: ' + DASHBOARD_ID);
+  }
+
+  /* ─── 2. 헤더/푸터/모달 마운트 ──────────────────────────── */
+  document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+    title: meta.label,
+    sub: meta.kr
+  });
+  document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+    left: 'Family OS · ' + meta.label,
+    right: 'v0.1.0'
+  });
+  document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML({
+    fields: [{ id: DASHBOARD_ID, label: meta.label + ' (' + meta.kr + ')' }],
+    title: meta.label + ' Web App URL 설정',
+    desc: '이 대시보드의 Apps Script Web App URL을 입력하세요. 이 정보는 이 기기 브라우저에만 저장됩니다.'
+  });
+
+  FamilyOS.attachSettingsModal({
+    fieldIds: [DASHBOARD_ID],
+    onSave: refresh
+  });
+
+  // 새로고침 버튼
+  const btnRefresh = document.getElementById('fos-btn-refresh');
+  if (btnRefresh) btnRefresh.addEventListener('click', refresh);
+
+  // 빈 상태 안의 버튼들 위임 (재시도, 설정 열기)
+  document.getElementById('main-mount').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-fos-action]');
+    if (!btn) return;
+    const action = btn.dataset.fosAction;
+    if (action === 'open-settings') {
+      document.getElementById('fos-btn-settings')?.click();
+    } else if (action === 'retry') {
+      refresh();
+    }
+  });
+
+  /* ─── 3. 데이터 로드 + 렌더링 ─────────────────────────── */
+  async function refresh() {
+    const mount = document.getElementById('main-mount');
+
+    // unset 체크
+    if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+      mount.innerHTML = FamilyOS.renderUnsetStateHTML();
+      FamilyOS.setLastSync('—');
+      return;
+    }
+
+    // loading
+    mount.innerHTML = FamilyOS.renderLoadingStateHTML();
+    FamilyOS.setLastSync('동기화 중…');
+
+    try {
+      // 서브 대시보드는 full 모드 호출 (요약이 아닌 전체 데이터)
+      const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+      renderDashboard(data);
+      FamilyOS.setSyncedNow();
+    } catch (err) {
+      console.error('[' + DASHBOARD_ID + '] fetch failed:', err);
+      const msg = err.message === 'UNSET' ? 'URL 미설정' : err.message;
+      mount.innerHTML = FamilyOS.renderErrorStateHTML(msg, { retryId: DASHBOARD_ID });
+      FamilyOS.setLastSync('동기화 실패');
+    }
+  }
+
+  /**
+   * TODO: 이 함수에 대시보드 본문 렌더링 작성.
+   *
+   * @param {object} data - Apps Script에서 받은 data 필드.
+   *                        구조는 backend-spec.md의 buildFullPayload() 결과.
+   *
+   * 권장 패턴:
+   *   1. data를 분해해 각 섹션 HTML 문자열 생성
+   *   2. mount.innerHTML 에 한 번에 삽입
+   *   3. 차트나 인터랙션은 innerHTML 삽입 후 querySelector로 바인딩
+   */
+  function renderDashboard(data) {
+    const mount = document.getElementById('main-mount');
+    // TODO: 실제 렌더링 로직
+    mount.innerHTML = `
+      <div style="padding: 40px; color: var(--text-tertiary);">
+        ⚠ renderDashboard()가 아직 구현되지 않았습니다.
+        <pre style="margin-top: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-quiet); white-space: pre-wrap;">${FamilyOS.escapeHtml(JSON.stringify(data, null, 2)).slice(0, 2000)}</pre>
+      </div>
+    `;
+  }
+
+  /* ─── 4. 부팅 ───────────────────────────────────────────── */
+  refresh();
+  FamilyOS.registerServiceWorker();
+  </script>
+</body>
+</html>

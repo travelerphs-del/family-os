@@ -1030,11 +1030,14 @@
     if (!goalProject) return;
 
     // P004 마일스톤 추출
+    // Session 5: milestoneKrw 컬럼 우선 사용. 없으면 Task명 파싱 fallback.
     const milestones = state.tasks
       .filter(t => t.projectId === goalProject.id)
       .map(t => ({
         date: t.deadline,
-        amountKrw: parseEokFromText(t.taskName),
+        amountKrw: (t.milestoneKrw && t.milestoneKrw > 0)
+          ? t.milestoneKrw
+          : parseEokFromText(t.taskName),
         status: t.status,
         detail: t.detail || '',
         taskName: t.taskName

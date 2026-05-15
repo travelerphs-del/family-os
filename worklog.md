@@ -733,3 +733,195 @@ readRealestate @ Code.gs:530
 - Strava/환경정보 시트의 stale 데이터 — 시트는 남아있음. 추후 정리 권장
 
 ────────────────────────────────────────────────────────────────────
+## Session 5 — Future 재개발 (Phase 3 진행 / 마지막 대시보드)
+
+**기간**: 2026-05-15
+**대상**: 미래 대시보드 → 다크 럭셔리 + 라벤더 악센트로 재작성, 외부 시트 의존 끊고 backend-spec 표준 응답 정착
+
+### [DECISION] 핵심 결정 6가지
+
+| # | 사항 | 답 |
+|---|---|---|
+| 1 | 시트 의존 방향 | **B안 (메인이 중재)** — Future Apps Script는 본인 시트(Project/Task)만 읽음. Wealth 시트 직접 접근 금지 |
+| 2 | 노후자금 현재값 출처 | Wealth Apps Script summary에 `retirement_value_krw` 키 추가 → 메인 허브가 결합해 Future 카드에 진행률 표시 |
+| 3 | 자산 도넛 차트 | **제거** (Wealth 대시보드/메인 허브와 중복) |
+| 4 | 노후 탭 시각화 | **꺾은선 차트** (P004 마일스톤 3억→16.6억 연도별 누적). Task명 파싱해 Y축 |
+| 5 | 시트 신규 | 없음. P004 예상비용에 1500000000 입력 시 그 값 사용. 비어 있으면 15억 fallback |
+| 6 | family id | 기존 시트 텍스트(아빠/엄마/도비/로비) 유지. SVG 아이콘 4종 재사용 |
+
+### [DECISION] 비판적으로 짚어둔 점
+
+- **B안 함정 — Wealth summary 키 추가 필요**: backend-spec 3-1엔 `retirement_value_krw`가 없음. 본 세션에서 Wealth Apps Script에도 키 1개 추가하는 hotfix 동반. backend-spec.md는 (다음 세션에서) 보강 권장
+- **메인 허브 결합 표시는 본 세션 미포함**: index.html 수정은 별도 hotfix로. 본 세션은 두 backend가 결합 가능한 데이터 노출까지만
+- **Future 페이지 직접 접속 시 진행률 막대 안 보임**: 의도된 한계. 본인 시트로 노후 잔액을 모르기 때문. 마일스톤 차트 + 목표액(15억) + Next milestone 정보로 충분히 의미 있음. 메인 허브에서 결합 표시 시 진행률 완성
+- **P004 Task가 사실은 마일스톤**: 일반 Task와 의미 다름. Task명("3억", "3.8억" 등)을 숫자 파싱해 차트 Y축. 시트 구조 변경 없이 코드에서 분기
+- **외부 API 0**: Claude API/환율/주가 등 일체 없음. 무료 유지
+- **악센트 색 변경**: 골드(`--accent`) → 라벤더(`--acc-future: #C084FC`)
+
+### [COST] 운영 비용 / 토큰
+
+- **사용자 운영 비용**: 0원. 외부 API 없음
+- **이번 세션 작업 토큰**: Apps Script ~500줄 + HTML ~1300줄 + Wealth Apps Script hotfix ~30줄 추정. Health(900+2400)·Expense(521+2439)보다 가벼움
+
+### 작업 계획
+
+1. [진행] Session 5 시작 기록
+2. [대기] `future-apps-script.gs` 신규 작성
+3. [대기] `wealth-apps-script.gs` hotfix (`retirement_value_krw` 추가)
+4. [대기] `future.html` 신규 작성
+5. [대기] 문법/구조 검증
+6. [대기] Session 5 완료 기록
+
+
+### [CODE] 산출물 (3개)
+
+| # | 파일 | 줄수 | 크기 | 역할 |
+|---|---|---|---|---|
+| 1 | `future-apps-script.gs` | 438 | 15KB | 신규 — 본인 시트(Project/Task)만 읽음. backend-spec 3-4 준수 |
+| 2 | `future.html` | 1373 | 50KB | 신규 — 단기/중장기/노후 3탭 + 노후 마일스톤 차트 + 사이드 상세 시트 |
+| 3 | `wealth-apps-script-hotfix.gs` | 132 | 4KB | Wealth Apps Script에 `retirement_value_krw` 키 추가 패치 안내 |
+
+**1. `future-apps-script.gs` 핵심 구조**
+
+- `DASHBOARD_ID = 'future'`, `SHEET_ID = ''` (사용자 입력)
+- `SHEET_NAMES = { project: 'Project', task: 'Task' }`
+- `RETIREMENT_GOAL_KRW_FALLBACK = 1500000000` — P004 예상비용이 비어 있을 때
+- `doGet(e)`: mode=summary/full/ping 분기
+- `buildSummaryPayload()`:
+  - `years_to_retirement`: P004 종료일까지 년수 (소수점 1자리, 잘라서)
+  - `goal_progress_pct: null` ← **본인 시트로 모름. 메인이 채움**
+  - `retirement_target_krw`: P004 예상비용 또는 fallback
+  - `next_milestone`, `next_milestone_date`: P004의 가까운 미래 task
+  - `tasks`: 60일 이내 미완료 task. urgency 분기 (bad=지남 / warn=14일 이내 / info=60일 이내)
+- `buildFullPayload()`:
+  - 모든 프로젝트 + task 정규화. 한글 헤더 → camelCase 키
+  - `retirement_target_krw`, `retirement_goal_project_id` 함께 반환
+- 헬퍼: `parseKrw_` (1.5억/5000만원/숫자 모두 처리), `parseDate_` (Date/serial/문자열 모두), `isoDate_`, `daysBetween_`, `calcYearsTo_`
+- 디버그: `debug_summary`, `debug_full`, `debug_sheetlist`, `debug_tasks`
+
+**2. `future.html` 핵심 구조**
+
+- 외부 자원: `design-tokens.css`, `common.js`, Chart.js 4.4.0
+- **자산 도넛 차트 완전 제거** (기존 v2와 가장 큰 차이)
+- **라벤더 악센트** `var(--acc-future)`: brand-dot, 노후 탭 활성, 마일스톤 차트 라인, 노후 프로젝트 카드 좌측 바
+- **상단 탭** (단기/중장기/노후) + 카운트 표시
+- **노후 탭 진입 시**: 마일스톤 카드 (Hero 숫자 + Chart.js 꺾은선) → 프로젝트 카드 리스트 순서
+- 마일스톤 차트:
+  - X축: 마일스톤 기한 연도
+  - Y축: 누적 목표액 (Task명 "3억"/"3.8억"/..."16.60억" 파싱)
+  - 완료/진행 상태는 녹색 점 (size 6), 준비는 라벤더 점 (size 4)
+  - 목표 라인은 점선 (15억 가로선)
+  - 툴팁: Task명 + 상태
+- **프로젝트 카드**:
+  - 좌측 바 색상 = 상태 (회/노/녹/라벤더)
+  - D-Day 배지 (0~100일 = imminent 노랑, 음수 = inprog 녹, 100일+ = upcoming 회)
+  - 완료 카드는 opacity 0.55
+  - 진행률 바 + 가족 SVG 아이콘
+- **사이드 시트 상세** (오른쪽에서 슬라이드):
+  - 요약 카드 (가족/기간/진척률/예산 3그리드)
+  - Task 그룹 (목표는 시간순 완→진→준, 일반은 진→준→완)
+  - Task별 deadline·cost·detail·person
+- 가족 SVG 아이콘 4종 (아빠/엄마/도비/로비) 재사용
+
+**3. `wealth-apps-script-hotfix.gs` 핵심**
+
+- 자기 충족적 함수 `getRetirementAccountValueKrw_()`
+- 헤더 자동 감지 (acc/계좌, value_krw/평가/금액) + fallback (A열/K열)
+- `buildSummaryPayload()`의 kpi에 한 줄 추가하는 안내
+- 사용자 wealth-apps-script.gs 본문 미확인 → 두 가지 패턴 모두 대응
+
+### [VERIFICATION] 검증 결과
+
+| 항목 | 결과 |
+|---|---|
+| Apps Script 문법 (`node --check`) | ✅ 통과 (438줄) |
+| HTML 인라인 JS 문법 (`node --check`) | ✅ 통과 (25,080자) |
+| HTML 태그 균형 | ✅ div 59/59, section 1/1, article 1/1, main 1/1, aside 1/1, span 17/17, button 2/2, h2 1/1, script 3/3, style 1/1, svg 6/6, canvas 1/1 |
+| FamilyOS.* 호출 매칭 | ✅ 14개 호출 모두 common.js export 존재 |
+| Apps Script summary envelope | ✅ dashboard / kpi / tasks / updated_at 4개 키 |
+| Apps Script summary KPI 키 | ✅ years_to_retirement / goal_progress_pct / retirement_target_krw / next_milestone / next_milestone_date |
+| HTML ↔ Apps Script full 호환 | ✅ projects / tasks / retirement_target_krw / retirement_goal_project_id 모두 매칭 |
+| Wealth hotfix 문법 | ✅ 통과 (132줄) |
+| 실시트 / 실 API 호출 | ⚠ 미테스트 (사용자 배포 후 검증) |
+
+### [DEPLOYMENT] 배포 가이드
+
+#### Step 1. Future 시트 준비
+
+1. `Family_Future_Dashboard.xlsx`를 Google Drive에 업로드
+2. **반드시 "파일 > Google Sheets로 저장"** (Session 2.2 교훈)
+3. 변환된 Google Sheets URL의 `/d/{SHEET_ID}/edit`에서 ID 추출
+
+#### Step 2. Future Apps Script 프로젝트 생성
+
+1. `script.google.com` → 새 프로젝트
+2. `Code.gs`에 `future-apps-script.gs` 내용 전체 붙여넣기
+3. `SHEET_ID = ''` 라인을 `SHEET_ID = '추출한_ID'`로 변경
+4. 저장
+
+#### Step 3. 권한 부여
+
+1. 편집기에서 함수 드롭다운 `debug_full` 선택 → 실행
+2. Google Sheets 권한 팝업 → 허용
+3. 실행 로그에 "Projects: 4, Tasks: ~30, Retirement target: 1,500,000,000원" 비슷한 출력 확인
+4. `debug_summary` 실행 → KPI/tasks JSON 출력 확인
+5. `debug_tasks` 실행 → 14일 이내 마감 task 목록 확인
+
+#### Step 4. 웹 앱 배포
+
+1. 배포 > 새 배포 > 유형: 웹 앱
+2. 다음 사용자로 실행: **본인**
+3. 액세스: **모든 사용자**
+4. 배포 → URL 복사
+
+#### Step 5. future.html 연결
+
+1. `future.html`을 GitHub Pages 디렉토리에 배포 (같은 디렉토리에 `common.js`, `design-tokens.css` 필수)
+2. 브라우저에서 future.html 열기 → ⚙️ → URL 입력 → 저장 후 새로고침
+3. 단기/중장기/노후 3탭 모두 클릭해 데이터 표시 확인
+
+#### Step 6. Wealth Apps Script hotfix 적용 (선택)
+
+1. `wealth-apps-script-hotfix.gs`의 안내대로 기존 wealth-apps-script.gs에 패치
+2. 새 버전 배포 (기존 URL 유지)
+3. 메인 허브가 결합 표시할 수 있게 됨 (메인 허브 index.html은 본 세션에서 미수정 — 다음 hotfix 세션에서 처리)
+
+### [LESSON] Phase 3 마무리 시점에서
+
+1. **외부 시트 의존성을 시작부터 거부했어야**: 기존 Future v2가 Wealth 시트를 직접 읽는 구조였던 게 spec 위반. backend-spec.md의 "대시보드별 시트 1개" 원칙을 처음부터 엄격히 적용했어야. Session 5에서 결국 분리. 다음 프로젝트는 spec 시점에 명확히 강제.
+
+2. **B안의 함정**: "메인이 중재"는 듣기엔 좋지만 spec 호환 키가 없으면 작동 안 함. backend-spec 3-1엔 `retirement_value_krw`가 정의 안 돼 있는데 메인이 무슨 값을 결합하나? 답: Wealth Apps Script 응답 확장이 동반돼야 함. 메인 결합 표시 = backend 응답 키 확장 + 메인 결합 로직 둘 다 필요.
+
+3. **메인 허브 결합 표시는 미완**: 본 세션에서 Wealth hotfix만 함. 메인 허브 index.html이 `retirement_value_krw`를 받아 Future 카드의 진행률을 계산하는 로직은 안 만듦. **다음 hotfix 세션 필요** (작업량 작음, 20줄 미만).
+
+4. **Task명을 데이터 컬럼처럼 쓰는 패턴은 fragile**: P004 task명 "3억", "3.8억"을 파싱해 차트 Y축으로. 사용자가 "$3억"으로 쓰면 매칭 실패. 차라리 시트에 별도 컬럼 (예: "마일스톤_금액")을 두는 게 정공법. 본 세션은 시트 변경 없이 빠르게 가는 길 선택. **시트에 컬럼 추가가 장기적으로 권장**.
+
+5. **외부 API 0인 대시보드의 작업량 차이**: Future는 Health/Expense보다 30% 가벼웠음 (438+1373 vs 594+2393). 외부 의존(Strava, 환율, AI 인사이트) 없음의 영향. 다른 대시보드도 외부 의존 제거하면 유지보수성 ↑.
+
+### [PENDING] 다음 작업 후보 (우선순위 순)
+
+1. **메인 허브 index.html hotfix** — Future 카드에 진행률 결합 표시 (Wealth.retirement_value_krw ÷ Future.retirement_target_krw × 100). 작업량 ~30줄
+2. **backend-spec.md 보강** — Wealth 응답에 `retirement_value_krw` 키 정식 등재. Future 응답 키 5개 (years_to_retirement, goal_progress_pct, retirement_target_krw, next_milestone, next_milestone_date) 명시
+3. **시트 컬럼 추가 검토** — P004 마일스톤 금액을 별도 컬럼으로 (현재는 task명 파싱)
+4. **Future PWA 매니페스트** — 메인 허브와 별도 manifest.json 가능 (현재는 메인 것 공유)
+5. **노후 탭 시뮬레이션 도구** — 수익률·기여금 시나리오별 마일스톤 재계산 (현재는 시트 값 그대로 표시)
+
+### [COST] 본 세션 토큰/비용 최종
+
+- **사용자 운영 비용**: 0원 (외부 API 없음)
+- **이번 세션 작업 토큰**: Apps Script 438줄 + HTML 1373줄 + Hotfix 132줄 = 약 65KB 코드 산출. Health(900+2400)·Expense(521+2439)보다 가벼움. 외부 API 없음 + 시트 단순(2탭)이 이유.
+
+### [PHASE 3 COMPLETE]
+
+| 대시보드 | 상태 | Apps Script | HTML | 비고 |
+|---|---|---|---|---|
+| Wealth | ✅ Session 2 | 821줄 | 1601줄 | Session 5 hotfix 동반 (retirement_value_krw 추가) |
+| Expense | ✅ Session 3 | 521줄 | 2439줄 | OAuth 폐기, doPost 통일 |
+| Health | ✅ Session 4 | 594줄 | 2393줄 | Strava/환경정보 제거, health_tasks 신규 |
+| Future | ✅ Session 5 | 438줄 | 1373줄 | 외부 시트 의존 끊음, 라벤더 악센트, 마일스톤 차트 |
+
+**Phase 3 종료** — 4개 서브 대시보드 모두 backend-spec 표준 응답 포맷 준수. 다음은 통합 최적화 hotfix들 (메인 허브 결합 표시, spec 보강 등).
+
+- [완료] Session 5 종료
+
+────────────────────────────────────────────────────────────────────

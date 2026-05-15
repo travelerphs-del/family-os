@@ -1,0 +1,1373 @@
+<!--
+  ════════════════════════════════════════════════════════════════════
+  Family OS — Future Dashboard
+  ════════════════════════════════════════════════════════════════════
+  미래 대시보드: 단기·중장기·노후 프로젝트 + 노후자금 마일스톤 차트
+  - 본인 시트(Project/Task)만 사용 (Session 5 B안)
+  - 노후 현재값/진행률은 메인 허브가 결합 표시
+  ════════════════════════════════════════════════════════════════════
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0B0F">
+  <title>Future — Family OS</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Future">
+
+  <!-- 공통 토큰 -->
+  <link rel="stylesheet" href="./design-tokens.css">
+
+  <style>
+    /* ════════════════════════════════════════════════════════════
+       공통 레이아웃 (4개 대시보드 공유)
+    ════════════════════════════════════════════════════════════ */
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      overflow-x: hidden;
+    }
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--s6);
+    }
+    @media (max-width: 767px) {
+      .app { padding: 0 var(--s4); }
+    }
+
+    /* 헤더 */
+    header.hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--s6) 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--s7);
+    }
+    @media (max-width: 767px) {
+      header.hdr { padding: var(--s4) 0; margin-bottom: var(--s5); }
+    }
+    .brand { display: flex; align-items: baseline; gap: var(--s3); }
+    .brand-title {
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 24px; letter-spacing: -0.01em; color: var(--text-primary);
+      position: relative;
+    }
+    /* 라벤더 brand dot (Future 시그니처) */
+    .brand-title::before {
+      content: '';
+      position: absolute;
+      left: -14px; top: 50%;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--acc-future);
+      transform: translateY(-50%);
+      box-shadow: 0 0 12px var(--acc-future);
+    }
+    .brand-sub {
+      font-size: 12px; color: var(--text-quiet);
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    @media (max-width: 480px) {
+      .brand-title { font-size: 20px; }
+      .brand-sub { display: none; }
+    }
+    .hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+    .icon-btn {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-md); color: var(--text-tertiary);
+      transition: all var(--t-fast);
+      background: transparent; border: 0; cursor: pointer;
+    }
+    .icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+    .last-sync {
+      font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+      padding-right: var(--s2);
+    }
+    @media (max-width: 480px) { .last-sync { display: none; } }
+
+    /* 푸터 */
+    footer.ftr {
+      padding: var(--s5) 0 var(--s8);
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-quiet);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: var(--s2);
+      margin-top: var(--s7);
+    }
+    footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+    /* 설정 모달 (common.js와 짝) */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(10, 11, 15, 0.7);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: var(--s4);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border-hi);
+      border-radius: var(--r-lg); padding: var(--s6);
+      width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+      animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-title {
+      font-family: var(--font-display); font-size: 20px; font-weight: 500;
+      margin-bottom: var(--s2);
+    }
+    .modal-desc {
+      font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
+      margin-bottom: var(--s5);
+    }
+    .modal-field { margin-bottom: var(--s4); }
+    .modal-label {
+      display: flex; align-items: center; gap: var(--s2);
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: var(--s2);
+    }
+    .modal-label .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .modal-input {
+      width: 100%; background: var(--canvas);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; font-size: 12px; color: var(--text-primary);
+      font-family: var(--font-mono); transition: border-color var(--t-fast);
+    }
+    .modal-input:focus { outline: none; border-color: var(--acc-future); }
+    .modal-input::placeholder { color: var(--text-quiet); }
+    .modal-actions {
+      display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
+    }
+    .btn {
+      padding: 10px 18px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+      transition: all var(--t-fast); border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--acc-future); color: var(--canvas); }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+    /* 빈 상태 */
+    .state-empty {
+      padding: var(--s8) var(--s5);
+      color: var(--text-quiet); font-size: 13px;
+      display: flex; flex-direction: column; gap: var(--s2);
+      align-items: center; text-align: center;
+    }
+    .state-empty .ico {
+      width: 32px; height: 32px; border-radius: var(--r-md);
+      background: var(--elevated);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: var(--s2); color: var(--text-tertiary);
+    }
+    .state-empty .msg { color: var(--text-tertiary); font-size: 12px; }
+    .state-empty button {
+      font-size: 12px; color: var(--acc-future);
+      padding: 6px 10px; border: 1px solid var(--border);
+      border-radius: var(--r-sm); background: transparent;
+      margin-top: var(--s2); transition: all var(--t-fast); cursor: pointer;
+    }
+    .state-empty button:hover { border-color: var(--acc-future); background: var(--elevated); }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--elevated-2);
+      border-top-color: var(--acc-future);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ════════════════════════════════════════════════════════════
+       [Future 고유 스타일]
+    ════════════════════════════════════════════════════════════ */
+
+    /* 탭 (단기/중장기/노후) */
+    .ff-tabs {
+      display: flex; gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 4px;
+      margin-bottom: var(--s5);
+    }
+    .ff-tab {
+      flex: 1; text-align: center;
+      padding: 10px var(--s3);
+      cursor: pointer;
+      color: var(--text-quiet);
+      font-weight: 500; font-size: 13px;
+      border-radius: var(--r-md);
+      transition: all var(--t-fast);
+      letter-spacing: 0.02em;
+      background: transparent; border: 0;
+      font-family: inherit;
+    }
+    .ff-tab.active {
+      color: var(--canvas);
+      background: var(--text-primary);
+    }
+    .ff-tab[data-tab="노후"].active {
+      background: var(--acc-future);
+    }
+    .ff-tab:not(.active):hover {
+      color: var(--text-secondary);
+      background: var(--elevated);
+    }
+    .ff-tab .ff-tab-count {
+      display: inline-block;
+      margin-left: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      opacity: 0.6;
+    }
+
+    /* 노후 탭 — 마일스톤 차트 카드 */
+    .ff-retire-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--s5);
+      margin-bottom: var(--s4);
+      position: relative;
+      overflow: hidden;
+    }
+    .ff-retire-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--acc-future), transparent);
+    }
+    .ff-retire-head {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      flex-wrap: wrap; gap: var(--s3);
+      margin-bottom: var(--s5);
+    }
+    .ff-retire-title {
+      font-size: 11px; color: var(--text-quiet);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: var(--s2);
+    }
+    .ff-retire-goal {
+      font-family: var(--font-display); font-weight: 400;
+      font-size: 36px; color: var(--text-primary);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .ff-retire-goal .unit {
+      font-size: 18px; color: var(--text-tertiary);
+      margin-left: 4px; font-weight: 400;
+    }
+    .ff-retire-meta {
+      display: flex; flex-direction: column; align-items: flex-end;
+      gap: 4px;
+      text-align: right;
+    }
+    .ff-retire-meta-row {
+      display: flex; gap: var(--s2); align-items: baseline;
+    }
+    .ff-retire-meta-label {
+      font-size: 10px; color: var(--text-quiet);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .ff-retire-meta-value {
+      font-family: var(--font-mono); font-size: 13px;
+      color: var(--text-secondary);
+    }
+    @media (max-width: 540px) {
+      .ff-retire-goal { font-size: 28px; }
+      .ff-retire-meta { align-items: flex-start; text-align: left; }
+    }
+
+    .ff-chart-wrap {
+      position: relative;
+      height: 280px;
+      margin-top: var(--s3);
+    }
+    @media (max-width: 540px) {
+      .ff-chart-wrap { height: 220px; }
+    }
+
+    .ff-retire-note {
+      font-size: 11px; color: var(--text-quiet);
+      line-height: 1.6;
+      padding-top: var(--s3);
+      margin-top: var(--s3);
+      border-top: 1px solid var(--border);
+      display: flex; gap: var(--s2);
+      align-items: flex-start;
+    }
+    .ff-retire-note .ico-info {
+      flex-shrink: 0;
+      width: 14px; height: 14px;
+      color: var(--text-quiet);
+      margin-top: 1px;
+    }
+
+    /* 프로젝트 카드 리스트 */
+    .ff-proj-list {
+      display: flex; flex-direction: column;
+      gap: var(--s3);
+    }
+
+    .ff-proj-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--s4) var(--s5);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+      animation: fadeUp 280ms ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .ff-proj-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--text-quiet);
+    }
+    .ff-proj-card:hover {
+      border-color: var(--border-hi);
+      background: var(--elevated);
+    }
+    .ff-proj-card:active { transform: scale(0.99); }
+
+    /* 상태별 좌측 바 색 */
+    .ff-proj-card.s-upcoming::before  { background: var(--text-quiet); }
+    .ff-proj-card.s-imminent::before  { background: var(--neutral); }
+    .ff-proj-card.s-inprog::before    { background: var(--gain); }
+    .ff-proj-card.s-completed::before { background: var(--text-quiet); }
+    .ff-proj-card.s-completed         { opacity: 0.55; }
+    .ff-proj-card.s-completed:hover   { opacity: 0.85; }
+    .ff-proj-card.s-goal::before      { background: var(--acc-future); }
+    .ff-proj-card.s-goal              { box-shadow: inset 0 0 24px rgba(192, 132, 252, 0.05); }
+    .ff-proj-card.s-goal-done::before { background: var(--acc-future); }
+    .ff-proj-card.s-goal-done {
+      box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.35), inset 0 0 24px rgba(192, 132, 252, 0.08);
+    }
+
+    .ff-proj-head {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: var(--s3);
+      margin-bottom: var(--s2);
+    }
+    .ff-proj-title {
+      font-size: 15px; font-weight: 600;
+      color: var(--text-primary);
+      flex: 1; line-height: 1.4;
+    }
+    .ff-proj-summary {
+      font-size: 12px; color: var(--text-tertiary);
+      line-height: 1.6;
+      margin-bottom: var(--s3);
+    }
+
+    /* 배지 */
+    .ff-badge {
+      font-family: var(--font-mono);
+      font-size: 10px; font-weight: 500;
+      padding: 4px 8px; border-radius: var(--r-full, 999px);
+      white-space: nowrap; flex-shrink: 0;
+      letter-spacing: 0.02em;
+    }
+    .ff-badge-mute   { background: var(--elevated-2); color: var(--text-quiet); }
+    .ff-badge-warn   { background: rgba(252,211,77,0.15); color: var(--neutral); }
+    .ff-badge-inprog { background: rgba(74,222,128,0.13); color: var(--gain); }
+    .ff-badge-done   { background: var(--elevated); color: var(--text-quiet); }
+    .ff-badge-goal   { background: rgba(192,132,252,0.15); color: var(--acc-future); }
+    .ff-badge-goal-win {
+      background: rgba(192,132,252,0.25);
+      color: var(--acc-future);
+      font-weight: 600;
+    }
+
+    .ff-proj-foot {
+      display: flex; justify-content: space-between;
+      align-items: center; gap: var(--s3);
+    }
+    .ff-proj-cost {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-quiet);
+    }
+    .ff-proj-progress {
+      flex: 1;
+      max-width: 180px;
+      display: flex; align-items: center; gap: var(--s2);
+    }
+    .ff-proj-bar {
+      flex: 1; height: 4px;
+      background: var(--elevated-2);
+      border-radius: var(--r-full, 999px);
+      overflow: hidden;
+    }
+    .ff-proj-bar-fill {
+      height: 100%;
+      background: var(--text-quiet);
+      border-radius: var(--r-full, 999px);
+      transition: width 0.4s ease;
+    }
+    .ff-proj-card.s-inprog    .ff-proj-bar-fill { background: var(--gain); }
+    .ff-proj-card.s-imminent  .ff-proj-bar-fill { background: var(--neutral); }
+    .ff-proj-card.s-goal      .ff-proj-bar-fill { background: var(--acc-future); }
+    .ff-proj-card.s-goal-done .ff-proj-bar-fill { background: var(--acc-future); }
+    .ff-proj-pct {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--text-quiet);
+      min-width: 30px; text-align: right;
+    }
+    .ff-people {
+      display: flex; gap: 2px;
+      flex-shrink: 0;
+    }
+    .ff-people svg { display: block; }
+
+    @media (max-width: 540px) {
+      .ff-proj-foot {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--s2);
+      }
+      .ff-proj-progress { max-width: none; }
+      .ff-proj-foot-row {
+        display: flex; justify-content: space-between; align-items: center;
+      }
+    }
+
+    .ff-empty {
+      text-align: center;
+      color: var(--text-quiet);
+      font-size: 12px;
+      padding: var(--s8) 0;
+      letter-spacing: 0.02em;
+      font-family: var(--font-mono);
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       프로젝트 상세 모달 (사이드 시트)
+    ════════════════════════════════════════════════════════════ */
+    .ff-detail-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity var(--t-med);
+    }
+    .ff-detail-overlay.active {
+      opacity: 1; pointer-events: auto;
+    }
+    .ff-detail-sheet {
+      position: fixed;
+      top: 0; right: -100%;
+      width: 100%; max-width: 480px;
+      height: 100%;
+      background: var(--surface);
+      border-left: 1px solid var(--border-hi);
+      z-index: 201;
+      transition: right var(--t-sheet);
+      overflow-y: auto;
+      padding: var(--s5);
+      box-shadow: -24px 0 64px rgba(0, 0, 0, 0.7);
+    }
+    .ff-detail-sheet.active { right: 0; }
+
+    .ff-detail-head {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: var(--s3);
+      padding-bottom: var(--s4);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--s5);
+    }
+    .ff-detail-title {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 22px;
+      color: var(--text-primary);
+      line-height: 1.3;
+      flex: 1;
+      letter-spacing: -0.01em;
+    }
+    .ff-detail-close {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all var(--t-fast);
+      flex-shrink: 0;
+    }
+    .ff-detail-close:hover {
+      background: var(--elevated-2);
+      color: var(--text-primary);
+    }
+
+    /* 모달 안 — 요약 카드 */
+    .ff-summary {
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: var(--s4);
+      margin-bottom: var(--s5);
+      position: relative;
+      overflow: hidden;
+    }
+    .ff-summary.is-goal::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; right: 0; height: 1px;
+      background: var(--acc-future);
+    }
+    .ff-summary-row {
+      display: flex; justify-content: space-between;
+      align-items: center; gap: var(--s3);
+      margin-bottom: var(--s3);
+    }
+    .ff-summary-people {
+      display: flex; gap: 2px;
+    }
+    .ff-summary-duration {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-quiet);
+      letter-spacing: 0.02em;
+    }
+    .ff-progress-block { margin-bottom: var(--s4); }
+    .ff-progress-head {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--text-tertiary);
+      margin-bottom: var(--s2);
+      letter-spacing: 0.04em;
+    }
+    .ff-progress-head .pct { color: var(--text-primary); font-weight: 600; }
+    .ff-progress-track {
+      height: 6px; background: var(--elevated-2);
+      border-radius: var(--r-full, 999px);
+      overflow: hidden;
+    }
+    .ff-progress-fill {
+      height: 100%;
+      background: var(--gain);
+      border-radius: var(--r-full, 999px);
+      transition: width 0.5s ease;
+    }
+    .ff-summary.is-goal .ff-progress-fill { background: var(--acc-future); }
+    .ff-summary.is-done .ff-progress-fill { background: var(--text-quiet); }
+
+    .ff-budget {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: var(--s2);
+      margin-top: var(--s2);
+    }
+    .ff-budget-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 10px var(--s3);
+    }
+    .ff-budget-label {
+      font-size: 10px; color: var(--text-quiet);
+      letter-spacing: 0.05em; text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .ff-budget-value {
+      font-family: var(--font-mono);
+      font-size: 13px; font-weight: 600;
+      color: var(--text-primary);
+    }
+    .ff-budget-item.is-remaining .ff-budget-value {
+      color: var(--neutral);
+    }
+    .ff-summary.is-goal .ff-budget-item.is-remaining .ff-budget-value {
+      color: var(--acc-future);
+    }
+    @media (max-width: 420px) {
+      .ff-budget { grid-template-columns: 1fr; }
+    }
+
+    /* Task 그룹 */
+    .ff-task-group { margin-bottom: var(--s5); }
+    .ff-task-group:last-child { margin-bottom: 0; }
+    .ff-task-group-title {
+      font-family: var(--font-mono);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-quiet);
+      margin-bottom: var(--s3);
+      padding-bottom: var(--s2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: var(--s2);
+    }
+    .ff-task-group-title .s-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .ff-task-group.g-done   .s-dot { background: var(--gain); }
+    .ff-task-group.g-prog   .s-dot { background: var(--neutral); }
+    .ff-task-group.g-ready  .s-dot { background: var(--text-quiet); }
+
+    .ff-task {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: var(--s3) var(--s4);
+      margin-bottom: var(--s2);
+      display: flex; flex-direction: column;
+      gap: var(--s2);
+    }
+    .ff-task-top {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: var(--s2);
+    }
+    .ff-task-name {
+      font-size: 13px; font-weight: 500;
+      color: var(--text-primary);
+      flex: 1; line-height: 1.4;
+    }
+    .ff-task-meta {
+      font-family: var(--font-mono);
+      font-size: 10px; color: var(--text-quiet);
+      text-align: right; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .ff-task-detail {
+      font-size: 11px; color: var(--text-tertiary);
+      line-height: 1.6;
+    }
+    .ff-task-people {
+      display: flex; gap: 2px;
+      justify-content: flex-end;
+    }
+
+    /* 색 */
+    .gain  { color: var(--gain); }
+    .loss  { color: var(--loss); }
+    .muted { color: var(--text-quiet); }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div id="hdr-mount"></div>
+    <main id="main-mount"></main>
+    <div id="ftr-mount"></div>
+  </div>
+
+  <!-- 설정 모달 -->
+  <div id="modal-mount"></div>
+
+  <!-- 프로젝트 상세 시트 -->
+  <div class="ff-detail-overlay" id="ff-detail-overlay"></div>
+  <aside class="ff-detail-sheet" id="ff-detail-sheet" aria-hidden="true">
+    <div class="ff-detail-head">
+      <h2 class="ff-detail-title" id="ff-detail-title">—</h2>
+      <button class="ff-detail-close" id="ff-detail-close" aria-label="닫기">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <line x1="6" y1="6" x2="18" y2="18"/>
+          <line x1="6" y1="18" x2="18" y2="6"/>
+        </svg>
+      </button>
+    </div>
+    <div id="ff-detail-body"></div>
+  </aside>
+
+  <!-- 공통 모듈 -->
+  <script src="./common.js"></script>
+  <!-- Chart.js (노후 마일스톤 차트) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+  /* ════════════════════════════════════════════════════════════
+   * Family OS — Future Dashboard 로직
+   * ════════════════════════════════════════════════════════════ */
+
+  const DASHBOARD_ID = 'future';
+  const meta = FamilyOS.getDashboardMeta(DASHBOARD_ID);
+
+  /* ─── 가족 SVG 아이콘 (기존 v2에서 재사용) ─────────────────── */
+  const FAMILY_SVG = {
+    '아빠': '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="아빠"><circle cx="130" cy="150" r="65" fill="#B27A5D"/><circle cx="382" cy="150" r="65" fill="#B27A5D"/><circle cx="130" cy="150" r="35" fill="#DDBCA9"/><circle cx="382" cy="150" r="35" fill="#DDBCA9"/><rect x="106" y="150" width="300" height="280" rx="120" fill="#C28A6D"/><ellipse cx="256" cy="350" rx="85" ry="65" fill="#DDBCA9"/><ellipse cx="256" cy="320" rx="35" ry="25" fill="#4A3B32"/><circle cx="180" cy="250" r="18" fill="#333"/><circle cx="332" cy="250" r="18" fill="#333"/></svg>',
+    '엄마': '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="엄마"><polygon points="90,220 50,50 220,160" fill="#E27A3F"/><polygon points="422,220 462,50 292,160" fill="#E27A3F"/><polygon points="105,190 75,90 180,160" fill="#F4ECD8"/><polygon points="407,190 437,90 332,160" fill="#F4ECD8"/><path d="M 60 220 Q 256 512 452 220 Q 356 120 256 120 Q 156 120 60 220 Z" fill="#E27A3F"/><path d="M 60 220 Q 256 512 452 220 Q 356 310 256 310 Q 156 310 60 220 Z" fill="#F4ECD8"/><circle cx="170" cy="230" r="18" fill="#333"/><circle cx="342" cy="230" r="18" fill="#333"/><circle cx="256" cy="360" r="22" fill="#333"/></svg>',
+    '도비': '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="도비"><ellipse cx="180" cy="160" rx="45" ry="140" fill="#E8E8E8"/><ellipse cx="332" cy="160" rx="45" ry="140" fill="#E8E8E8"/><ellipse cx="180" cy="180" rx="20" ry="100" fill="#F2B1C4"/><ellipse cx="332" cy="180" rx="20" ry="100" fill="#F2B1C4"/><path d="M 126 240 C 126 160 386 160 386 240 C 416 380 346 450 256 450 C 166 450 96 380 126 240 Z" fill="#F4F4F4"/><ellipse cx="256" cy="350" rx="30" ry="20" fill="#F2B1C4"/><circle cx="170" cy="280" r="18" fill="#333"/><circle cx="342" cy="280" r="18" fill="#333"/></svg>',
+    '로비': '<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="로비"><path d="M 160 180 C 60 180 50 380 120 420 C 160 440 180 300 180 200 Z" fill="#B58B54"/><path d="M 352 180 C 452 180 462 380 392 420 C 352 440 332 300 332 200 Z" fill="#B58B54"/><rect x="136" y="160" width="240" height="260" rx="110" fill="#DFC297"/><ellipse cx="256" cy="350" rx="80" ry="60" fill="#F4ECD8"/><ellipse cx="256" cy="325" rx="35" ry="25" fill="#5E4D46"/><circle cx="190" cy="260" r="18" fill="#333"/><circle cx="322" cy="260" r="18" fill="#333"/></svg>'
+  };
+
+  const TABS = ['단기', '중장기', '노후'];
+
+  let state = {
+    projects: [],
+    tasks: [],
+    retirementTargetKrw: 1500000000,
+    goalProjectId: null,
+    currentTab: '단기',
+    chart: null
+  };
+
+  /* ─── 헤더/푸터/모달 마운트 ────────────────────────────────── */
+  document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+    title: meta.label,
+    sub: meta.kr
+  });
+  document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+    left: 'Family OS · ' + meta.label,
+    right: 'v0.1.0'
+  });
+  document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML({
+    fields: [{ id: DASHBOARD_ID, label: meta.label + ' (' + meta.kr + ')' }],
+    title: meta.label + ' Web App URL 설정',
+    desc: '이 대시보드의 Apps Script Web App URL을 입력하세요. 이 정보는 이 기기 브라우저에만 저장됩니다.'
+  });
+
+  FamilyOS.attachSettingsModal({
+    fieldIds: [DASHBOARD_ID],
+    onSave: refresh
+  });
+
+  document.getElementById('fos-btn-refresh')?.addEventListener('click', refresh);
+
+  document.getElementById('main-mount').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-fos-action]');
+    if (!btn) return;
+    const action = btn.dataset.fosAction;
+    if (action === 'open-settings') {
+      document.getElementById('fos-btn-settings')?.click();
+    } else if (action === 'retry') {
+      refresh();
+    }
+  });
+
+  /* ─── 유틸리티 ────────────────────────────────────────────── */
+
+  function safeNum(v) {
+    if (v == null || v === '') return 0;
+    const n = typeof v === 'number' ? v : Number(String(v).replace(/[^0-9.-]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  function fmtKRWFull(n) {
+    if (!n || n === 0) return '0원';
+    return Number(n).toLocaleString('ko-KR') + '원';
+  }
+
+  function fmtEok(n) {
+    if (n == null || isNaN(n) || n === 0) return '0억';
+    const eok = n / 100000000;
+    return (Math.round(eok * 100) / 100).toString().replace(/\.?0+$/, '') + '억';
+  }
+
+  function fmtDate(isoOrSerial) {
+    if (!isoOrSerial) return '';
+    const d = new Date(isoOrSerial);
+    if (isNaN(d.getTime())) return String(isoOrSerial);
+    return d.getFullYear() + '.' +
+           String(d.getMonth() + 1).padStart(2, '0') + '.' +
+           String(d.getDate()).padStart(2, '0');
+  }
+
+  function calcDDay(isoStr) {
+    if (!isoStr) return { text: '—', days: Infinity };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const target = new Date(isoStr); target.setHours(0, 0, 0, 0);
+    if (isNaN(target.getTime())) return { text: '—', days: Infinity };
+    const days = Math.ceil((target - today) / 86400000);
+    if (days === 0) return { text: 'D-Day', days: 0 };
+    if (days > 0) return { text: 'D-' + days, days: days };
+    return { text: 'D+' + Math.abs(days), days: days };
+  }
+
+  function renderPeople(s) {
+    if (!s) return '';
+    const matches = [];
+    Object.keys(FAMILY_SVG).forEach(k => {
+      if (s.indexOf(k) !== -1) matches.push(FAMILY_SVG[k]);
+    });
+    return matches.join('');
+  }
+
+  function getProjectStats(project) {
+    const isGoal = project.type === '목표';
+    const projectTasks = state.tasks.filter(t => t.projectId === project.id);
+
+    let totalCost = 0, execCost = 0;
+    projectTasks.forEach(t => {
+      const c = safeNum(t.cost);
+      totalCost += c;
+      if (t.status === '완료') execCost += c;
+    });
+
+    const total = projectTasks.length;
+    const completed = projectTasks.filter(t => t.status === '완료').length;
+
+    let pct;
+    if (isGoal) {
+      // 목표 프로젝트: 완료된 마일스톤 / 총 마일스톤
+      // (현재값/목표값 비율은 Future 시트로 모름. 메인 허브가 결합 표시)
+      pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+    } else {
+      pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+    }
+
+    const allDone = !isGoal && total > 0 && completed === total;
+
+    return {
+      isGoal,
+      tasks: projectTasks,
+      totalCost,
+      execCost,
+      remainingCost: Math.max(0, totalCost - execCost),
+      total,
+      completed,
+      pct,
+      allDone
+    };
+  }
+
+  /* ─── 데이터 로드 ─────────────────────────────────────────── */
+
+  async function refresh() {
+    const mount = document.getElementById('main-mount');
+
+    if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+      mount.innerHTML = FamilyOS.renderUnsetStateHTML();
+      FamilyOS.setLastSync('—');
+      return;
+    }
+
+    mount.innerHTML = FamilyOS.renderLoadingStateHTML();
+    FamilyOS.setLastSync('동기화 중…');
+
+    try {
+      const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+      state.projects = Array.isArray(data.projects) ? data.projects : [];
+      state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      state.retirementTargetKrw = data.retirement_target_krw || 1500000000;
+      state.goalProjectId = data.retirement_goal_project_id || null;
+      renderShell();
+      renderTab(state.currentTab);
+      FamilyOS.setSyncedNow();
+    } catch (err) {
+      console.error('[future] fetch failed:', err);
+      const msg = err.message === 'UNSET' ? 'URL 미설정' : err.message;
+      mount.innerHTML = FamilyOS.renderErrorStateHTML(msg, { retryId: DASHBOARD_ID });
+      FamilyOS.setLastSync('동기화 실패');
+    }
+  }
+
+  /* ─── 메인 렌더링 ──────────────────────────────────────────── */
+
+  function renderShell() {
+    const mount = document.getElementById('main-mount');
+
+    // 탭별 카운트
+    const counts = {};
+    TABS.forEach(t => {
+      counts[t] = state.projects.filter(p => p.category === t).length;
+    });
+
+    mount.innerHTML = `
+      <div class="ff-tabs" role="tablist">
+        ${TABS.map(t => `
+          <button class="ff-tab ${t === state.currentTab ? 'active' : ''}" data-tab="${t}" role="tab">
+            ${t}<span class="ff-tab-count">${counts[t] || 0}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div id="ff-tab-body"></div>
+    `;
+
+    mount.querySelectorAll('.ff-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        if (!tab || tab === state.currentTab) return;
+        state.currentTab = tab;
+        // 활성 표시 업데이트
+        mount.querySelectorAll('.ff-tab').forEach(b => {
+          b.classList.toggle('active', b.dataset.tab === tab);
+        });
+        renderTab(tab);
+      });
+    });
+  }
+
+  function renderTab(tab) {
+    // 기존 차트 정리
+    if (state.chart) {
+      state.chart.destroy();
+      state.chart = null;
+    }
+
+    const body = document.getElementById('ff-tab-body');
+    if (!body) return;
+
+    const projects = state.projects
+      .filter(p => p.category === tab)
+      .sort((a, b) => {
+        if (!a.startDate) return 1;
+        if (!b.startDate) return -1;
+        return new Date(a.startDate) - new Date(b.startDate);
+      });
+
+    let html = '';
+
+    // 노후 탭은 마일스톤 차트 카드 먼저
+    if (tab === '노후') {
+      html += renderRetireCard();
+    }
+
+    if (projects.length === 0) {
+      html += `<div class="ff-empty">해당 카테고리에 프로젝트가 없습니다</div>`;
+    } else {
+      html += '<div class="ff-proj-list">';
+      projects.forEach(p => { html += renderProjectCard(p); });
+      html += '</div>';
+    }
+
+    body.innerHTML = html;
+
+    // 카드 클릭 이벤트
+    body.querySelectorAll('.ff-proj-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        const proj = state.projects.find(p => p.id === id);
+        if (proj) openDetail(proj);
+      });
+    });
+
+    // 노후 탭이면 차트 그리기
+    if (tab === '노후') {
+      drawRetirementChart();
+    }
+  }
+
+  function renderRetireCard() {
+    const targetKrw = state.retirementTargetKrw;
+    const goalProject = state.projects.find(p =>
+      p.id === state.goalProjectId || p.type === '목표'
+    );
+    const targetYear = goalProject && goalProject.endDate
+      ? new Date(goalProject.endDate).getFullYear()
+      : '—';
+
+    // 가장 가까운 미래 마일스톤
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let nextMs = null;
+    if (goalProject) {
+      const upcoming = state.tasks
+        .filter(t => t.projectId === goalProject.id && t.status !== '완료')
+        .map(t => ({ name: t.taskName, date: t.deadline ? new Date(t.deadline) : null }))
+        .filter(x => x.date && x.date >= today)
+        .sort((a, b) => a.date - b.date);
+      if (upcoming.length > 0) nextMs = upcoming[0];
+    }
+
+    const nextMsStr = nextMs
+      ? `${nextMs.name} (${fmtDate(nextMs.date)})`
+      : '—';
+
+    return `
+      <section class="ff-retire-card">
+        <div class="ff-retire-head">
+          <div>
+            <div class="ff-retire-title">노후자금 목표</div>
+            <div class="ff-retire-goal">${fmtEok(targetKrw)}<span class="unit">원</span></div>
+          </div>
+          <div class="ff-retire-meta">
+            <div class="ff-retire-meta-row">
+              <span class="ff-retire-meta-label">목표년</span>
+              <span class="ff-retire-meta-value">${targetYear}년</span>
+            </div>
+            <div class="ff-retire-meta-row">
+              <span class="ff-retire-meta-label">다음 마일스톤</span>
+              <span class="ff-retire-meta-value" style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${FamilyOS.escapeHtml(nextMsStr)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="ff-chart-wrap">
+          <canvas id="ff-retire-chart"></canvas>
+        </div>
+        <div class="ff-retire-note">
+          <svg class="ico-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>마일스톤은 연 15% 수익 + 매년 원금 3,600만 추가 가정의 시뮬레이션. 현재 잔액과 진행률은 메인 허브에서 Wealth 데이터와 결합해 표시.</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function drawRetirementChart() {
+    const canvas = document.getElementById('ff-retire-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const goalProject = state.projects.find(p =>
+      p.id === state.goalProjectId || p.type === '목표'
+    );
+    if (!goalProject) return;
+
+    // P004 마일스톤 추출
+    const milestones = state.tasks
+      .filter(t => t.projectId === goalProject.id)
+      .map(t => ({
+        date: t.deadline,
+        amountKrw: parseEokFromText(t.taskName),
+        status: t.status,
+        detail: t.detail || '',
+        taskName: t.taskName
+      }))
+      .filter(m => m.date && m.amountKrw > 0)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (milestones.length < 2) {
+      canvas.parentElement.innerHTML = '<div class="ff-empty">마일스톤 데이터가 부족합니다 (2개 이상 필요)</div>';
+      return;
+    }
+
+    // CSS 변수 추출
+    const cs = getComputedStyle(document.documentElement);
+    const colAccent = cs.getPropertyValue('--acc-future').trim() || '#C084FC';
+    const colDone = cs.getPropertyValue('--gain').trim() || '#4ADE80';
+    const colMuted = cs.getPropertyValue('--text-quiet').trim() || '#71717A';
+    const colGrid = cs.getPropertyValue('--border').trim() || 'rgba(255,255,255,0.08)';
+    const colText = cs.getPropertyValue('--text-tertiary').trim() || '#A1A1AA';
+    const colTextPri = cs.getPropertyValue('--text-primary').trim() || '#FAFAFA';
+
+    const labels = milestones.map(m => new Date(m.date).getFullYear() + '년');
+    const data = milestones.map(m => m.amountKrw / 100000000);  // 억 단위
+    const pointColors = milestones.map(m => m.status === '완료' || m.status === '진행' ? colDone : colAccent);
+    const pointRadii = milestones.map(m => m.status === '완료' || m.status === '진행' ? 6 : 4);
+
+    // 목표 라인 (gradient 효과를 위해 별도 dataset)
+    const targetEok = state.retirementTargetKrw / 100000000;
+    const targetLineData = milestones.map(() => targetEok);
+
+    state.chart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: '목표',
+            data: targetLineData,
+            borderColor: colMuted,
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false,
+            tension: 0,
+            order: 2
+          },
+          {
+            label: '마일스톤',
+            data: data,
+            borderColor: colAccent,
+            backgroundColor: 'rgba(192, 132, 252, 0.08)',
+            borderWidth: 2.5,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            pointRadius: pointRadii,
+            pointHoverRadius: 8,
+            fill: true,
+            tension: 0.35,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(28, 29, 36, 0.95)',
+            titleColor: colTextPri,
+            bodyColor: colText,
+            borderColor: colGrid,
+            borderWidth: 1,
+            padding: 12,
+            titleFont: { family: 'JetBrains Mono, monospace', size: 11, weight: '600' },
+            bodyFont: { family: 'JetBrains Mono, monospace', size: 11 },
+            callbacks: {
+              title: (items) => items[0].label,
+              label: (item) => {
+                const ms = milestones[item.dataIndex];
+                if (!ms) return '';
+                const lines = [];
+                if (item.datasetIndex === 1) {
+                  lines.push('  ' + ms.taskName);
+                  lines.push('  상태: ' + ms.status);
+                } else {
+                  lines.push('  목표: ' + targetEok.toFixed(1) + '억');
+                }
+                return lines;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: colGrid, drawBorder: false },
+            ticks: {
+              color: colText,
+              font: { family: 'JetBrains Mono, monospace', size: 10 }
+            }
+          },
+          y: {
+            grid: { color: colGrid, drawBorder: false },
+            ticks: {
+              color: colText,
+              font: { family: 'JetBrains Mono, monospace', size: 10 },
+              callback: (v) => v + '억'
+            },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * P004 Task명에서 누적 목표액 추출.
+   * "3억", "3.8억", "4.74억", "16.60억" 같은 패턴.
+   * 매칭 실패 시 0 반환.
+   */
+  function parseEokFromText(s) {
+    if (!s) return 0;
+    const m = String(s).match(/([\d.]+)\s*억/);
+    if (!m) return 0;
+    const n = parseFloat(m[1]);
+    return isNaN(n) ? 0 : n * 100000000;
+  }
+
+  /* ─── 프로젝트 카드 ──────────────────────────────────────── */
+
+  function renderProjectCard(proj) {
+    const isGoal = proj.type === '목표';
+    const stats = getProjectStats(proj);
+    const dday = calcDDay(proj.startDate);
+
+    let cardClass = '';
+    let badge = '';
+
+    if (isGoal) {
+      if (stats.pct >= 100) {
+        cardClass = 's-goal-done';
+        badge = `<span class="ff-badge ff-badge-goal-win">달성 완료</span>`;
+      } else {
+        cardClass = 's-goal';
+        badge = `<span class="ff-badge ff-badge-goal">${stats.completed}/${stats.total} 마일스톤</span>`;
+      }
+    } else if (stats.allDone) {
+      cardClass = 's-completed';
+      badge = `<span class="ff-badge ff-badge-done">완료</span>`;
+    } else if (dday.days < 0) {
+      cardClass = 's-inprog';
+      badge = `<span class="ff-badge ff-badge-inprog">${dday.text}</span>`;
+    } else if (dday.days <= 100) {
+      cardClass = 's-imminent';
+      badge = `<span class="ff-badge ff-badge-warn">${dday.text}</span>`;
+    } else {
+      cardClass = 's-upcoming';
+      badge = `<span class="ff-badge ff-badge-mute">${dday.text}</span>`;
+    }
+
+    // 비용 표시: 목표는 전체 목표액, 일반은 예상비용
+    let costStr = '';
+    if (isGoal) {
+      const target = proj.cost > 0 ? proj.cost : state.retirementTargetKrw;
+      costStr = '목표 ' + fmtEok(target);
+    } else if (stats.totalCost > 0) {
+      costStr = fmtKRWFull(stats.totalCost);
+    } else if (proj.cost > 0) {
+      costStr = fmtKRWFull(proj.cost);
+    }
+
+    const people = renderPeople(proj.people);
+
+    return `
+      <article class="ff-proj-card ${cardClass}" data-id="${FamilyOS.escapeHtml(proj.id)}">
+        <div class="ff-proj-head">
+          <div class="ff-proj-title">${FamilyOS.escapeHtml(proj.title)}</div>
+          ${badge}
+        </div>
+        ${proj.summary ? `<div class="ff-proj-summary">${FamilyOS.escapeHtml(proj.summary)}</div>` : ''}
+        <div class="ff-proj-foot">
+          <div class="ff-proj-cost">${FamilyOS.escapeHtml(costStr)}</div>
+          <div class="ff-proj-progress">
+            <div class="ff-proj-bar">
+              <div class="ff-proj-bar-fill" style="width: ${Math.min(100, stats.pct)}%;"></div>
+            </div>
+            <div class="ff-proj-pct">${stats.pct}%</div>
+          </div>
+          <div class="ff-people">${people}</div>
+        </div>
+      </article>
+    `;
+  }
+
+  /* ─── 상세 시트 ──────────────────────────────────────────── */
+
+  function openDetail(proj) {
+    const isGoal = proj.type === '목표';
+    const stats = getProjectStats(proj);
+
+    document.getElementById('ff-detail-title').textContent = proj.title;
+    const body = document.getElementById('ff-detail-body');
+
+    const startStr = fmtDate(proj.startDate);
+    const endStr = fmtDate(proj.endDate);
+    const dur = (startStr && endStr) ? `${startStr} → ${endStr}` : (startStr || endStr || '');
+
+    // 라벨 분기
+    const lblE = isGoal ? '최종 목표' : '총 예상';
+    const lblX = isGoal ? '완료 마일스톤' : '집행액';
+    const lblR = isGoal ? '남은 마일스톤' : '잔여 예산';
+
+    let valE, valX, valR;
+    if (isGoal) {
+      const target = proj.cost > 0 ? proj.cost : state.retirementTargetKrw;
+      valE = fmtEok(target);
+      valX = stats.completed + '건';
+      valR = Math.max(0, stats.total - stats.completed) + '건';
+    } else {
+      valE = stats.totalCost > 0 ? fmtKRWFull(stats.totalCost) : (proj.cost > 0 ? fmtKRWFull(proj.cost) : '—');
+      valX = fmtKRWFull(stats.execCost);
+      valR = fmtKRWFull(stats.remainingCost);
+    }
+
+    let summaryClass = 'ff-summary';
+    if (isGoal) summaryClass += ' is-goal';
+    if (!isGoal && stats.allDone) summaryClass += ' is-done';
+
+    const peopleHtml = renderPeople(proj.people);
+
+    let html = `
+      <div class="${summaryClass}">
+        <div class="ff-summary-row">
+          <div class="ff-summary-people">${peopleHtml}</div>
+          <div class="ff-summary-duration">${dur || '—'}</div>
+        </div>
+        ${proj.summary ? `<div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.6; margin-bottom: var(--s4);">${FamilyOS.escapeHtml(proj.summary)}</div>` : ''}
+        <div class="ff-progress-block">
+          <div class="ff-progress-head">
+            <span>진척률 <span class="pct">${stats.pct}%</span></span>
+            <span>${stats.completed} / ${stats.total} 완료</span>
+          </div>
+          <div class="ff-progress-track">
+            <div class="ff-progress-fill" style="width: ${Math.min(100, stats.pct)}%;"></div>
+          </div>
+        </div>
+        <div class="ff-budget">
+          <div class="ff-budget-item">
+            <div class="ff-budget-label">${lblE}</div>
+            <div class="ff-budget-value">${FamilyOS.escapeHtml(valE)}</div>
+          </div>
+          <div class="ff-budget-item">
+            <div class="ff-budget-label">${lblX}</div>
+            <div class="ff-budget-value">${FamilyOS.escapeHtml(valX)}</div>
+          </div>
+          <div class="ff-budget-item is-remaining">
+            <div class="ff-budget-label">${lblR}</div>
+            <div class="ff-budget-value">${FamilyOS.escapeHtml(valR)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Task 그룹: 목표형은 시간순(완→진→준), 일반형은 진행 우선(진→준→완)
+    const order = isGoal ? ['완료', '진행', '준비'] : ['진행', '준비', '완료'];
+    const groupCls = { '완료': 'g-done', '진행': 'g-prog', '준비': 'g-ready' };
+
+    let hasTasks = false;
+    order.forEach(status => {
+      const grp = stats.tasks.filter(t => t.status === status);
+      if (grp.length === 0) return;
+      hasTasks = true;
+
+      // 정렬: deadline 빠른 순
+      grp.sort((a, b) => {
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+
+      html += `<div class="ff-task-group ${groupCls[status]}">`;
+      html += `<div class="ff-task-group-title">
+                 <span class="s-dot"></span>${status} (${grp.length})
+               </div>`;
+
+      grp.forEach(t => {
+        const dateStr = fmtDate(t.deadline);
+        const cost = safeNum(t.cost);
+        const costStr = cost > 0 ? fmtKRWFull(cost) : '';
+        const metaParts = [dateStr, costStr].filter(Boolean);
+        const taskPeople = renderPeople(t.person);
+
+        html += `
+          <div class="ff-task">
+            <div class="ff-task-top">
+              <div class="ff-task-name">${FamilyOS.escapeHtml(t.taskName || '—')}</div>
+              ${metaParts.length > 0 ? `<div class="ff-task-meta">${metaParts.map(FamilyOS.escapeHtml).join(' · ')}</div>` : ''}
+            </div>
+            ${t.detail ? `<div class="ff-task-detail">${FamilyOS.escapeHtml(t.detail)}</div>` : ''}
+            ${taskPeople ? `<div class="ff-task-people">${taskPeople}</div>` : ''}
+          </div>
+        `;
+      });
+      html += `</div>`;
+    });
+
+    if (!hasTasks) {
+      html += '<div class="ff-empty">등록된 Task가 없습니다</div>';
+    }
+
+    body.innerHTML = html;
+    document.getElementById('ff-detail-overlay').classList.add('active');
+    document.getElementById('ff-detail-sheet').classList.add('active');
+    document.getElementById('ff-detail-sheet').setAttribute('aria-hidden', 'false');
+    document.getElementById('ff-detail-sheet').scrollTop = 0;
+  }
+
+  function closeDetail() {
+    document.getElementById('ff-detail-overlay').classList.remove('active');
+    document.getElementById('ff-detail-sheet').classList.remove('active');
+    document.getElementById('ff-detail-sheet').setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('ff-detail-close').addEventListener('click', closeDetail);
+  document.getElementById('ff-detail-overlay').addEventListener('click', closeDetail);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDetail();
+  });
+
+  /* ─── 부팅 ─────────────────────────────────────────────────── */
+  refresh();
+  FamilyOS.registerServiceWorker();
+  </script>
+</body>
+</html>

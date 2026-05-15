@@ -1,0 +1,2393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0B0F">
+<title>Health — Family OS</title>
+
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link rel="stylesheet" href="./design-tokens.css">
+
+<!-- 외부 라이브러리 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+/* ─── 공통 레이아웃 ──────────────────────────────────────────── */
+body {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  overflow-x: hidden;
+}
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--s6);
+}
+@media (max-width: 767px) {
+  .app { padding: 0 var(--s4); }
+}
+
+header.hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s6) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--s5);
+}
+@media (max-width: 767px) {
+  header.hdr { padding: var(--s4) 0; margin-bottom: var(--s4); }
+}
+.brand { display: flex; align-items: baseline; gap: var(--s3); }
+.brand-title {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 24px; letter-spacing: -0.01em; color: var(--text-primary);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.brand-title::before {
+  content: ''; display: inline-block;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--acc-health);
+}
+.brand-sub {
+  font-size: 12px; color: var(--text-quiet);
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+@media (max-width: 480px) {
+  .brand-title { font-size: 20px; }
+  .brand-sub { display: none; }
+}
+.hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+.icon-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); color: var(--text-tertiary);
+  transition: all var(--t-fast);
+  background: transparent; border: none; cursor: pointer;
+}
+.icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+.last-sync {
+  font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+  padding-right: var(--s2);
+}
+@media (max-width: 480px) { .last-sync { display: none; } }
+
+footer.ftr {
+  padding: var(--s5) 0 var(--s8);
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-quiet);
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--s2);
+}
+footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+/* ─── 공통 모달 (common.js의 settings 모달과 짝) ─────────── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 11, 15, 0.7);
+  backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100; padding: var(--s4);
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg); padding: var(--s6);
+  width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+  animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-title {
+  font-family: var(--font-display); font-size: 20px; font-weight: 500;
+  margin-bottom: var(--s2);
+}
+.modal-desc {
+  font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
+  margin-bottom: var(--s5);
+}
+.modal-field { margin-bottom: var(--s4); }
+.modal-label {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: var(--s2);
+}
+.modal-input {
+  width: 100%; background: var(--canvas);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 12px; font-size: 12px; color: var(--text-primary);
+  font-family: var(--font-mono); transition: border-color var(--t-fast);
+}
+.modal-input:focus { border-color: var(--accent); outline: none; }
+.modal-input::placeholder { color: var(--text-quiet); }
+.modal-actions {
+  display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
+}
+.btn {
+  padding: 10px 18px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500;
+  transition: all var(--t-fast); border: 1px solid transparent;
+  background: transparent; cursor: pointer; color: inherit;
+  font-family: inherit;
+}
+.btn-primary { background: var(--accent); color: var(--canvas); }
+.btn-primary:hover { background: #F5D175; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border-color: var(--border);
+}
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+.btn-danger { background: var(--loss); color: white; border: none; }
+.btn-danger:hover { background: #DC2626; }
+
+/* ─── 공통 빈 상태 ──────────────────────────────────────── */
+.state-empty {
+  padding: var(--s8) var(--s5);
+  color: var(--text-quiet); font-size: 13px;
+  display: flex; flex-direction: column; gap: var(--s2);
+  align-items: center; text-align: center;
+}
+.state-empty .ico {
+  width: 32px; height: 32px; border-radius: var(--r-md);
+  background: var(--elevated);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: var(--s2); color: var(--text-tertiary);
+}
+.state-empty .msg { color: var(--text-tertiary); font-size: 12px; }
+.state-empty button {
+  font-size: 12px; color: var(--accent);
+  padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: transparent;
+  margin-top: var(--s2); transition: all var(--t-fast); cursor: pointer;
+}
+.state-empty button:hover { border-color: var(--accent); background: var(--elevated); }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--elevated-2);
+  border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.gain  { color: var(--gain); }
+.loss  { color: var(--loss); }
+.muted { color: var(--text-quiet); }
+
+/* ─── [Health 고유 스타일] ─────────────────────────────────── */
+
+/* 멤버 색 매핑 — 다크 배경에서도 보이는 톤 */
+:root {
+  --m-dad:  #60A5FA;   /* 차분한 블루 */
+  --m-mom:  #F472B6;   /* 핑크 */
+  --m-robi: #C084FC;   /* 라벤더 */
+  --m-dobi: #FB923C;   /* 오렌지 */
+  --m-family: var(--acc-health);
+
+  /* status 색 */
+  --st-ok:   var(--gain);
+  --st-warn: var(--neutral);
+  --st-bad:  var(--loss);
+  --st-done: var(--acc-health);
+}
+
+/* 멤버 탭 */
+.health-tabs {
+  display: flex; gap: var(--s2);
+  padding: var(--s2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: var(--s5);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.health-tabs::-webkit-scrollbar { display: none; }
+.health-tab {
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500;
+  color: var(--text-tertiary);
+  background: transparent; border: none;
+  cursor: pointer; transition: all var(--t-fast);
+  white-space: nowrap;
+  display: flex; align-items: center; gap: var(--s2);
+}
+.health-tab:hover { color: var(--text-primary); background: var(--elevated); }
+.health-tab.active {
+  background: var(--elevated-2); color: var(--text-primary);
+}
+.health-tab .mdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* 액션 바 */
+.health-actionbar {
+  display: flex; gap: var(--s2); align-items: center;
+  margin-bottom: var(--s5);
+  flex-wrap: wrap;
+}
+.btn-action {
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 500;
+  border-radius: var(--r-sm);
+  background: var(--acc-health); color: var(--canvas);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: all var(--t-fast);
+}
+.btn-action:hover { background: #6EE7B7; }
+.btn-action-ghost {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-action-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+/* ─── 카드 공통 ─────────────────────────────────────────── */
+.h-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s5);
+  margin-bottom: var(--s4);
+}
+.h-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--s4);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.h-card-title .right {
+  font-family: var(--font-mono); color: var(--text-quiet);
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+  font-size: 11px;
+}
+.h-card-title .right.link {
+  cursor: pointer; color: var(--acc-health);
+  transition: color var(--t-fast);
+}
+.h-card-title .right.link:hover { color: #6EE7B7; }
+
+/* ─── 전체뷰 그리드 ─────────────────────────────────────── */
+.grid-members {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s4);
+  margin-bottom: var(--s4);
+}
+@media (max-width: 1023px) {
+  .grid-members { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .grid-members { grid-template-columns: 1fr; }
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s4);
+}
+@media (max-width: 1023px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* 멤버 카드 (전체뷰) */
+.member-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s4);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  position: relative;
+}
+.member-card:hover {
+  border-color: var(--border-hi);
+  transform: translateY(-2px);
+}
+.member-card .top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+.member-card .name {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.member-card .name::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--mcolor, var(--acc-health));
+}
+.member-card .status-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.member-card .meta {
+  font-size: 11px; color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  margin-bottom: var(--s2);
+}
+.member-card .bmi-row {
+  display: flex; gap: var(--s4);
+  font-size: 12px;
+}
+.member-card .bmi-row .label {
+  color: var(--text-quiet); margin-right: 4px;
+}
+.member-card .bmi-row .val {
+  color: var(--text-secondary); font-family: var(--font-mono);
+}
+.member-card .conds {
+  font-size: 11px; color: var(--text-quiet);
+  margin-top: var(--s2);
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.cond-chip {
+  font-size: 10px;
+  background: var(--elevated);
+  color: var(--text-tertiary);
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+}
+
+/* ─── Task 카드 ──────────────────────────────────────── */
+.task-group { margin-bottom: var(--s4); }
+.task-group:last-child { margin-bottom: 0; }
+.task-group-head {
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: var(--s2);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.task-group-head .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--mcolor, var(--text-tertiary));
+}
+.task-row {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: 10px var(--s3);
+  border-radius: var(--r-sm);
+  border-left: 3px solid var(--border);
+  background: var(--elevated);
+  margin-bottom: 6px;
+  transition: all var(--t-fast);
+}
+.task-row.bad   { border-left-color: var(--st-bad); }
+.task-row.warn  { border-left-color: var(--st-warn); }
+.task-row.done  { border-left-color: var(--st-done); opacity: 0.5; }
+.task-row .check {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--border-hi);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: all var(--t-fast);
+  background: transparent;
+}
+.task-row.done .check {
+  background: var(--st-done); border-color: var(--st-done);
+}
+.task-row .check svg { width: 12px; height: 12px; color: var(--canvas); }
+.task-row .body { flex: 1; min-width: 0; }
+.task-row .title {
+  font-size: 13px; color: var(--text-primary);
+  line-height: 1.4;
+}
+.task-row.done .title { text-decoration: line-through; color: var(--text-quiet); }
+.task-row .meta {
+  font-size: 11px; color: var(--text-quiet);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+.task-row.bad .meta { color: var(--st-bad); }
+.task-row .del {
+  font-size: 16px; color: var(--text-quiet);
+  cursor: pointer; opacity: 0;
+  transition: opacity var(--t-fast);
+  background: transparent; border: none;
+}
+.task-row:hover .del { opacity: 1; }
+.task-row .del:hover { color: var(--loss); }
+.task-empty {
+  font-size: 12px; color: var(--text-quiet);
+  padding: var(--s3); text-align: center;
+}
+
+/* ─── Recent updates ─────────────────────────────────── */
+.recent-item {
+  display: flex; gap: var(--s3);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  cursor: default;
+}
+.recent-item:last-child { border-bottom: none; }
+.recent-item.clickable { cursor: pointer; transition: background var(--t-fast);
+  margin: 0 calc(-1 * var(--s3)); padding-left: var(--s3); padding-right: var(--s3);
+  border-radius: var(--r-sm);
+}
+.recent-item.clickable:hover { background: var(--elevated); border-bottom-color: transparent; }
+.recent-item .icon {
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  background: var(--elevated);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.recent-item .icon.vital     { background: rgba(96,165,250,0.15);   color: #93C5FD; }
+.recent-item .icon.medication { background: rgba(167,139,250,0.15); color: #C4B5FD; }
+.recent-item .icon.hospital  { background: rgba(244,114,182,0.15);  color: #FBCFE8; }
+.recent-item .icon.home      { background: rgba(52,211,153,0.15);   color: #6EE7B7; }
+.recent-item .icon.progress  { background: rgba(192,132,252,0.15);  color: #DDD6FE; }
+.recent-item .icon.bloodtest { background: rgba(239,68,68,0.15);    color: #FCA5A5; }
+.recent-item .icon.imaging   { background: rgba(251,146,60,0.15);   color: #FDBA74; }
+.recent-item .icon.checkup   { background: rgba(99,102,241,0.15);   color: #A5B4FC; }
+.recent-item .icon.vaccination { background: rgba(34,211,238,0.15); color: #67E8F9; }
+.recent-item .icon.condition { background: rgba(234,179,8,0.15);    color: #FDE047; }
+.recent-item .icon.allergy   { background: rgba(248,113,113,0.15);  color: #FECACA; }
+.recent-item .icon.symptom   { background: rgba(244,114,182,0.15);  color: #FBCFE8; }
+.recent-item .body { flex: 1; min-width: 0; }
+.recent-item .head-row {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.recent-item .who {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: var(--r-full);
+  background: var(--elevated-2);
+  color: var(--text-tertiary);
+}
+.recent-item .date {
+  font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+}
+.recent-item .chart-num {
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--text-tertiary); background: var(--elevated-2);
+  padding: 1px 6px; border-radius: var(--r-sm);
+}
+.recent-item .title {
+  font-size: 13px; color: var(--text-primary);
+  line-height: 1.4;
+}
+.recent-item .detail {
+  font-size: 12px; color: var(--text-tertiary);
+  margin-top: 2px; line-height: 1.5;
+}
+.recent-photos {
+  display: flex; gap: 6px; margin-top: var(--s2);
+  flex-wrap: wrap;
+}
+.recent-photo {
+  width: 60px; height: 60px; border-radius: var(--r-sm);
+  object-fit: cover; cursor: pointer;
+  border: 1px solid var(--border);
+  transition: opacity var(--t-fast);
+}
+.recent-photo:hover { opacity: 0.8; }
+
+/* ─── 개인뷰 ─────────────────────────────────────────── */
+.person-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: var(--s4);
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.person-head .left {
+  display: flex; align-items: center; gap: var(--s4);
+}
+.person-avatar {
+  width: 56px; height: 56px;
+  border-radius: var(--r-full);
+  background: var(--mcolor, var(--acc-health));
+  display: flex; align-items: center; justify-content: center;
+  color: var(--canvas); font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.person-head .name {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.person-head .meta {
+  font-size: 12px; color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  display: flex; gap: var(--s3);
+  flex-wrap: wrap;
+}
+.person-head .meta span {
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.person-head .meta .label { color: var(--text-quiet); }
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--s4);
+  margin-bottom: var(--s4);
+}
+@media (max-width: 767px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
+
+.summary-card { padding: var(--s5); }
+.summary-list {
+  display: flex; flex-direction: column; gap: var(--s2);
+  font-size: 13px;
+}
+.summary-list .row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.summary-list .row:last-child { border-bottom: none; }
+.summary-list .row .l { color: var(--text-secondary); }
+.summary-list .row .r {
+  color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 12px;
+}
+.summary-list .empty {
+  font-size: 12px; color: var(--text-quiet); text-align: center; padding: var(--s3);
+}
+
+/* 차트 영역 */
+.chart-card { padding: var(--s5); }
+.chart-tabs {
+  display: flex; gap: 4px;
+  margin-bottom: var(--s3);
+  flex-wrap: wrap;
+}
+.chart-tab {
+  padding: 5px 10px;
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  background: transparent; border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer; transition: all var(--t-fast);
+}
+.chart-tab:hover { color: var(--text-primary); }
+.chart-tab.active {
+  background: var(--elevated); color: var(--text-primary);
+  border-color: var(--border-hi);
+}
+.chart-wrap {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
+/* ─── 카테고리 picker / 폼 모달 ───────────────────────── */
+.h-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 11, 15, 0.7);
+  backdrop-filter: blur(8px);
+  display: none; align-items: flex-end; justify-content: center;
+  z-index: 200;
+}
+.h-modal-backdrop.open { display: flex; }
+@media (min-width: 768px) {
+  .h-modal-backdrop { align-items: center; padding: var(--s4); }
+}
+.h-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  width: 100%; max-width: 560px;
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+  animation: modalSlideUp var(--t-sheet) cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (min-width: 768px) {
+  .h-modal { border-radius: var(--r-lg); }
+}
+@keyframes modalSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.h-modal-head {
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.h-modal-title {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 500;
+  color: var(--text-primary);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.h-modal-back {
+  font-size: 13px; color: var(--text-tertiary);
+  background: transparent; border: none; cursor: pointer;
+  margin-right: var(--s2);
+  padding: 4px;
+}
+.h-modal-back:hover { color: var(--text-primary); }
+.h-modal-close {
+  font-size: 24px; line-height: 1;
+  color: var(--text-quiet);
+  background: transparent; border: none; cursor: pointer;
+  padding: 4px 8px;
+}
+.h-modal-close:hover { color: var(--text-primary); }
+.h-modal-body {
+  padding: var(--s5);
+  overflow-y: auto;
+  flex: 1;
+}
+.h-modal-foot {
+  padding: var(--s4) var(--s5);
+  border-top: 1px solid var(--border);
+  display: flex; gap: var(--s2); justify-content: flex-end;
+}
+
+/* 카테고리 picker */
+.cat-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.cat-item {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  text-align: left;
+  font-family: inherit;
+}
+.cat-item:hover {
+  background: var(--elevated);
+  border-color: var(--border-hi);
+}
+.cat-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 13px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  background: var(--elevated);
+  color: var(--text-tertiary);
+}
+.cat-icon.task      { background: rgba(52,211,153,0.15); color: #6EE7B7; }
+.cat-icon.vital     { background: rgba(96,165,250,0.15); color: #93C5FD; }
+.cat-icon.medication { background: rgba(167,139,250,0.15); color: #C4B5FD; }
+.cat-icon.hospital  { background: rgba(244,114,182,0.15); color: #FBCFE8; }
+.cat-icon.home      { background: rgba(52,211,153,0.15); color: #6EE7B7; }
+.cat-icon.vaccination { background: rgba(34,211,238,0.15); color: #67E8F9; }
+.cat-icon.progress  { background: rgba(192,132,252,0.15); color: #DDD6FE; }
+.cat-icon.condition { background: rgba(234,179,8,0.15); color: #FDE047; }
+.cat-icon.allergy   { background: rgba(248,113,113,0.15); color: #FECACA; }
+.cat-icon.momsnote  { background: rgba(244,114,182,0.15); color: #FBCFE8; }
+.cat-meta { flex: 1; min-width: 0; }
+.cat-name {
+  font-size: 13px; font-weight: 500;
+  color: var(--text-primary);
+}
+.cat-desc {
+  font-size: 11px; color: var(--text-quiet);
+  margin-top: 2px;
+}
+.cat-arrow {
+  font-size: 16px; color: var(--text-quiet);
+}
+
+/* 폼 */
+.form-group { margin-bottom: var(--s4); }
+.form-label {
+  display: block; font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.form-label .req { color: var(--loss); margin-left: 2px; }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  transition: border-color var(--t-fast);
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent); outline: none;
+}
+.form-textarea {
+  min-height: 70px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+@media (max-width: 480px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
+/* 멤버 picker (폼 안) */
+.mem-picker {
+  display: flex; gap: 4px;
+  flex-wrap: wrap;
+}
+.mem-pick-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: var(--r-sm);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  display: flex; align-items: center; gap: 6px;
+  font-family: inherit;
+}
+.mem-pick-btn .mdot { width: 6px; height: 6px; border-radius: 50%; }
+.mem-pick-btn:hover { color: var(--text-primary); }
+.mem-pick-btn.active {
+  background: var(--elevated);
+  border-color: var(--border-hi);
+  color: var(--text-primary);
+}
+
+/* Mom's Note 필드 검증 */
+.mn-field {
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: var(--s3); margin-bottom: var(--s3);
+  transition: border-color var(--t-fast);
+}
+.mn-field.error { border-color: var(--loss); }
+.mn-error-msg {
+  font-size: 11px; color: var(--loss);
+  margin-top: 4px; display: none;
+}
+.mn-field.error .mn-error-msg { display: block; }
+
+/* 사진 업로드 */
+.photo-strip {
+  display: flex; gap: var(--s2);
+  flex-wrap: wrap;
+  margin-bottom: var(--s2);
+}
+.photo-preview {
+  position: relative;
+  width: 80px; height: 80px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.photo-preview img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.photo-preview-del {
+  position: absolute; top: 4px; right: 4px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: white; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+.photo-input-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--elevated);
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--r-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.photo-input-label:hover {
+  border-color: var(--accent); color: var(--text-primary);
+}
+
+/* ─── Toast ─────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(120px);
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-sm);
+  padding: 12px 18px;
+  font-size: 13px;
+  color: var(--text-primary);
+  z-index: 300;
+  display: flex; align-items: center; gap: var(--s2);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  transition: transform var(--t-sheet) cubic-bezier(0.32, 0.72, 0, 1);
+  max-width: 90vw;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.ok    { border-left: 3px solid var(--gain); }
+.toast.error { border-left: 3px solid var(--loss); }
+.toast.info  { border-left: 3px solid var(--accent); }
+
+/* ─── Home Clinic Detail Popup ─────────────────────── */
+.hc-detail-section {
+  margin-bottom: var(--s4);
+}
+.hc-detail-section h4 {
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.hc-detail-section .content {
+  font-size: 13px; line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+.pn-card {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--s3);
+  margin-bottom: var(--s2);
+}
+.pn-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.pn-card-head .date {
+  font-size: 11px; color: var(--text-quiet);
+  font-family: var(--font-mono);
+}
+.pn-card-head .day {
+  font-size: 11px;
+  background: var(--elevated);
+  color: var(--text-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-family: var(--font-mono);
+}
+.pn-card .pn-body {
+  font-size: 12px; color: var(--text-secondary);
+  line-height: 1.5;
+}
+.pn-card .pn-body b { color: var(--text-primary); }
+
+/* ─── 뷰 전환 ──────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="hdr-mount"></div>
+
+  <!-- 멤버 탭 -->
+  <nav class="health-tabs" id="member-tabs">
+    <button class="health-tab active" data-view="all">전체</button>
+  </nav>
+
+  <!-- 액션 바 -->
+  <div class="health-actionbar">
+    <button class="btn-action" id="btn-add-record">
+      <span style="font-size:16px;line-height:1">＋</span>기록 추가
+    </button>
+    <button class="btn-action-ghost" id="btn-export-excel">📥 Excel 내보내기</button>
+  </div>
+
+  <!-- 메인 마운트 -->
+  <main id="main-mount">
+    <!-- 데이터 로드 후 renderView()가 채움 -->
+  </main>
+
+  <div id="ftr-mount"></div>
+</div>
+
+<!-- Web App URL 모달 (common.js) -->
+<div id="modal-mount"></div>
+
+<!-- Health 자체 모달 (기록 추가 / 상세 보기) -->
+<div class="h-modal-backdrop" id="h-modal-backdrop">
+  <div class="h-modal" id="h-modal">
+    <div class="h-modal-head">
+      <div class="h-modal-title">
+        <button class="h-modal-back" id="h-modal-back" style="display:none">←</button>
+        <span id="h-modal-title">기록 추가</span>
+      </div>
+      <button class="h-modal-close" id="h-modal-close">×</button>
+    </div>
+    <div class="h-modal-body" id="h-modal-body"></div>
+    <div class="h-modal-foot" id="h-modal-foot" style="display:none">
+      <button class="btn btn-ghost" id="h-modal-cancel">취소</button>
+      <button class="btn btn-primary" id="h-modal-submit">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span id="toast-msg"></span>
+</div>
+
+<!-- 공통 모듈 -->
+<script src="./common.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+ * Health Dashboard — 클라이언트 로직
+ * ════════════════════════════════════════════════════════════ */
+
+const DASHBOARD_ID = 'health';
+const meta = FamilyOS.getDashboardMeta(DASHBOARD_ID);
+
+/* ─── 상태 ───────────────────────────────────────── */
+const state = {
+  sheets: {},      // mode=full 응답의 sheets 객체
+  members: [],     // 멤버 마스터 (sheets.members 캐싱)
+  currentView: 'all', // 'all' | 'dad' | 'mom' | 'robi' | 'dobi'
+  currentChartItem: 'AST',
+  currentVitalItem: 'weight',
+  charts: {},
+  isSubmitting: false,
+  pendingPhotos: [],
+  currentCategory: null,
+};
+
+const MEMBER_ORDER = ['dad', 'mom', 'robi', 'dobi'];
+const MEMBER_LABELS = { dad: '아빠', mom: '엄마', robi: '로비', dobi: '도비', family: '가족' };
+const MEMBER_COLOR_VAR = {
+  dad: 'var(--m-dad)', mom: 'var(--m-mom)',
+  robi: 'var(--m-robi)', dobi: 'var(--m-dobi)',
+  family: 'var(--m-family)'
+};
+
+const CATEGORIES = [
+  { id: 'task',        name: '할 일',            desc: '가족별 수동 입력 task',                sheet: 'health_tasks',     icon: '✓' },
+  { id: 'vital',       name: 'Vital',           desc: '키 / 몸무게 / 혈압 / 혈당 / 체온',      sheet: 'vital',            icon: 'V' },
+  { id: 'medication',  name: 'Medication',      desc: '투약 · 영양제',                        sheet: 'medication',       icon: 'Rx' },
+  { id: 'hospital',    name: 'Hospital report', desc: '외부병원 진료 (C/C · P/I · A/P)',      sheet: 'hospital_report',  icon: 'H' },
+  { id: 'home',        name: 'Home clinic',     desc: '가정 내 진료 + 사진 첨부 가능',         sheet: 'home_clinic',      icon: 'HC' },
+  { id: 'progress',    name: 'Progress note',   desc: '재진료 이어서 (Assessment · Plan)',    sheet: 'progress_note',    icon: 'PN' },
+  { id: 'vaccination', name: 'Vaccination',     desc: '예방접종 이력',                        sheet: 'vaccination',      icon: 'VA' },
+  { id: 'condition',   name: 'Condition',       desc: '보유질환 추가',                        sheet: 'conditions',       icon: 'C' },
+  { id: 'allergy',     name: 'Allergy',         desc: '알레르기 추가',                        sheet: 'allergies',        icon: 'A' },
+  { id: 'momsnote',    name: "Mom's Note",      desc: '증상·대상자·기타 — 4가지 필수 입력',  sheet: 'symptom',          icon: '📝' },
+];
+
+/* ─── 부팅 ───────────────────────────────────────── */
+document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+  title: 'Health', sub: '가족 건강'
+});
+document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+  left: 'Family OS · Health',
+  right: 'v0.1.0'
+});
+document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML({
+  fields: [{ id: DASHBOARD_ID, label: 'Health (건강)' }],
+  title: 'Health Web App URL 설정',
+  desc: '이 대시보드의 Apps Script Web App URL을 입력하세요. 이 정보는 이 기기 브라우저에만 저장됩니다.'
+});
+FamilyOS.attachSettingsModal({
+  fieldIds: [DASHBOARD_ID],
+  onSave: refresh
+});
+
+// 새로고침 버튼
+document.getElementById('fos-btn-refresh')?.addEventListener('click', refresh);
+
+// 액션 버튼들
+document.getElementById('btn-add-record').addEventListener('click', () => openCategoryPicker());
+document.getElementById('btn-export-excel').addEventListener('click', () => downloadExcel());
+
+// 빈 상태 안 버튼 위임
+document.getElementById('main-mount').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-fos-action]');
+  if (!btn) return;
+  if (btn.dataset.fosAction === 'open-settings') {
+    document.getElementById('fos-btn-settings')?.click();
+  } else if (btn.dataset.fosAction === 'retry') {
+    refresh();
+  }
+});
+
+// 모달 닫기 / 뒤로
+document.getElementById('h-modal-close').addEventListener('click', closeHModal);
+document.getElementById('h-modal-cancel').addEventListener('click', closeHModal);
+document.getElementById('h-modal-back').addEventListener('click', () => openCategoryPicker());
+document.getElementById('h-modal-submit').addEventListener('click', () => submitForm());
+document.getElementById('h-modal-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'h-modal-backdrop') closeHModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const bd = document.getElementById('h-modal-backdrop');
+    if (bd.classList.contains('open')) closeHModal();
+  }
+});
+
+/* ─── 데이터 로드 ──────────────────────────────────── */
+async function refresh() {
+  const mount = document.getElementById('main-mount');
+
+  if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+    mount.innerHTML = FamilyOS.renderUnsetStateHTML();
+    FamilyOS.setLastSync('—');
+    return;
+  }
+
+  mount.innerHTML = FamilyOS.renderLoadingStateHTML();
+  FamilyOS.setLastSync('동기화 중…');
+
+  try {
+    const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+    state.sheets = data.sheets || {};
+    state.members = state.sheets.members || [];
+    renderMemberTabs();
+    renderView();
+    FamilyOS.setSyncedNow();
+  } catch (err) {
+    console.error('[health] fetch failed:', err);
+    mount.innerHTML = FamilyOS.renderErrorStateHTML(err.message, { retryId: DASHBOARD_ID });
+    FamilyOS.setLastSync('동기화 실패');
+  }
+}
+
+/* ─── 멤버 탭 ───────────────────────────────────── */
+function renderMemberTabs() {
+  const tabs = document.getElementById('member-tabs');
+  const order = state.members
+    .map(m => m.member_id)
+    .filter(id => MEMBER_ORDER.includes(id))
+    .sort((a, b) => MEMBER_ORDER.indexOf(a) - MEMBER_ORDER.indexOf(b));
+
+  let html = '<button class="health-tab" data-view="all">전체</button>';
+  order.forEach(id => {
+    const m = state.members.find(x => x.member_id === id);
+    if (!m) return;
+    html += `<button class="health-tab" data-view="${id}">
+      <span class="mdot" style="background:${MEMBER_COLOR_VAR[id]}"></span>${escapeHtml(MEMBER_LABELS[id] || m.name)}
+    </button>`;
+  });
+  tabs.innerHTML = html;
+
+  tabs.querySelectorAll('.health-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.currentView = btn.dataset.view;
+      tabs.querySelectorAll('.health-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderView();
+    });
+  });
+  // 현재 뷰 활성화
+  const cur = tabs.querySelector(`[data-view="${state.currentView}"]`);
+  if (cur) cur.classList.add('active');
+  else tabs.querySelector('[data-view="all"]')?.classList.add('active');
+}
+
+/* ─── 뷰 렌더링 ───────────────────────────────── */
+function renderView() {
+  if (state.currentView === 'all') {
+    renderAllView();
+  } else {
+    renderPersonView(state.currentView);
+  }
+  // 차트는 DOM 삽입 후 그려야 함
+  setTimeout(() => {
+    if (state.currentView !== 'all') {
+      renderBloodChart(state.currentView);
+      renderVitalChart(state.currentView);
+    }
+  }, 30);
+}
+
+function renderAllView() {
+  const mount = document.getElementById('main-mount');
+  const memberCardsHtml = MEMBER_ORDER
+    .map(id => state.members.find(m => m.member_id === id))
+    .filter(Boolean)
+    .map(m => renderMemberCardHtml(m))
+    .join('');
+
+  mount.innerHTML = `
+    <div class="grid-members">${memberCardsHtml}</div>
+    <div class="grid-2">
+      <div>
+        <section class="h-card">
+          <div class="h-card-title"><span>할 일</span>
+            <span class="right link" id="add-task-link">+ 추가</span>
+          </div>
+          <div id="tasks-body">${renderTasksHtml(null)}</div>
+        </section>
+      </div>
+      <div>
+        <section class="h-card">
+          <div class="h-card-title"><span>Recent updates</span>
+            <span class="right link" id="refresh-link">새로고침</span>
+          </div>
+          <div id="recent-body">${renderRecentHtml(null, 8)}</div>
+        </section>
+      </div>
+    </div>
+  `;
+  // 이벤트 위임
+  document.getElementById('add-task-link').addEventListener('click', () => openForm('task'));
+  document.getElementById('refresh-link').addEventListener('click', refresh);
+  // 멤버 카드 클릭 → 개인뷰
+  mount.querySelectorAll('.member-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.memberId;
+      state.currentView = id;
+      renderMemberTabs();
+      renderView();
+    });
+  });
+  // task 핸들러
+  attachTaskHandlers();
+  // recent 클릭 (home clinic detail)
+  attachRecentHandlers();
+}
+
+function renderMemberCardHtml(m) {
+  const id = m.member_id;
+  const age = computeAge(m.birth_date);
+  const status = computeMemberStatus(id);
+  const statusColor = status === 'bad' ? 'var(--st-bad)' :
+                      status === 'warn' ? 'var(--st-warn)' : 'var(--st-ok)';
+  const latestH = getLatestVital(id, 'height');
+  const latestW = getLatestVital(id, 'weight');
+  const hcm = latestH ? parseFloat(latestH.value) : (m.height_cm ? parseFloat(m.height_cm) : null);
+  const wkg = latestW ? parseFloat(latestW.value) : null;
+  const bmi = (hcm && wkg) ? (wkg / Math.pow(hcm/100, 2)).toFixed(1) : null;
+
+  const activeConds = (state.sheets.conditions || [])
+    .filter(c => c.member_id === id && c.status !== 'resolved');
+  const condChips = activeConds.slice(0, 3).map(c =>
+    `<span class="cond-chip">${escapeHtml(c.condition_name)}</span>`
+  ).join('');
+  const moreCount = activeConds.length > 3 ? `<span class="cond-chip">+${activeConds.length - 3}</span>` : '';
+
+  return `
+    <div class="member-card" data-member-id="${id}" style="--mcolor: ${MEMBER_COLOR_VAR[id]}">
+      <div class="top">
+        <div class="name">${escapeHtml(MEMBER_LABELS[id])}</div>
+        <div class="status-dot" style="background: ${statusColor}" title="status: ${status}"></div>
+      </div>
+      <div class="meta">${age ? age + '세' : ''}${m.gender ? ' · ' + (m.gender === 'M' ? '남' : '여') : ''}${m.blood_type ? ' · ' + m.blood_type : ''}</div>
+      <div class="bmi-row">
+        ${wkg ? `<div><span class="label">체중</span><span class="val">${wkg}kg</span></div>` : ''}
+        ${bmi ? `<div><span class="label">BMI</span><span class="val">${bmi}</span></div>` : ''}
+      </div>
+      ${condChips || moreCount ? `<div class="conds">${condChips}${moreCount}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderPersonView(memberId) {
+  const m = state.members.find(x => x.member_id === memberId);
+  if (!m) {
+    document.getElementById('main-mount').innerHTML = `<div class="state-empty"><div class="msg">멤버를 찾을 수 없음</div></div>`;
+    return;
+  }
+  const age = computeAge(m.birth_date);
+  const latestH = getLatestVital(memberId, 'height');
+  const latestW = getLatestVital(memberId, 'weight');
+  const hcm = latestH ? parseFloat(latestH.value) : (m.height_cm ? parseFloat(m.height_cm) : null);
+  const wkg = latestW ? parseFloat(latestW.value) : null;
+  const bmi = (hcm && wkg) ? (wkg / Math.pow(hcm/100, 2)).toFixed(1) : null;
+
+  const initial = (m.name || memberId).charAt(0);
+
+  const mount = document.getElementById('main-mount');
+  mount.innerHTML = `
+    <section class="person-head" style="--mcolor: ${MEMBER_COLOR_VAR[memberId]}">
+      <div class="left">
+        <div class="person-avatar">${escapeHtml(initial)}</div>
+        <div>
+          <div class="name">${escapeHtml(m.name || MEMBER_LABELS[memberId])}</div>
+          <div class="meta">
+            ${age ? `<span><span class="label">나이</span>${age}세</span>` : ''}
+            ${m.gender ? `<span><span class="label">성별</span>${m.gender === 'M' ? '남' : '여'}</span>` : ''}
+            ${m.blood_type ? `<span><span class="label">혈액형</span>${m.blood_type}</span>` : ''}
+            ${hcm ? `<span><span class="label">키</span>${hcm}cm</span>` : ''}
+            ${wkg ? `<span><span class="label">몸무게</span>${wkg}kg</span>` : ''}
+            ${bmi ? `<span><span class="label">BMI</span>${bmi}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="summary-grid">
+      <section class="h-card summary-card">
+        <div class="h-card-title">보유질환</div>
+        <div class="summary-list" id="person-conds"></div>
+      </section>
+      <section class="h-card summary-card">
+        <div class="h-card-title">알레르기</div>
+        <div class="summary-list" id="person-allergies"></div>
+      </section>
+      <section class="h-card summary-card">
+        <div class="h-card-title">복용중인 약</div>
+        <div class="summary-list" id="person-meds"></div>
+      </section>
+    </div>
+
+    <div class="grid-2">
+      <section class="h-card chart-card">
+        <div class="h-card-title">신체계측 추이</div>
+        <div class="chart-tabs" id="vital-tabs"></div>
+        <div class="chart-wrap"><canvas id="vital-chart"></canvas></div>
+      </section>
+      <section class="h-card chart-card">
+        <div class="h-card-title">혈액검사 추이</div>
+        <div class="chart-tabs" id="blood-tabs"></div>
+        <div class="chart-wrap"><canvas id="blood-chart"></canvas></div>
+      </section>
+    </div>
+
+    <section class="h-card">
+      <div class="h-card-title">최근 기록 — ${escapeHtml(MEMBER_LABELS[memberId])}</div>
+      <div id="person-recent"></div>
+    </section>
+  `;
+
+  renderPersonSummary(memberId);
+  document.getElementById('person-recent').innerHTML = renderRecentHtml(memberId, 15);
+  attachRecentHandlers();
+}
+
+function renderPersonSummary(memberId) {
+  const todayStr = formatYMD(new Date());
+
+  // 보유질환
+  const conds = (state.sheets.conditions || [])
+    .filter(c => c.member_id === memberId && c.status !== 'resolved');
+  document.getElementById('person-conds').innerHTML = conds.length === 0
+    ? `<div class="empty">없음</div>`
+    : conds.map(c => `
+        <div class="row">
+          <span class="l">${escapeHtml(c.condition_name)}</span>
+          <span class="r">${escapeHtml(c.status || '')}</span>
+        </div>
+      `).join('');
+
+  // 알레르기
+  const alg = (state.sheets.allergies || [])
+    .filter(a => a.member_id === memberId);
+  document.getElementById('person-allergies').innerHTML = alg.length === 0
+    ? `<div class="empty">없음</div>`
+    : alg.map(a => `
+        <div class="row">
+          <span class="l">${escapeHtml(a.allergen)}</span>
+          <span class="r">${escapeHtml(a.severity || '')}</span>
+        </div>
+      `).join('');
+
+  // 복용중인 약
+  const meds = (state.sheets.medication || [])
+    .filter(m => m.member_id === memberId &&
+      (!m.end_date || String(m.end_date) >= todayStr));
+  document.getElementById('person-meds').innerHTML = meds.length === 0
+    ? `<div class="empty">없음</div>`
+    : meds.map(m => `
+        <div class="row">
+          <span class="l">${escapeHtml(m.drug_name)}${m.dose ? ' · ' + escapeHtml(m.dose) : ''}</span>
+          <span class="r">${escapeHtml(m.frequency || '')}</span>
+        </div>
+      `).join('');
+}
+
+/* ─── Task 렌더링 ─────────────────────────────── */
+function renderTasksHtml(filterMember) {
+  const tasks = state.sheets.health_tasks || [];
+  if (tasks.length === 0) {
+    return `<div class="task-empty">아직 등록된 할 일이 없어요. 우측 + 추가로 시작하세요.</div>`;
+  }
+
+  const todayStr = formatYMD(new Date());
+
+  // 미완료 위, 완료 아래, 멤버별 그룹
+  const filtered = filterMember
+    ? tasks.filter(t => t.member_id === filterMember || t.member_id === 'family')
+    : tasks;
+
+  // 정렬: 미완료 우선, 그 안에서 기한 지남 > 기한 가까운 순
+  const sorted = filtered.slice().sort((a, b) => {
+    const ac = !!a.completed_at, bc = !!b.completed_at;
+    if (ac !== bc) return ac ? 1 : -1;
+    const ad = a.due_date ? formatYMD(a.due_date) : '9999-99-99';
+    const bd = b.due_date ? formatYMD(b.due_date) : '9999-99-99';
+    return ad.localeCompare(bd);
+  });
+
+  // 멤버별 그룹
+  const groups = {};
+  MEMBER_ORDER.concat(['family']).forEach(id => { groups[id] = []; });
+  sorted.forEach(t => {
+    const k = MEMBER_ORDER.includes(t.member_id) ? t.member_id :
+              (t.member_id === 'family' ? 'family' : 'family');
+    groups[k].push(t);
+  });
+
+  let html = '';
+  MEMBER_ORDER.concat(['family']).forEach(id => {
+    if (groups[id].length === 0) return;
+    html += `<div class="task-group">
+      <div class="task-group-head" style="--mcolor: ${MEMBER_COLOR_VAR[id]}">
+        <span class="dot"></span>${escapeHtml(MEMBER_LABELS[id])}
+      </div>`;
+    groups[id].forEach(t => {
+      const completed = !!t.completed_at;
+      const due = t.due_date ? formatYMD(t.due_date) : null;
+      const overdue = !completed && due && due < todayStr;
+      const cls = completed ? 'done' : (overdue ? 'bad' : 'warn');
+      const dueLabel = due
+        ? (completed ? `완료 · ${formatRelativeDate(t.completed_at)}`
+                     : `마감 ${formatDueRelative(due, todayStr)}`)
+        : (completed ? `완료 · ${formatRelativeDate(t.completed_at)}` : '기한 없음');
+      html += `
+        <div class="task-row ${cls}" data-record-id="${escapeHtml(t.record_id)}">
+          <button class="check" data-action="toggle" title="${completed ? '미완료로' : '완료'}">
+            ${completed ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+          </button>
+          <div class="body">
+            <div class="title">${escapeHtml(t.title)}</div>
+            <div class="meta">${dueLabel}${t.notes ? ' · ' + escapeHtml(t.notes) : ''}</div>
+          </div>
+          <button class="del" data-action="delete" title="삭제">×</button>
+        </div>`;
+    });
+    html += `</div>`;
+  });
+  return html || `<div class="task-empty">표시할 할 일이 없어요.</div>`;
+}
+
+function attachTaskHandlers() {
+  document.querySelectorAll('.task-row').forEach(row => {
+    const recordId = row.dataset.recordId;
+    row.querySelector('[data-action="toggle"]')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const isDone = row.classList.contains('done');
+      try {
+        const r = await apiPost({
+          action: 'togglecomplete',
+          record_id: recordId,
+          completed: !isDone
+        });
+        if (r.ok) {
+          // 로컬 상태 업데이트
+          const task = (state.sheets.health_tasks || []).find(t => t.record_id === recordId);
+          if (task) task.completed_at = !isDone ? new Date().toISOString() : '';
+          // 재렌더
+          if (state.currentView === 'all') {
+            document.getElementById('tasks-body').innerHTML = renderTasksHtml(null);
+            attachTaskHandlers();
+            // 멤버 카드 상태도 업데이트
+            document.querySelectorAll('.member-card').forEach(c => {
+              const id = c.dataset.memberId;
+              const newStatus = computeMemberStatus(id);
+              const color = newStatus === 'bad' ? 'var(--st-bad)' :
+                            newStatus === 'warn' ? 'var(--st-warn)' : 'var(--st-ok)';
+              c.querySelector('.status-dot').style.background = color;
+            });
+          }
+        } else {
+          showToast('error', r.error || '저장 실패');
+        }
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    });
+    row.querySelector('[data-action="delete"]')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('이 할 일을 삭제할까요?')) return;
+      try {
+        const r = await apiPost({
+          action: 'delete',
+          sheet: 'health_tasks',
+          record_id: recordId
+        });
+        if (r.ok) {
+          state.sheets.health_tasks = (state.sheets.health_tasks || [])
+            .filter(t => t.record_id !== recordId);
+          if (state.currentView === 'all') {
+            document.getElementById('tasks-body').innerHTML = renderTasksHtml(null);
+            attachTaskHandlers();
+          }
+          showToast('ok', '삭제됨');
+        } else {
+          showToast('error', r.error || '삭제 실패');
+        }
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    });
+  });
+}
+
+/* ─── Recent updates 렌더링 ─────────────────────── */
+function renderRecentHtml(filterMember, limit) {
+  // 모든 시트에서 최근 N개 통합
+  const items = [];
+  const pushItem = (sheet, row) => items.push({ sheet, row, sortKey: getSortKey(row) });
+
+  ['hospital_report', 'home_clinic', 'progress_note', 'medication', 'vital',
+   'blood_test', 'healthcheck', 'imaging', 'conditions', 'allergies',
+   'vaccination', 'symptom'].forEach(sheet => {
+    (state.sheets[sheet] || []).forEach(row => {
+      if (filterMember && row.member_id !== filterMember) return;
+      pushItem(sheet, row);
+    });
+  });
+
+  items.sort((a, b) => (b.sortKey || '').localeCompare(a.sortKey || ''));
+  const top = items.slice(0, limit || 10);
+
+  if (top.length === 0) {
+    return `<div class="task-empty">아직 기록이 없어요.</div>`;
+  }
+
+  return top.map(({ sheet, row }) => renderRecentItemHtml(sheet, row)).join('');
+}
+
+function getSortKey(row) {
+  return String(row.note_date || row.visit_date || row.date || row.test_date ||
+    row.check_date || row.exam_date || row.diagnosis_date || row.start_date ||
+    row.onset_datetime || '');
+}
+
+function renderRecentItemHtml(sheet, row) {
+  const m = state.members.find(x => x.member_id === row.member_id);
+  const who = m ? (m.name || MEMBER_LABELS[row.member_id]) : (row.member_id || '');
+  const sortDate = getSortKey(row).slice(0, 10);
+
+  let icon, iconCls, title, detail = '';
+  let clickable = false, recordId = '';
+  let chartNumBadge = '';
+
+  switch (sheet) {
+    case 'hospital_report':
+      icon = 'H'; iconCls = 'hospital';
+      title = `${row.hospital || ''}${row.department ? ' · ' + row.department : ''}`;
+      detail = row.chief_complaint || '';
+      break;
+    case 'home_clinic':
+      icon = 'HC'; iconCls = 'home';
+      title = row.chief_complaint || '가정진료';
+      detail = row.assessment_plan || '';
+      clickable = true;
+      recordId = row.record_id || '';
+      chartNumBadge = row.record_id ? `<span class="chart-num">차트 ${row.record_id}</span>` : '';
+      break;
+    case 'progress_note':
+      icon = 'PN'; iconCls = 'progress';
+      title = `경과기록${row.day_number ? ' #' + row.day_number : ''} (${row.parent_record_id || ''})`;
+      detail = row.assessment || row.plan || '';
+      break;
+    case 'medication':
+      icon = 'Rx'; iconCls = 'medication';
+      title = `${row.drug_name || ''}${row.dose ? ' ' + row.dose : ''}${row.frequency ? ' · ' + row.frequency : ''}`;
+      detail = row.end_date ? `종료 ${row.end_date}` : '현재 복용 중';
+      break;
+    case 'vital':
+      icon = 'V'; iconCls = 'vital';
+      title = `${row.item || ''} ${row.value || ''}${row.unit || ''}`;
+      break;
+    case 'blood_test':
+      icon = 'BT'; iconCls = 'bloodtest';
+      title = `${row.item || ''} ${row.value || ''}${row.unit || ''}${row.flag ? ' (' + row.flag + ')' : ''}`;
+      break;
+    case 'healthcheck':
+      icon = 'CK'; iconCls = 'checkup';
+      title = `건강검진 — ${row.hospital || ''}`;
+      detail = row.conclusion_text || '';
+      break;
+    case 'imaging':
+      icon = 'IM'; iconCls = 'imaging';
+      title = `${row.modality || ''}${row.body_part ? ' · ' + row.body_part : ''}`;
+      detail = row.conclusion_text || '';
+      break;
+    case 'conditions':
+      icon = 'C'; iconCls = 'condition';
+      title = `${row.condition_name || ''} (${row.status || ''})`;
+      detail = row.notes || '';
+      break;
+    case 'allergies':
+      icon = 'A'; iconCls = 'allergy';
+      title = `${row.allergen || ''}${row.severity ? ' · ' + row.severity : ''}`;
+      detail = row.reaction || '';
+      break;
+    case 'vaccination':
+      icon = 'VA'; iconCls = 'vaccination';
+      title = `${row.vaccine_name || ''}${row.dose_number ? ' ' + row.dose_number + '/' + (row.total_doses || '') : ''}`;
+      break;
+    case 'symptom':
+      icon = 'MN'; iconCls = 'symptom';
+      title = row.chief_complaint || "Mom's Note";
+      detail = row.notes || '';
+      break;
+    default:
+      icon = '?'; iconCls = '';
+      title = row.record_id || sheet;
+  }
+
+  // 사진 (home_clinic만)
+  let photosHtml = '';
+  if (sheet === 'home_clinic' && row.photo_drive_ids) {
+    const ids = String(row.photo_drive_ids).split(',').map(s => s.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      photosHtml = `<div class="recent-photos">${ids.slice(0, 3).map(id =>
+        `<img class="recent-photo" src="https://drive.google.com/thumbnail?id=${escapeHtml(id)}&sz=w200" onclick="event.stopPropagation(); window.open('https://drive.google.com/file/d/${escapeHtml(id)}/view', '_blank')" alt="사진">`
+      ).join('')}</div>`;
+    }
+  }
+
+  return `
+    <div class="recent-item ${clickable ? 'clickable' : ''}" ${clickable ? `data-record-id="${escapeHtml(recordId)}"` : ''}>
+      <div class="icon ${iconCls}">${icon}</div>
+      <div class="body">
+        <div class="head-row">
+          <span class="who">${escapeHtml(who)}</span>
+          <span class="date">${escapeHtml(sortDate)}</span>
+          ${chartNumBadge}
+        </div>
+        <div class="title">${escapeHtml(title)}</div>
+        ${detail ? `<div class="detail">${escapeHtml(detail)}</div>` : ''}
+        ${photosHtml}
+      </div>
+    </div>
+  `;
+}
+
+function attachRecentHandlers() {
+  document.querySelectorAll('.recent-item.clickable').forEach(el => {
+    el.addEventListener('click', () => {
+      openHomeClinicDetail(el.dataset.recordId);
+    });
+  });
+}
+
+/* ─── Home Clinic 상세 팝업 ───────────────────── */
+function openHomeClinicDetail(recordId) {
+  if (!recordId) return;
+  const row = (state.sheets.home_clinic || []).find(r => r.record_id === recordId);
+  if (!row) return;
+
+  const m = state.members.find(x => x.member_id === row.member_id);
+  const who = m ? (m.name || MEMBER_LABELS[row.member_id]) : row.member_id;
+
+  // 연결된 progress_note들
+  const pns = (state.sheets.progress_note || [])
+    .filter(p => p.parent_record_id === recordId)
+    .sort((a, b) => String(a.note_date).localeCompare(String(b.note_date)));
+
+  // 사진
+  const ids = row.photo_drive_ids
+    ? String(row.photo_drive_ids).split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  document.getElementById('h-modal-title').textContent = `가정진료 — ${row.date || ''}`;
+  document.getElementById('h-modal-back').style.display = 'none';
+  document.getElementById('h-modal-foot').style.display = 'flex';
+  document.getElementById('h-modal-body').innerHTML = `
+    <div style="font-size:11px;color:var(--text-quiet);font-family:var(--font-mono);margin-bottom:var(--s4)">
+      ${escapeHtml(who)} · 차트 ${escapeHtml(recordId)}
+    </div>
+    ${row.chief_complaint ? `<div class="hc-detail-section"><h4>C/C — 주증상</h4><div class="content">${escapeHtml(row.chief_complaint)}</div></div>` : ''}
+    ${row.present_illness ? `<div class="hc-detail-section"><h4>P/I — 현병력</h4><div class="content">${escapeHtml(row.present_illness)}</div></div>` : ''}
+    ${row.assessment_plan ? `<div class="hc-detail-section"><h4>A/P — 진단·계획</h4><div class="content">${escapeHtml(row.assessment_plan)}</div></div>` : ''}
+    ${ids.length > 0 ? `<div class="hc-detail-section"><h4>증상 사진 (${ids.length})</h4><div class="recent-photos">${
+      ids.map(id => `<img class="recent-photo" style="width:100px;height:100px" src="https://drive.google.com/thumbnail?id=${escapeHtml(id)}&sz=w300" onclick="window.open('https://drive.google.com/file/d/${escapeHtml(id)}/view', '_blank')" alt="사진">`).join('')
+    }</div></div>` : ''}
+    <div class="hc-detail-section">
+      <h4>경과 기록 (${pns.length}건)</h4>
+      ${pns.length === 0 ? `<div style="font-size:12px;color:var(--text-quiet)">아직 경과 기록 없음</div>` :
+        pns.map(p => `
+          <div class="pn-card">
+            <div class="pn-card-head">
+              <span class="date">${escapeHtml(formatYMD(p.note_date) || '')}</span>
+              ${p.day_number ? `<span class="day">${escapeHtml(p.day_number)}</span>` : ''}
+            </div>
+            <div class="pn-body">
+              ${p.assessment ? `<div><b>A:</b> ${escapeHtml(p.assessment)}</div>` : ''}
+              ${p.plan ? `<div><b>P:</b> ${escapeHtml(p.plan)}</div>` : ''}
+            </div>
+          </div>
+        `).join('')
+      }
+    </div>
+  `;
+  // submit 버튼 → progress note 추가
+  const submitBtn = document.getElementById('h-modal-submit');
+  submitBtn.textContent = '+ 경과 기록 추가';
+  submitBtn.onclick = () => {
+    closeHModal();
+    setTimeout(() => openForm('progress', row.member_id, recordId), 100);
+  };
+  document.getElementById('h-modal-cancel').textContent = '닫기';
+
+  openHModal();
+}
+
+/* ─── 차트 ─────────────────────────────────────── */
+function renderBloodChart(memberId) {
+  const rows = (state.sheets.blood_test || [])
+    .filter(r => r.member_id === memberId);
+  if (rows.length === 0) {
+    const tabsEl = document.getElementById('blood-tabs');
+    if (tabsEl) tabsEl.innerHTML = '<span style="font-size:11px;color:var(--text-quiet)">데이터 없음</span>';
+    return;
+  }
+  // 가용 항목
+  const items = Array.from(new Set(rows.map(r => r.item).filter(Boolean)));
+  if (!items.includes(state.currentChartItem)) state.currentChartItem = items[0];
+
+  const tabsEl = document.getElementById('blood-tabs');
+  if (tabsEl) {
+    tabsEl.innerHTML = items.map(it =>
+      `<button class="chart-tab ${it === state.currentChartItem ? 'active' : ''}" data-item="${escapeHtml(it)}">${escapeHtml(it)}</button>`
+    ).join('');
+    tabsEl.querySelectorAll('.chart-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.currentChartItem = btn.dataset.item;
+        renderBloodChart(memberId);
+      });
+    });
+  }
+
+  const item = state.currentChartItem;
+  const series = rows.filter(r => r.item === item)
+    .sort((a, b) => String(a.test_date).localeCompare(String(b.test_date)));
+  const labels = series.map(s => formatYMD(s.test_date) || '');
+  const data = series.map(s => parseFloat(s.value));
+
+  drawLineChart('blood-chart', 'bloodChart', labels, data, getCss('--m-mom'));
+}
+
+function renderVitalChart(memberId) {
+  const rows = (state.sheets.vital || [])
+    .filter(r => r.member_id === memberId);
+  if (rows.length === 0) {
+    const tabsEl = document.getElementById('vital-tabs');
+    if (tabsEl) tabsEl.innerHTML = '<span style="font-size:11px;color:var(--text-quiet)">데이터 없음</span>';
+    return;
+  }
+  const items = Array.from(new Set(rows.map(r => r.item).filter(Boolean)));
+  if (!items.includes(state.currentVitalItem)) state.currentVitalItem = items[0];
+
+  const tabsEl = document.getElementById('vital-tabs');
+  if (tabsEl) {
+    tabsEl.innerHTML = items.map(it =>
+      `<button class="chart-tab ${it === state.currentVitalItem ? 'active' : ''}" data-item="${escapeHtml(it)}">${escapeHtml(it)}</button>`
+    ).join('');
+    tabsEl.querySelectorAll('.chart-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.currentVitalItem = btn.dataset.item;
+        renderVitalChart(memberId);
+      });
+    });
+  }
+
+  const item = state.currentVitalItem;
+  const series = rows.filter(r => r.item === item)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const labels = series.map(s => formatYMD(s.date) || '');
+  const data = series.map(s => parseFloat(s.value));
+
+  drawLineChart('vital-chart', 'vitalChart', labels, data, getCss('--acc-health'));
+}
+
+function drawLineChart(canvasId, chartKey, labels, data, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  if (state.charts[chartKey]) {
+    state.charts[chartKey].destroy();
+  }
+  const textColor  = getCss('--text-tertiary');
+  const borderColor = getCss('--border');
+
+  state.charts[chartKey] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        borderColor: color || getCss('--acc-health'),
+        backgroundColor: (color || getCss('--acc-health')) + '22',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: color || getCss('--acc-health'),
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: textColor, font: { size: 10 } },
+          grid: { color: borderColor }
+        },
+        y: {
+          ticks: { color: textColor, font: { size: 10 } },
+          grid: { color: borderColor }
+        }
+      }
+    }
+  });
+}
+
+function getCss(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ─── 카테고리 picker / 폼 ───────────────────── */
+function openCategoryPicker() {
+  state.currentCategory = null;
+  state.pendingPhotos = [];
+  document.getElementById('h-modal-title').textContent = '어떤 기록을 추가할까요?';
+  document.getElementById('h-modal-back').style.display = 'none';
+  document.getElementById('h-modal-foot').style.display = 'none';
+  document.getElementById('h-modal-body').innerHTML = `
+    <div class="cat-list">
+      ${CATEGORIES.map(c => `
+        <button class="cat-item" data-cat-id="${c.id}">
+          <div class="cat-icon ${c.id}">${c.icon}</div>
+          <div class="cat-meta">
+            <div class="cat-name">${escapeHtml(c.name)}</div>
+            <div class="cat-desc">${escapeHtml(c.desc)}</div>
+          </div>
+          <div class="cat-arrow">→</div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('h-modal-body').querySelectorAll('.cat-item').forEach(btn => {
+    btn.addEventListener('click', () => openForm(btn.dataset.catId));
+  });
+  openHModal();
+}
+
+function openForm(catId, defaultMember, parentRecordId) {
+  const cat = CATEGORIES.find(c => c.id === catId);
+  if (!cat) return;
+  state.currentCategory = cat;
+  state.pendingPhotos = [];
+
+  document.getElementById('h-modal-title').textContent = cat.name;
+  document.getElementById('h-modal-back').style.display = 'inline-block';
+  document.getElementById('h-modal-foot').style.display = 'flex';
+  document.getElementById('h-modal-submit').textContent = '저장';
+  document.getElementById('h-modal-submit').onclick = () => submitForm();
+  document.getElementById('h-modal-cancel').textContent = '취소';
+
+  const today = formatYMD(new Date());
+  const defMem = defaultMember || (state.currentView !== 'all' ? state.currentView : 'dad');
+  const memberPick = memberPickerHtml(defMem, catId === 'task');
+  let html = '';
+
+  if (catId === 'task') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 할 일?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-group"><label class="form-label">제목<span class="req">*</span></label>
+        <input type="text" class="form-input" name="title" placeholder="예: 도비 약 체크" required></div>
+      <div class="form-group"><label class="form-label">완료일 (선택)</label>
+        <input type="date" class="form-input" name="due_date"></div>
+      <div class="form-group"><label class="form-label">메모 (선택)</label>
+        <textarea class="form-textarea" name="notes" placeholder="자유 메모"></textarea></div>
+    `;
+  } else if (catId === 'vital') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">측정일<span class="req">*</span></label>
+          <input type="date" class="form-input" name="date" value="${today}" required></div>
+        <div><label class="form-label">항목<span class="req">*</span></label>
+          <select class="form-select" name="item" required onchange="updateVitalUnit(this)">
+            <option value="weight" data-unit="kg">체중 (weight)</option>
+            <option value="height" data-unit="cm">키 (height)</option>
+            <option value="bp_sys" data-unit="mmHg">수축기혈압 (bp_sys)</option>
+            <option value="bp_dia" data-unit="mmHg">이완기혈압 (bp_dia)</option>
+            <option value="glucose" data-unit="mg/dL">혈당 (glucose)</option>
+            <option value="temp" data-unit="℃">체온 (temp)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">수치<span class="req">*</span></label>
+          <input type="number" step="0.1" class="form-input" name="value" placeholder="예: 72.4" required></div>
+        <div><label class="form-label">단위</label>
+          <input type="text" class="form-input" name="unit" value="kg" readonly></div>
+      </div>
+    `;
+  } else if (catId === 'medication') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">약 이름<span class="req">*</span></label>
+          <input type="text" class="form-input" name="drug_name" placeholder="예: Tylenol 500mg" required></div>
+        <div><label class="form-label">용량</label>
+          <input type="text" class="form-input" name="dose" placeholder="예: 1T"></div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">빈도</label>
+          <input type="text" class="form-input" name="frequency" placeholder="예: tid"></div>
+        <div><label class="form-label">종류</label>
+          <select class="form-select" name="kind">
+            <option value="">선택</option>
+            <option value="prescription">처방약</option>
+            <option value="otc">일반약</option>
+            <option value="supplement">영양제</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">시작일<span class="req">*</span></label>
+          <input type="date" class="form-input" name="start_date" value="${today}" required></div>
+        <div><label class="form-label">종료일</label>
+          <input type="date" class="form-input" name="end_date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">사유</label>
+        <input type="text" class="form-input" name="reason" placeholder="예: 감기, 두통"></div>
+    `;
+  } else if (catId === 'hospital') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">진료일<span class="req">*</span></label>
+          <input type="date" class="form-input" name="visit_date" value="${today}" required></div>
+        <div><label class="form-label">병원<span class="req">*</span></label>
+          <input type="text" class="form-input" name="hospital" placeholder="예: 서울대병원" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">진료과</label>
+        <input type="text" class="form-input" name="department" placeholder="예: 소아과"></div>
+      <div class="form-group"><label class="form-label">C/C — 주증상</label>
+        <textarea class="form-textarea" name="chief_complaint" placeholder="예: 발열 3일째"></textarea></div>
+      <div class="form-group"><label class="form-label">P/I — 현병력</label>
+        <textarea class="form-textarea" name="present_illness"></textarea></div>
+      <div class="form-group"><label class="form-label">A/P — 진단·계획</label>
+        <textarea class="form-textarea" name="assessment_plan"></textarea></div>
+    `;
+  } else if (catId === 'home') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">날짜<span class="req">*</span></label>
+          <input type="date" class="form-input" name="date" value="${today}" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">C/C — 주증상<span class="req">*</span></label>
+        <textarea class="form-textarea" name="chief_complaint" required></textarea></div>
+      <div class="form-group"><label class="form-label">P/I — 현병력</label>
+        <textarea class="form-textarea" name="present_illness"></textarea></div>
+      <div class="form-group"><label class="form-label">A/P — 진단·계획</label>
+        <textarea class="form-textarea" name="assessment_plan"></textarea></div>
+      <div class="form-group">
+        <label class="form-label">증상 사진 (최대 3장)</label>
+        <div class="photo-strip" id="photo-strip"></div>
+        <label class="photo-input-label">
+          + 사진 추가
+          <input type="file" accept="image/*" style="display:none" multiple onchange="handlePhotoSelect(this)">
+        </label>
+      </div>
+    `;
+  } else if (catId === 'progress') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">연결할 원래 진료 ID<span class="req">*</span></label>
+          <input type="text" class="form-input" name="parent_record_id" value="${escapeHtml(parentRecordId || '')}" placeholder="예: HC-20260415-001" required></div>
+        <div><label class="form-label">원래 진료 유형</label>
+          <select class="form-select" name="parent_type">
+            <option value="home">Home</option>
+            <option value="hospital">Hospital</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">기록일<span class="req">*</span></label>
+          <input type="date" class="form-input" name="note_date" value="${today}" required></div>
+        <div><label class="form-label">Day #</label>
+          <input type="text" class="form-input" name="day_number" placeholder="예: #12"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Assessment</label>
+        <textarea class="form-textarea" name="assessment" placeholder="예: decreased rhinorrhea"></textarea></div>
+      <div class="form-group"><label class="form-label">Plan</label>
+        <textarea class="form-textarea" name="plan" placeholder="예: observation"></textarea></div>
+    `;
+  } else if (catId === 'vaccination') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">백신 이름<span class="req">*</span></label>
+          <input type="text" class="form-input" name="vaccine_name" placeholder="예: MMR" required></div>
+        <div><label class="form-label">접종일<span class="req">*</span></label>
+          <input type="date" class="form-input" name="date" value="${today}" required></div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">질병</label>
+          <input type="text" class="form-input" name="disease"></div>
+        <div><label class="form-label">카테고리</label>
+          <select class="form-select" name="category">
+            <option value="essential">필수</option>
+            <option value="optional">비필수</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">회차 / 총</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" min="1" class="form-input" name="dose_number" placeholder="1" style="width:70px">
+            <span style="color:var(--text-quiet)">/</span>
+            <input type="number" min="1" class="form-input" name="total_doses" placeholder="3" style="width:70px">
+          </div>
+        </div>
+        <div><label class="form-label">병원</label>
+          <input type="text" class="form-input" name="hospital"></div>
+      </div>
+      <div class="form-group"><label class="form-label">다음 접종일</label>
+        <input type="date" class="form-input" name="next_date"></div>
+      <div class="form-group"><label class="form-label">이상반응</label>
+        <input type="text" class="form-input" name="adverse_reaction" placeholder="없으면 공란"></div>
+    `;
+  } else if (catId === 'condition') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-group"><label class="form-label">질환명<span class="req">*</span></label>
+        <input type="text" class="form-input" name="condition_name" placeholder="예: 알레르기성 비염" required></div>
+      <div class="form-row">
+        <div><label class="form-label">진단일</label>
+          <input type="date" class="form-input" name="diagnosis_date" value="${today}"></div>
+        <div><label class="form-label">상태<span class="req">*</span></label>
+          <select class="form-select" name="status" required>
+            <option value="active">active (활성)</option>
+            <option value="observation">observation (관찰)</option>
+            <option value="resolved">resolved (해소)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">비고</label>
+        <textarea class="form-textarea" name="notes"></textarea></div>
+    `;
+  } else if (catId === 'allergy') {
+    html = `
+      <div class="form-group"><label class="form-label">누구의 기록?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">알레르겐<span class="req">*</span></label>
+          <input type="text" class="form-input" name="allergen" placeholder="예: 갑각류" required></div>
+        <div><label class="form-label">심각도</label>
+          <select class="form-select" name="severity">
+            <option value="">선택</option>
+            <option value="mild">mild</option>
+            <option value="moderate">moderate</option>
+            <option value="severe">severe</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">반응</label>
+        <input type="text" class="form-input" name="reaction" placeholder="예: 두드러기"></div>
+      <div class="form-group"><label class="form-label">비고</label>
+        <textarea class="form-textarea" name="notes"></textarea></div>
+    `;
+  } else if (catId === 'momsnote') {
+    html = `
+      <div class="mn-field">
+        <label class="form-label">① 대상자<span class="req">*</span></label>
+        ${memberPick}
+        <div class="mn-error-msg">대상자를 선택하세요</div>
+      </div>
+      <div class="mn-field">
+        <label class="form-label">② 발생일시<span class="req">*</span></label>
+        <input type="datetime-local" class="form-input" name="onset_datetime" value="${todayDatetimeLocal()}" required>
+        <div class="mn-error-msg">발생일시를 입력하세요</div>
+      </div>
+      <div class="mn-field">
+        <label class="form-label">③ 증상<span class="req">*</span></label>
+        <input type="text" class="form-input" name="chief_complaint" placeholder="예: 콧물, 미열" required>
+        <div class="mn-error-msg">증상을 입력하세요</div>
+      </div>
+      <div class="mn-field">
+        <label class="form-label">④ 기타<span class="req">*</span></label>
+        <textarea class="form-textarea" name="notes" placeholder="동반증상·메모·맥락 등" required></textarea>
+        <div class="mn-error-msg">기타 정보를 입력하세요</div>
+      </div>
+    `;
+  }
+  document.getElementById('h-modal-body').innerHTML = html;
+  // 멤버 picker 핸들러
+  document.getElementById('h-modal-body').querySelectorAll('.mem-pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => pickMember(btn));
+  });
+  openHModal();
+}
+
+function updateVitalUnit(selectEl) {
+  const unit = selectEl.options[selectEl.selectedIndex].dataset.unit || '';
+  const unitInput = selectEl.closest('.h-modal-body').querySelector('input[name="unit"]');
+  if (unitInput) unitInput.value = unit;
+}
+window.updateVitalUnit = updateVitalUnit;
+
+/* ─── 멤버 picker ─────────────────────────────── */
+function memberPickerHtml(defaultId, includeFamily) {
+  const ids = includeFamily ? MEMBER_ORDER.concat(['family']) : MEMBER_ORDER;
+  return `<div class="mem-picker" data-name="member_id">${
+    ids.map(id => `
+      <button type="button" class="mem-pick-btn ${id === defaultId ? 'active' : ''}" data-value="${id}">
+        <span class="mdot" style="background:${MEMBER_COLOR_VAR[id]}"></span>${escapeHtml(MEMBER_LABELS[id])}
+      </button>
+    `).join('')
+  }</div>`;
+}
+
+function pickMember(btn) {
+  const picker = btn.closest('.mem-picker');
+  if (!picker) return;
+  picker.querySelectorAll('.mem-pick-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function getPickedMember(scope) {
+  const root = scope || document.getElementById('h-modal-body');
+  const picker = root.querySelector('.mem-picker');
+  if (!picker) return null;
+  const active = picker.querySelector('.mem-pick-btn.active');
+  return active ? active.dataset.value : null;
+}
+
+/* ─── 사진 업로드 ─────────────────────────────── */
+function handlePhotoSelect(input) {
+  const files = Array.from(input.files);
+  const remaining = 3 - state.pendingPhotos.length;
+  if (remaining <= 0) {
+    showToast('error', '최대 3장까지 가능합니다');
+    input.value = '';
+    return;
+  }
+  files.slice(0, remaining).forEach(file => {
+    resizeImageFile(file, 1000, 0.75).then(({ dataUrl }) => {
+      state.pendingPhotos.push({ dataUrl, name: file.name });
+      renderPhotoStrip();
+    });
+  });
+  input.value = '';
+}
+window.handlePhotoSelect = handlePhotoSelect;
+
+function resizeImageFile(file, maxWidth, quality) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', quality) });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoStrip() {
+  const strip = document.getElementById('photo-strip');
+  if (!strip) return;
+  strip.innerHTML = state.pendingPhotos.map((p, i) => `
+    <div class="photo-preview">
+      <img src="${p.dataUrl}" alt="사진 ${i+1}">
+      <div class="photo-preview-del" onclick="removePhoto(${i})">×</div>
+    </div>
+  `).join('');
+}
+
+function removePhoto(i) {
+  state.pendingPhotos.splice(i, 1);
+  renderPhotoStrip();
+}
+window.removePhoto = removePhoto;
+
+async function uploadPendingPhotos() {
+  const ids = [];
+  for (let i = 0; i < state.pendingPhotos.length; i++) {
+    const p = state.pendingPhotos[i];
+    try {
+      const r = await apiPost({
+        action: 'uploadphoto',
+        base64: p.dataUrl.split(',')[1],
+        filename: 'hc_' + Date.now() + '_' + i + '.jpg',
+        mimetype: 'image/jpeg'
+      });
+      if (r.ok && r.file_id) ids.push(r.file_id);
+    } catch (e) { console.error('Photo upload error:', e); }
+  }
+  return ids.join(',');
+}
+
+/* ─── 폼 제출 ─────────────────────────────────── */
+async function submitForm() {
+  if (state.isSubmitting) return;
+  const cat = state.currentCategory;
+  if (!cat) return;
+
+  const body = document.getElementById('h-modal-body');
+
+  // Mom's Note 4필드 검증
+  if (cat.id === 'momsnote') {
+    let ok = true;
+    body.querySelectorAll('.mn-field').forEach(f => f.classList.remove('error'));
+    if (!getPickedMember()) {
+      body.querySelectorAll('.mn-field')[0].classList.add('error'); ok = false;
+    }
+    const fields = body.querySelectorAll('.mn-field');
+    [['onset_datetime', 1], ['chief_complaint', 2], ['notes', 3]].forEach(([n, idx]) => {
+      const el = body.querySelector(`[name="${n}"]`);
+      if (!el || !el.value.trim()) {
+        fields[idx].classList.add('error'); ok = false;
+      }
+    });
+    if (!ok) {
+      showToast('error', '4가지 항목을 모두 입력하세요');
+      return;
+    }
+  }
+
+  // 폼 데이터 수집
+  const data = {};
+  body.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.name) data[el.name] = el.value;
+  });
+  // 멤버 picker
+  const picked = getPickedMember();
+  if (picked) data.member_id = picked;
+
+  // 필수 필드 체크
+  if (!data.member_id) {
+    showToast('error', '대상자를 선택하세요');
+    return;
+  }
+
+  // task 카테고리: 빈 필드 정리
+  if (cat.id === 'task') {
+    if (!data.title || !data.title.trim()) {
+      showToast('error', '제목을 입력하세요');
+      return;
+    }
+    data.completed_at = '';
+  }
+
+  // idempotency
+  data.client_req_id = 'client-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
+  state.isSubmitting = true;
+  const submitBtn = document.getElementById('h-modal-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '저장 중…';
+
+  try {
+    // home_clinic: 사진 먼저 업로드
+    if (cat.id === 'home' && state.pendingPhotos.length > 0) {
+      submitBtn.textContent = '사진 업로드 중…';
+      const photoIds = await uploadPendingPhotos();
+      data.photo_drive_ids = photoIds;
+    }
+
+    submitBtn.textContent = '저장 중…';
+    const r = await apiPost({ action: 'add', sheet: cat.sheet, data });
+
+    if (r.ok) {
+      showToast('ok', r.duplicate ? '이미 저장된 기록' : '저장 완료');
+      closeHModal();
+      // 부분 새로고침 — 일단 풀 리프레시
+      await refresh();
+    } else {
+      showToast('error', r.error || '저장 실패');
+    }
+  } catch (err) {
+    showToast('error', err.message);
+  } finally {
+    state.isSubmitting = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = '저장';
+  }
+}
+
+/* ─── API 호출 ──────────────────────────────────── */
+async function apiPost(body) {
+  const url = FamilyOS.getWebAppUrl(DASHBOARD_ID);
+  if (!url) throw new Error('Web App URL 미설정');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
+    redirect: 'follow'
+  });
+  return res.json();
+}
+
+/* ─── Excel 내보내기 ──────────────────────────── */
+function downloadExcel() {
+  if (!state.sheets || Object.keys(state.sheets).length === 0) {
+    showToast('error', '데이터가 없습니다');
+    return;
+  }
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // 데이터 시트들
+    const exportSheets = [
+      ['hospital_report', '병원진료'],
+      ['home_clinic', '가정진료'],
+      ['progress_note', '경과기록'],
+      ['medication', '투약'],
+      ['vital', '신체계측'],
+      ['blood_test', '혈액검사'],
+      ['healthcheck', '건강검진'],
+      ['imaging', '영상검사'],
+      ['symptom', "Mom's Note"],
+      ['conditions', '보유질환'],
+      ['allergies', '알레르기'],
+      ['vaccination', '접종'],
+      ['health_tasks', '할 일'],
+    ];
+
+    exportSheets.forEach(([key, label]) => {
+      const rows = state.sheets[key] || [];
+      if (rows.length === 0) return;
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, label);
+    });
+
+    const today = new Date().toISOString().substring(0, 10);
+    XLSX.writeFile(wb, `FamilyHealth_${today}.xlsx`);
+    showToast('ok', 'Excel 파일 다운로드 완료');
+  } catch (err) {
+    console.error('Excel export error:', err);
+    showToast('error', 'Excel 생성 실패: ' + err.message);
+  }
+}
+
+/* ─── 유틸 ──────────────────────────────────────── */
+function escapeHtml(s) { return FamilyOS.escapeHtml(s); }
+
+function formatYMD(d) {
+  if (!d) return null;
+  if (typeof d === 'string') {
+    // 이미 YYYY-MM-DD면 그대로
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.substring(0, 10);
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    return dt.toISOString().substring(0, 10);
+  }
+  if (d instanceof Date) return d.toISOString().substring(0, 10);
+  return null;
+}
+
+function formatRelativeDate(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return '';
+  const diff = Math.floor((Date.now() - t) / 86400000);
+  if (diff < 1) return '오늘';
+  if (diff < 2) return '어제';
+  if (diff < 7) return diff + '일 전';
+  return new Date(t).toISOString().substring(0, 10);
+}
+
+function formatDueRelative(due, today) {
+  if (!due) return '';
+  const d1 = new Date(due).getTime();
+  const d2 = new Date(today).getTime();
+  if (isNaN(d1) || isNaN(d2)) return due;
+  const diff = Math.floor((d1 - d2) / 86400000);
+  if (diff === 0) return '오늘';
+  if (diff === 1) return '내일';
+  if (diff < 0) return `D+${Math.abs(diff)} (지남)`;
+  return `D-${diff}`;
+}
+
+function todayDatetimeLocal() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function computeAge(birthDate) {
+  if (!birthDate) return null;
+  const bd = new Date(birthDate);
+  if (isNaN(bd.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - bd.getFullYear();
+  const m = now.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  return age;
+}
+
+function getLatestVital(memberId, item) {
+  const rows = (state.sheets.vital || [])
+    .filter(r => r.member_id === memberId && r.item === item);
+  if (rows.length === 0) return null;
+  return rows.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+}
+
+function computeMemberStatus(memberId) {
+  const tasks = (state.sheets.health_tasks || [])
+    .filter(t => (t.member_id === memberId || t.member_id === 'family') && !t.completed_at);
+  if (tasks.length === 0) return 'ok';
+  const todayStr = formatYMD(new Date());
+  const overdue = tasks.some(t => t.due_date && formatYMD(t.due_date) < todayStr);
+  return overdue ? 'bad' : 'warn';
+}
+
+/* ─── 모달 open/close ─────────────────────────── */
+function openHModal() {
+  document.getElementById('h-modal-backdrop').classList.add('open');
+}
+function closeHModal() {
+  document.getElementById('h-modal-backdrop').classList.remove('open');
+  state.pendingPhotos = [];
+}
+
+/* ─── Toast ───────────────────────────────────── */
+let toastTimer = null;
+function showToast(kind, msg) {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  el.classList.remove('ok', 'error', 'info');
+  el.classList.add(kind || 'info', 'show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+/* ─── 부팅 ───────────────────────────────────── */
+refresh();
+FamilyOS.registerServiceWorker();
+</script>
+</body>
+</html>

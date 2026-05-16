@@ -402,13 +402,26 @@
     }
     footer.ftr .ftr-r { font-family: var(--font-mono); }
 
-    /* 카드 전체 클릭 영역 */
+    /* 카드 전체 클릭 영역 — JS 핸들러가 처리. 오버레이 링크는 키보드 접근성용 */
+    .card { cursor: pointer; }
     .card a.card-link-overlay {
       position: absolute; inset: 0; z-index: 1;
+      /* 마우스/터치 클릭은 JS가 위임 처리하므로 링크가 가리는 영역을 줄임 */
+      pointer-events: none;
+    }
+    /* 키보드 Tab 으로 포커스 시에만 외곽선 표시 + 클릭 가능하게 */
+    .card a.card-link-overlay:focus-visible {
+      pointer-events: auto;
+      outline: 2px solid var(--accent);
+      outline-offset: -3px;
+      border-radius: var(--r-lg);
     }
     .card .card-interactive { position: relative; z-index: 2; }
     .card:hover { border-color: var(--border-hi); }
     .card:active { transform: scale(0.998); }
+    /* 카드 안의 펼치기/버튼은 카드 클릭과 별개로 작동해야 함 */
+    .card details.wealth-expand summary,
+    .card button { cursor: pointer; }
   </style>
 </head>
 
@@ -754,6 +767,23 @@
     }
   });
 
+  /* ─── Session 5.3 — 카드 전체 영역 클릭 → 대시보드 열기 ─────────
+   * 기존엔 오버레이 <a>가 카드 상단 패딩만 차지해 클릭 영역이 좁음.
+   * 이 핸들러로 카드 어디든 클릭하면 새 탭에서 해당 대시보드 열림.
+   * 내부 상호작용 요소(버튼/펼치기 summary/링크 등)는 자체 동작 우선.
+   * 오버레이 <a>는 키보드 Tab 접근성용으로 유지 (focus-visible 시 활성).
+   * ─────────────────────────────────────────────────────────── */
+  document.getElementById('cards').addEventListener('click', (e) => {
+    // 카드 내부의 상호작용 요소는 자체 동작에 맡김
+    if (e.target.closest('button, summary, a, input, textarea, label')) return;
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const overlay = card.querySelector('.card-link-overlay');
+    if (overlay && overlay.href) {
+      window.open(overlay.href, '_blank', 'noopener');
+    }
+  });
+
   /* ─── 부팅 ───────────────────────────────────────────── */
   DASHBOARDS.forEach(d => renderCard(d.id));
   refreshAll();
@@ -772,7 +802,6 @@
     const PREFIX = 'familyOS.webAppUrl.';
     const COUNT_KEY = 'familyOS.diag.lastUrlCount';
     const TS_KEY = 'familyOS.diag.lastLoadTs';
-    const SESSION_BEACON = 'familyOS.diag.sessionBeacon';
     const ids = DASHBOARDS.map(d => d.id);
 
     // 현재 저장된 URL 개수
@@ -790,10 +819,6 @@
     const prevTs = prevTsStr ? parseInt(prevTsStr, 10) : null;
     const now = Date.now();
 
-    // 세션 비콘: sessionStorage에 있고 localStorage엔 없으면 → 이전 같은 세션은 있었으나 localStorage가 비워진 것 = 명백한 영속화 실패
-    const sessionBeaconLs = localStorage.getItem(SESSION_BEACON);
-    const sessionBeaconSs = sessionStorage.getItem(SESSION_BEACON);
-
     // 콘솔 진단
     console.log('%c[Family OS] Storage 진단', 'color:#E5C158;font-weight:600');
     console.log('  현재 저장된 URL:', saved, '(' + nowCount + '/' + ids.length + ')');
@@ -803,27 +828,18 @@
     } else {
       console.log('  이전 로드 기록 없음 (첫 방문 또는 storage가 영속화 안 됨)');
     }
-    console.log('  세션 비콘: localStorage=' + (sessionBeaconLs ? '있음' : '없음')
-                + ' / sessionStorage=' + (sessionBeaconSs ? '있음' : '없음'));
 
-    // 영속화 실패 감지 케이스들
+    // 영속화 실패 감지: 이전 로드에선 URL이 있었는데 이번엔 0개
     const persistenceFailed = (prevCount > 0 && nowCount === 0);
-    const beaconMismatch = (sessionBeaconSs && !sessionBeaconLs);  // sessionStorage엔 있는데 localStorage엔 없음
-
     if (persistenceFailed) {
       console.warn('  ⚠ LocalStorage 영속화 실패. 이전엔 ' + prevCount + '개였는데 모두 사라짐');
       showStorageWarningBanner(prevCount);
-    } else if (beaconMismatch) {
-      console.warn('  ⚠ 같은 세션 내 LocalStorage 비콘 사라짐 — 매우 적극적 휘발');
-      showStorageWarningBanner(-1);
     }
 
-    // 이번 로드 상태 기록 (영속성 테스트 비콘 포함)
+    // 이번 로드 상태 기록
     try {
       localStorage.setItem(COUNT_KEY, String(nowCount));
       localStorage.setItem(TS_KEY, String(now));
-      localStorage.setItem(SESSION_BEACON, String(now));
-      sessionStorage.setItem(SESSION_BEACON, String(now));
     } catch (e) {
       console.error('  ⚠ LocalStorage 쓰기 실패:', e.message);
       showStorageBlockedBanner();
@@ -836,14 +852,11 @@
       + 'background:#7c2d12;color:#fef3c7;padding:12px 16px;'
       + 'font-size:13px;line-height:1.5;display:flex;gap:12px;align-items:center;'
       + 'box-shadow:0 2px 12px rgba(0,0,0,0.4);font-family:var(--font-body);';
-    const msg = (prevCount === -1)
-      ? '<strong>⚠ 같은 세션 안에서도 저장이 휘발됩니다.</strong> '
-        + '브라우저나 확장프로그램이 이 사이트의 localStorage를 즉시 비우고 있습니다. '
-      : '<strong>⚠ 저장된 Web App URL이 사라졌어요.</strong> '
-        + '이전 방문에서 ' + prevCount + '개를 저장했는데 모두 비어있습니다. '
-        + 'Chrome 설정 또는 시스템 클리너가 사이트 데이터를 자동 삭제 중일 수 있어요. ';
     banner.innerHTML =
-      '<div style="flex:1;">' + msg
+      '<div style="flex:1;">'
+      + '<strong>⚠ 저장된 Web App URL이 사라졌어요.</strong> '
+      + '이전 방문에서 ' + prevCount + '개를 저장했는데 모두 비어있습니다. '
+      + 'Chrome 설정 또는 시스템 클리너가 사이트 데이터를 자동 삭제 중일 수 있어요. '
       + '<a href="#" id="fos-diag-help" style="color:#fef3c7;text-decoration:underline;">대처 방법</a>'
       + '</div>'
       + '<button id="fos-diag-close" style="background:transparent;border:1px solid #fef3c7;'
@@ -888,35 +901,10 @@
     setTimeout(injectBackupUI, 50);  // 모달 열린 후
   });
 
-  /* 백업 텍스트 갱신 — 현재 input 값 + LocalStorage 합쳐 인코딩 */
-  function refreshBackupText(modal) {
-    const text = modal.querySelector('#fos-backup-text');
-    if (!text) return;
-    const backup = {};
-    DASHBOARDS.forEach(d => {
-      const input = modal.querySelector('#fos-url-' + d.id);
-      const v = (input && input.value.trim()) || FamilyOS.getWebAppUrl(d.id);
-      if (v) backup[d.id] = v;
-    });
-    text.value = btoa(unescape(encodeURIComponent(JSON.stringify(backup))));
-    // 비어있으면 사용자에게 시각적 힌트
-    if (text.value === 'e30=') {
-      text.style.borderColor = 'var(--border)';
-      text.placeholder = '아직 저장된 URL이 없어 백업 코드가 비어있습니다. URL을 입력하고 "저장"하세요.';
-    } else {
-      text.style.borderColor = 'var(--accent)';
-    }
-  }
-
   function injectBackupUI() {
     const modal = document.querySelector('.modal-backdrop.open .modal');
     if (!modal) return;
-
-    // 백업 블록이 이미 있으면 텍스트만 새로 채우고 종료 (모달 두 번째부터 열렸을 때)
-    if (modal.querySelector('#fos-backup-block')) {
-      refreshBackupText(modal);
-      return;
-    }
+    if (modal.querySelector('#fos-backup-block')) return;  // 이미 있으면 skip
 
     // URL 입력 필드들 다음, 액션 버튼들 앞에 끼워넣기
     const actions = modal.querySelector('.modal-actions');
@@ -934,7 +922,6 @@
       <div style="font-size:11px;color:var(--text-quiet);line-height:1.6;margin-bottom:var(--s3);">
         4개 URL을 한 줄로 묶어 백업합니다. URL이 사라졌을 때 붙여넣고
         <strong style="color:var(--text-secondary);">복원</strong> 버튼을 누르면 즉시 복구됩니다.
-        <strong style="color:#fbbf24;">URL 저장 직후 이 코드를 메모장/메일에 복사해 두세요.</strong>
       </div>
       <textarea id="fos-backup-text" class="modal-input"
         style="width:100%;height:72px;resize:vertical;font-size:10px;line-height:1.4;"
@@ -948,15 +935,15 @@
     `;
     actions.parentNode.insertBefore(block, actions);
 
-    // 최초 채우기
-    refreshBackupText(modal);
-    const text = modal.querySelector('#fos-backup-text');
-
-    // URL input 변경 감지 — 사용자가 타이핑/붙여넣기하면 백업 코드 즉시 갱신
+    // 백업 코드 자동 생성 (현재 입력 필드 값들 우선, 없으면 LocalStorage)
+    const backup = {};
     DASHBOARDS.forEach(d => {
       const input = modal.querySelector('#fos-url-' + d.id);
-      if (input) input.addEventListener('input', () => refreshBackupText(modal));
+      const v = (input && input.value.trim()) || FamilyOS.getWebAppUrl(d.id);
+      if (v) backup[d.id] = v;
     });
+    const text = modal.querySelector('#fos-backup-text');
+    text.value = btoa(unescape(encodeURIComponent(JSON.stringify(backup))));
 
     modal.querySelector('#fos-backup-copy').onclick = async () => {
       try {
@@ -990,7 +977,6 @@
           }
         });
         alert(restored + '개 URL이 입력란에 복원되었습니다. "저장" 버튼을 눌러 적용하세요.');
-        refreshBackupText(modal);  // 복원 후 백업 코드도 갱신
       } catch (e) {
         alert('백업 코드 형식이 올바르지 않습니다.\n' + e.message);
       }

@@ -926,7 +926,7 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
 /* 주간 캘린더 (weekly) */
 .week-cal {
   display: grid;
-  grid-template-columns: 110px repeat(7, 1fr);
+  grid-template-columns: 80px repeat(7, 1fr);
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
@@ -936,7 +936,7 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
 }
 .week-cal-cell {
   background: var(--surface);
-  padding: 6px 4px;
+  padding: 6px 2px;
   text-align: center;
   color: var(--text-secondary);
   min-height: 24px;
@@ -955,14 +955,19 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
 }
 .week-cal-row-label {
   background: var(--surface);
-  padding: 6px 8px;
+  padding: 6px 6px;
   text-align: left;
   color: var(--text-primary);
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 4px;
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.week-cal-row-label .sched-who-badge {
+  padding: 1px 5px;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 .week-cal-cell.has-event {
   background: var(--acc-health-soft);
@@ -975,18 +980,19 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
   display: flex; flex-direction: column; gap: 6px;
 }
 .sched-oneoff-item {
-  display: flex; align-items: center; gap: var(--s3);
+  display: flex; align-items: center; gap: var(--s2);
   padding: 8px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   font-size: 12px;
+  flex-wrap: wrap;
 }
 .sched-oneoff-item .date {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-quiet);
-  min-width: 80px;
+  min-width: 70px;
 }
 .sched-oneoff-item .date.today {
   color: var(--acc-health);
@@ -995,12 +1001,16 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
 .sched-oneoff-item .title {
   flex: 1;
   color: var(--text-primary);
+  min-width: 0;
 }
 .sched-oneoff-item .meta {
   font-size: 11px;
   color: var(--text-quiet);
   font-family: var(--font-mono);
+  width: 100%;
+  padding-left: 78px;
 }
+.sched-oneoff-item .meta:empty { display: none; }
 .sched-oneoff-item.past {
   opacity: 0.5;
 }
@@ -1239,9 +1249,9 @@ function renderAllView() {
 
   mount.innerHTML = `
     <div class="grid-members">${memberCardsHtml}</div>
-    ${renderScheduleCardHtml()}
     <div class="grid-2">
       <div>
+        ${renderScheduleCardHtml()}
         <section class="h-card">
           <div class="h-card-title"><span>할 일</span>
             <span class="right link" id="add-task-link">+ 추가</span>

@@ -409,9 +409,17 @@
     }
     footer.ftr .ftr-r { font-family: var(--font-mono); }
 
-    /* 카드 전체 클릭 영역 */
+    /* 카드 전체 클릭 영역 — Session 5.3: 클릭 영역 확장 + 키보드 접근성 */
+    .card { cursor: pointer; }
     .card a.card-link-overlay {
       position: absolute; inset: 0; z-index: 1;
+      pointer-events: none;
+      border-radius: var(--r-lg);
+      outline: 0;
+    }
+    .card a.card-link-overlay:focus-visible {
+      outline: 2px solid var(--card-accent);
+      outline-offset: 2px;
     }
     .card .card-interactive { position: relative; z-index: 2; }
     .card:hover { border-color: var(--border-hi); }
@@ -859,6 +867,19 @@
       const id = btn.dataset.id;
       if (id) refreshOne(id);
     }
+  });
+
+  /* ─── 카드 전체 클릭 → 새 탭에서 서브 대시보드 열기 (Session 5.3) ─── */
+  document.getElementById('cards').addEventListener('click', (e) => {
+    // 내부 인터랙티브 요소 클릭이면 무시 (button/summary/a/input/textarea/label)
+    if (e.target.closest('button, summary, a, input, textarea, label')) return;
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const overlay = card.querySelector('a.card-link-overlay');
+    if (!overlay) return;
+    const href = overlay.getAttribute('href');
+    if (!href) return;
+    window.open(href, '_blank', 'noopener');
   });
 
   /* ─── 부팅 ───────────────────────────────────────────── */

@@ -10,21 +10,21 @@
 
 ```
 family-os/
-├── index.html              ← 메인 허브 (5번째 카드 Travel 추가, Session 6)
-├── design-tokens.css       ← 공통 CSS 변수 (--acc-travel coral 추가)
-├── design-system.md        ← 디자인 가이드 (Travel 행 추가)
-├── common.js               ← 공통 JS (window.FamilyOS, 26 public API, DASHBOARDS 5개)
+├── index.html              ← 메인 허브 (5번째 카드 Travel 포함)
+├── design-tokens.css       ← 공통 CSS 변수 (--acc-travel coral 포함)
+├── design-system.md        ← 디자인 가이드
+├── common.js               ← 공통 JS (window.FamilyOS, DASHBOARDS 5개)
 ├── manifest.json + icon.svg ← PWA
-├── backend-spec.md         ← Apps Script 응답 표준 (v0.3, Travel kpi/스키마 추가)
+├── backend-spec.md         ← Apps Script 응답 표준 (v0.3)
 ├── dashboard-template.html ← 새 대시보드 시작점
 ├── apps-script-template.gs ← 백엔드 시작점
 ├── wealth.html  + wealth-apps-script.gs   ← Phase 2 완료
 ├── expense.html + expense-apps-script.gs  ← Phase 2 완료
 ├── health.html  + health-apps-script.gs   ← Phase 2 완료
 ├── future.html  + future-apps-script.gs   ← Phase 2 완료 (v0.1.1)
-├── travel.html  + travel-apps-script.gs   ← Session 6 Phase A 완료 (메인만)
+├── travel.html + travel-trip.html + travel-apps-script.gs  ← Session 6+7 완료
 ├── worklog.md              ← 이 파일 (슬림 현재 상태)
-├── worklog-archive.md      ← Session 1 ~ 6 누적 (참조용, 첨부 X)
+├── worklog-archive.md      ← Session 1 ~ 7 누적 (참조용, 첨부 X)
 └── context-{dashboard}.md  ← 대시보드별 작업 시작용 컨텍스트
                               (현재: wealth, health, travel)
 ```
@@ -35,14 +35,16 @@ family-os/
 |---|---|
 | Apps Script 응답 envelope | `{ok: true, data: {kpi, tasks, updated_at}}` |
 | Write 패턴 (필수) | `doPost` + `Content-Type: text/plain;charset=utf-8` (CORS preflight 회피) |
-| LocalStorage 키 prefix | `familyOS.webAppUrl.{id}` |
+| LocalStorage 키 prefix (Web App URL) | `familyOS.webAppUrl.{id}` |
+| LocalStorage 키 (Mapbox token) | `familyOS.mapboxToken` (travel-trip.html 전용) |
 | 대시보드 id | `wealth`, `expense`, `health`, `future`, `travel` |
 | 가족 id (시트 진실의 원천) | `dad`, `mom`, `son1`(=도비, 형), `son2`(=로비, 동생) |
 | 호스팅 | GitHub Pages (public repo) |
 | 백엔드 | 대시보드별 독립 Apps Script + 독립 스프레드시트 |
 | 인증 | Web App URL 기기별 LocalStorage 저장 (백업 코드 export/import 지원) |
 | 시트 격리 원칙 | 각 대시보드 Apps Script 는 자기 시트만 읽음. 결합은 메인 허브 |
-| Travel ↔ Expense 연동 | 메모 태깅 (`#trip_id`). Travel 측은 비용 모름 |
+| Travel ↔ Expense 연동 | 메모 태깅 (`#trip_id`). Travel 측은 비용 모름. Phase B 는 수동 입력 |
+| 외부 API | Mapbox (travel-trip 의 지도/검색), OSM Nominatim (travel 의 도시 검색). 둘 다 무료 |
 | 테마 | 다크 전용 (`#0A0B0F` + 골드 `#E5C158`) |
 | 폰트 | Fraunces (display), Pretendard (body), JetBrains Mono (mono) |
 | 악센트 | Wealth=골드, Expense=인디고, Health=민트, Future=라벤더, Travel=코랄 |
@@ -51,22 +53,22 @@ family-os/
 
 | 대시보드 | 버전 | 상태 / 비고 |
 |---|---|---|
-| 메인 허브 `index.html` | v0.1.0 + 5.2 + 5.3 + 6 | 5번째 카드 Travel 추가 (가로 전체 span, 비대칭) |
+| 메인 허브 `index.html` | v0.1.0 + 5.2 + 5.3 + 6 | 5번째 카드 Travel 포함 (가로 전체 span) |
 | Wealth | 배포됨 | **수정 예정**: daily snapshot 미작동, MoM/YoY 동일값, 전체금액 오차, 주가 미세 오차, 올해 수익 계산 변경, 추가 기능 |
 | Expense | 배포됨 | OAuth 폐기 (doPost 통일). 안정 |
-| Health | 배포됨 | **기능 추가 예정**: 아이들(도비/로비) 1주일 운동 스케줄 |
+| Health | 배포됨 | **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
-| Travel | **v0.1.0 Phase A** | 메인 페이지만 완성 (세계지도 SVG + 2열 + 여행 추가/편집). 개별 여행 페이지는 Phase B |
+| Travel | **v0.2.0** | Phase A (메인) + Phase B (개별 여행) 완료. Mapbox 통합. 카테고리 핀 10개. 같은 도시 재방문 시각화 |
 
 ## Cross-cutting Pending
 
-1. **Travel Phase B** — 개별 여행 페이지 (`travel.html?trip=...`). Mapbox 통합 + 검색 자동완성 + 카테고리 핀 9개+other + 별점 + 필터. **다음 세션 후보** (`context-travel.md` 참조)
-2. **Travel ↔ Expense 비용 표기 방식 결정** — Phase B 진입 시 옵션 A(Expense API 호출) / B(수동 입력) / C(표기 안 함) 결정 필요
-3. **같은 도시 재방문 시각화** — Phase A 데이터 모델 (`country_code`+`city_key`) 준비됨. Phase B 에서 회색/유색 구현
-4. **Wealth 대수정** — daily snapshot 복구 + 전체금액/주가 오차 + 올해 수익 계산 + 추가 기능 → 다음 Wealth 세션 (`context-wealth.md` 참조)
-5. **Health 기능 추가** — 아이들 운동 스케줄 입출력 → 다음 Health 세션 (`context-health.md` 참조)
-6. **LocalStorage 영속성 진단 결과** — Session 5.2 의 자동 배너/콘솔 로그 사용자 보고 미수령
-7. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
+1. **Travel ↔ Expense 비용 표기 자동화** — Phase B 는 현재 수동 입력. 메인 허브가 양쪽 결합해 LocalStorage 캐싱 후 travel-trip 이 읽는 방식 (hotfix 후보)
+2. **Multi-city trip 지원** — 현재 모델은 trip=1도시 가정. 사용자가 "샌프란시스코, LA" 식으로 입력 시 부분 동작. trip 분할 또는 데이터 모델 보강 검토
+3. **Wealth 대수정** — daily snapshot 복구 + 전체금액/주가 오차 + 올해 수익 계산 + 추가 기능 → 다음 Wealth 세션 (`context-wealth.md` 참조)
+4. **Health 기능 추가** — 아이들 운동 스케줄 입출력 → 다음 Health 세션 (`context-health.md` 참조)
+5. **LocalStorage 영속성 진단 결과** — Session 5.2 의 자동 배너/콘솔 로그 사용자 보고 미수령
+6. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
+7. **세계지도 정밀도** — 인라인 SVG 의 13개 추상 path 를 더 정밀한 topojson 으로 교체 (낮은 우선순위)
 
 ## 세션 종료 시 worklog 업데이트 규칙
 

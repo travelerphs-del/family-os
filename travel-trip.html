@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0B0F">
+
+  <title>Travel Trip — Family OS</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="./design-tokens.css">
+
+  <!-- Mapbox GL JS v3 -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+
+  <style>
+    /* ─── 공통 레이아웃 ─────────────────────────────────────── */
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      overflow-x: hidden;
+    }
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--s6);
+    }
+    @media (max-width: 767px) { .app { padding: 0 var(--s4); } }
+
+    header.hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--s6) 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--s5);
+    }
+    @media (max-width: 767px) {
+      header.hdr { padding: var(--s4) 0; margin-bottom: var(--s4); }
+    }
+    .brand { display: flex; align-items: baseline; gap: var(--s3); }
+    .brand-title {
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 24px; letter-spacing: -0.01em;
+    }
+    .brand-sub {
+      font-size: 12px; color: var(--text-quiet);
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    @media (max-width: 480px) { .brand-title { font-size: 20px; } .brand-sub { display: none; } }
+    .hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+    .icon-btn {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-md); color: var(--text-tertiary);
+      transition: all var(--t-fast); cursor: pointer;
+    }
+    .icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+    .last-sync {
+      font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+      padding-right: var(--s2);
+    }
+    @media (max-width: 480px) { .last-sync { display: none; } }
+
+    footer.ftr {
+      padding: var(--s5) 0 var(--s8);
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-quiet);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: var(--s2);
+      margin-top: var(--s8);
+    }
+    footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+    /* ─── 페이지 헤더 (back + 여행명) ───────────────────────── */
+    .trip-head {
+      margin-bottom: var(--s5);
+    }
+    .trip-head .back-link {
+      display: inline-flex; align-items: center; gap: var(--s2);
+      font-size: 12px; color: var(--text-tertiary);
+      padding: 6px 10px; border-radius: var(--r-sm);
+      transition: all var(--t-fast);
+      margin-bottom: var(--s3);
+      cursor: pointer;
+    }
+    .trip-head .back-link:hover {
+      color: var(--text-primary); background: var(--elevated);
+    }
+    .trip-head h1 {
+      font-family: var(--font-display);
+      font-size: 32px; font-weight: 500;
+      letter-spacing: -0.02em; line-height: 1.15;
+      margin-bottom: var(--s2);
+      display: flex; align-items: baseline; gap: var(--s3);
+      flex-wrap: wrap;
+    }
+    .trip-head .trip-id-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--acc-travel);
+      padding: 3px 9px;
+      background: var(--acc-travel-soft);
+      border-radius: var(--r-full);
+      letter-spacing: 0.02em;
+    }
+    .trip-head .trip-status {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: var(--r-full);
+      letter-spacing: 0.05em; text-transform: uppercase;
+      font-weight: 600;
+    }
+    .trip-head .trip-status.upcoming {
+      color: var(--info); background: rgba(125, 211, 252, 0.14);
+    }
+    .trip-head .trip-status.past {
+      color: var(--text-tertiary); background: var(--elevated);
+    }
+    .trip-head .trip-meta {
+      display: flex; flex-wrap: wrap; gap: var(--s3);
+      font-size: 13px; color: var(--text-tertiary);
+      align-items: center;
+    }
+    .trip-head .trip-meta .pip {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .trip-head .trip-meta svg { opacity: 0.55; }
+
+    /* ─── 액션 바 (필터 + 추가 버튼) ────────────────────────── */
+    .actionbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: var(--s4); flex-wrap: wrap;
+      margin-bottom: var(--s4);
+    }
+    .filter-chips {
+      display: flex; gap: var(--s2); flex-wrap: wrap;
+      align-items: center;
+      flex: 1; min-width: 0;
+    }
+    .filter-chip {
+      padding: 6px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-full);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--t-fast);
+      font-family: var(--font-mono);
+    }
+    .filter-chip:hover { border-color: var(--border-hi); }
+    .filter-chip.active {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+      background: var(--acc-travel-soft);
+    }
+    .filter-chip .cnt {
+      font-size: 10px; color: var(--text-quiet); margin-left: 4px;
+    }
+    .filter-chip.active .cnt { color: var(--acc-travel); }
+
+    .actionbar-right {
+      display: flex; gap: var(--s2); align-items: center;
+    }
+    .add-place-btn {
+      padding: 10px 18px;
+      background: var(--acc-travel);
+      color: var(--canvas);
+      border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: all var(--t-fast);
+      display: inline-flex; align-items: center; gap: var(--s2);
+      border: none;
+    }
+    .add-place-btn:hover { background: #FF9595; }
+    .add-place-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ─── 지도 영역 ─────────────────────────────────────────── */
+    .map-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      margin-bottom: var(--s5);
+      position: relative;
+    }
+    #map {
+      width: 100%;
+      height: 600px;
+      background: var(--canvas);
+    }
+    @media (max-width: 767px) { #map { height: 460px; } }
+    .mapboxgl-ctrl-attrib { font-size: 10px; }
+    /* Mapbox dark overrides */
+    .mapboxgl-popup-content {
+      background: var(--surface) !important;
+      color: var(--text-primary) !important;
+      border: 1px solid var(--border-hi);
+      border-radius: var(--r-md) !important;
+      box-shadow: var(--shadow-lg);
+      padding: var(--s4) var(--s4) var(--s3) !important;
+      font-family: var(--font-body);
+    }
+    .mapboxgl-popup-tip { display: none !important; }
+    .mapboxgl-popup-close-button {
+      color: var(--text-quiet) !important;
+      font-size: 18px !important;
+      padding: 4px 8px !important;
+    }
+
+    .map-overlay {
+      position: absolute; top: var(--s3); left: var(--s3);
+      background: rgba(10, 11, 15, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .map-overlay strong { color: var(--text-primary); }
+    .map-overlay-empty {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      color: var(--text-tertiary);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .map-overlay-empty .title {
+      font-family: var(--font-display);
+      font-size: 18px; color: var(--text-secondary);
+      margin-bottom: var(--s2);
+    }
+
+    /* ─── 핀 (DOM Marker) ─────────────────────────────────── */
+    .pin {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform var(--t-fast);
+      position: relative;
+    }
+    .pin:hover { transform: scale(1.18); z-index: 10; }
+    .pin-circle {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--acc-travel);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      transition: all var(--t-fast);
+    }
+    .pin-circle svg {
+      width: 18px; height: 18px;
+      stroke: var(--acc-travel);
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    /* visited (현재 trip 의 다녀온 곳) — 채워진 핀 */
+    .pin[data-status="visited"] .pin-circle {
+      background: var(--acc-travel);
+      border-color: var(--acc-travel);
+    }
+    .pin[data-status="visited"] .pin-circle svg { stroke: var(--canvas); }
+    /* planned (현재 trip 의 희망지) — 비어 있는 핀, coral 외곽선 */
+    .pin[data-status="planned"] .pin-circle {
+      background: var(--canvas);
+      border-color: var(--acc-travel);
+    }
+    /* other-trip (다른 trip 의 visited, 같은 도시) — 회색 */
+    .pin[data-source="other"] .pin-circle {
+      background: var(--canvas);
+      border-color: var(--text-quiet);
+      opacity: 0.7;
+    }
+    .pin[data-source="other"] .pin-circle svg { stroke: var(--text-quiet); }
+    .pin[data-source="other"]:hover .pin-circle { opacity: 1; }
+
+    .pin-label {
+      position: absolute; top: 38px; left: 50%; transform: translateX(-50%);
+      white-space: nowrap;
+      background: rgba(10, 11, 15, 0.92);
+      border: 1px solid var(--border-hi);
+      padding: 3px 8px;
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      color: var(--text-primary);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--t-fast);
+    }
+    .pin:hover .pin-label { opacity: 1; }
+
+    /* ─── 모달 공통 ─────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(10, 11, 15, 0.7);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: var(--s4);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border-hi);
+      border-radius: var(--r-lg); padding: var(--s6);
+      width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+      animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-title {
+      font-family: var(--font-display); font-size: 20px; font-weight: 500;
+      margin-bottom: var(--s2);
+    }
+    .modal-desc {
+      font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
+      margin-bottom: var(--s5);
+    }
+    .modal-field { margin-bottom: var(--s4); }
+    .modal-label {
+      display: block;
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: var(--s2);
+    }
+    .modal-input {
+      width: 100%; background: var(--canvas);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; font-size: 13px; color: var(--text-primary);
+      transition: border-color var(--t-fast);
+    }
+    .modal-input.mono { font-family: var(--font-mono); font-size: 12px; }
+    .modal-input:focus { border-color: var(--acc-travel); }
+    .modal-input::placeholder { color: var(--text-quiet); }
+    .modal-textarea {
+      width: 100%; background: var(--canvas);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; font-size: 13px; color: var(--text-primary);
+      transition: border-color var(--t-fast);
+      resize: vertical; min-height: 70px; font-family: var(--font-body);
+    }
+    .modal-textarea:focus { border-color: var(--acc-travel); }
+    .modal-actions {
+      display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
+    }
+    .btn {
+      padding: 10px 18px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+      transition: all var(--t-fast); border: 1px solid transparent; cursor: pointer;
+    }
+    .btn-primary { background: var(--acc-travel); color: var(--canvas); }
+    .btn-primary:hover { background: #FF9595; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+    .btn-danger {
+      background: transparent; color: var(--loss);
+      border: 1px solid var(--loss);
+    }
+    .btn-danger:hover { background: var(--loss-soft); }
+
+    /* ─── 카테고리 chips (모달) ─────────────────────────────── */
+    .cat-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2);
+    }
+    @media (max-width: 480px) { .cat-grid { grid-template-columns: repeat(2, 1fr); } }
+    .cat-chip {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 6px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: all var(--t-fast);
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .cat-chip svg {
+      width: 20px; height: 20px;
+      stroke: currentColor; stroke-width: 2;
+      fill: none; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .cat-chip:hover { border-color: var(--border-hi); }
+    .cat-chip.active {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+      background: var(--acc-travel-soft);
+    }
+
+    /* ─── 별점 ──────────────────────────────────────────────── */
+    .rating-stars {
+      display: flex; gap: 6px;
+    }
+    .star-btn {
+      width: 32px; height: 32px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--text-quiet);
+      transition: color var(--t-fast);
+      padding: 0;
+    }
+    .star-btn:hover, .star-btn.filled {
+      color: var(--acc-travel);
+    }
+    .star-btn svg {
+      width: 28px; height: 28px;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      fill: none;
+    }
+    .star-btn.filled svg { fill: currentColor; }
+    .rating-clear {
+      font-size: 11px; color: var(--text-quiet); cursor: pointer;
+      padding: 6px 10px;
+      align-self: center;
+    }
+    .rating-clear:hover { color: var(--text-tertiary); }
+
+    /* ─── 검색 자동완성 ───────────────────────────────────── */
+    .search-results {
+      margin-top: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      background: var(--canvas);
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+    }
+    .search-results.shown { display: block; }
+    .search-result-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background var(--t-fast);
+    }
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: var(--elevated); }
+    .search-result-item .name {
+      font-size: 13px; color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+    .search-result-item .sub {
+      font-size: 11px; color: var(--text-tertiary);
+    }
+    .search-result-empty {
+      padding: 12px; text-align: center;
+      color: var(--text-quiet); font-size: 12px;
+    }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text-quiet);
+      margin-top: 4px;
+    }
+    .field-hint.danger { color: var(--loss); }
+
+    /* status pills (planned/visited) */
+    .status-pills { display: flex; gap: var(--s2); }
+    .status-pill {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: center;
+      transition: all var(--t-fast);
+    }
+    .status-pill.active {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+      background: var(--acc-travel-soft);
+    }
+    .status-pill:hover:not(.active) { border-color: var(--border-hi); }
+
+    /* ─── 빈 상태 / 로딩 / 에러 ───────────────────────────── */
+    .state-block {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: var(--s8);
+      text-align: center; color: var(--text-tertiary);
+      margin-top: var(--s5);
+    }
+    .state-block .title {
+      font-family: var(--font-display);
+      font-size: 20px; color: var(--text-secondary);
+      margin-bottom: var(--s3);
+    }
+    .state-block .msg { font-size: 13px; line-height: 1.6; max-width: 460px; margin: 0 auto var(--s4); }
+    .state-block button {
+      padding: 10px 18px; border-radius: var(--r-sm);
+      border: 1px solid var(--border-hi); color: var(--text-primary);
+      background: transparent; cursor: pointer;
+      transition: all var(--t-fast); font-size: 13px;
+    }
+    .state-block button:hover { border-color: var(--acc-travel); color: var(--acc-travel); }
+    .spinner-lg {
+      width: 28px; height: 28px;
+      border: 2px solid var(--elevated-2);
+      border-top-color: var(--acc-travel);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      margin: 0 auto var(--s3);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div id="hdr-mount"></div>
+
+    <main id="main">
+      <!-- 동적으로 채워짐 -->
+      <div class="state-block">
+        <div class="spinner-lg"></div>
+        <div class="title">불러오는 중</div>
+      </div>
+    </main>
+
+    <div id="ftr-mount"></div>
+  </div>
+
+  <!-- 메인 허브 설정 모달 (common.js) -->
+  <div id="modal-mount"></div>
+
+  <!-- Mapbox token 모달 -->
+  <div class="modal-backdrop" id="token-modal">
+    <div class="modal">
+      <div class="modal-title serif">Mapbox Access Token</div>
+      <div class="modal-desc">
+        지도를 표시하려면 Mapbox Public Token이 필요해요.<br>
+        <strong>mapbox.com → Account → Tokens → Default public token</strong> 을 복사해 붙여넣으세요.<br>
+        토큰은 이 기기 브라우저에만 저장돼요 (LocalStorage).<br>
+        <strong style="color: var(--info);">팁:</strong> Mapbox Account → Billing → Usage limits 에서 "Free plan only" 로 한도를 걸어두면 절대 청구되지 않아요.
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Public Token</label>
+        <input class="modal-input mono" id="token-input" placeholder="pk.eyJ1Ijoi..." autocomplete="off">
+        <div class="field-hint">`pk.` 로 시작하는 public token. secret(sk.) token 은 절대 사용하지 마세요.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="token-cancel">취소</button>
+        <button class="btn btn-primary" id="token-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 방문장소 추가/편집 모달 -->
+  <div class="modal-backdrop" id="place-modal">
+    <div class="modal">
+      <div class="modal-title serif" id="place-modal-title">방문장소 추가</div>
+      <div class="modal-desc" id="place-modal-desc">카테고리를 고르고 장소를 검색하세요.</div>
+
+      <div class="modal-field">
+        <label class="modal-label">카테고리 *</label>
+        <div class="cat-grid" id="cat-grid"></div>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">장소 검색 *</label>
+        <input class="modal-input" id="place-search" placeholder="예: 츠키지 시장, Toraya, Starbucks Shibuya" autocomplete="off">
+        <div class="field-hint">한국어/영문 모두 가능. 현재 도시 주변 우선 검색.</div>
+        <div class="search-results" id="search-results"></div>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">선택된 장소</label>
+        <input class="modal-input" id="place-name" placeholder="검색 결과를 클릭하거나 직접 입력">
+        <div class="field-hint" id="place-coords">좌표 미설정</div>
+      </div>
+
+      <!-- visited 일 때만 표시 -->
+      <div id="visited-fields" style="display: none;">
+        <div class="modal-field">
+          <label class="modal-label">방문일</label>
+          <input class="modal-input mono" id="place-visited-date" type="date">
+          <div class="field-hint" id="visited-date-hint"></div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">별점 (선택)</label>
+          <div style="display: flex; align-items: center; gap: var(--s2);">
+            <div class="rating-stars" id="rating-stars"></div>
+            <span class="rating-clear" id="rating-clear">지우기</span>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">평가 (선택)</label>
+          <textarea class="modal-textarea" id="place-rating-text" placeholder="간단한 소감"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="place-delete" style="display: none; margin-right: auto;">삭제</button>
+        <button class="btn btn-ghost" id="place-cancel">취소</button>
+        <button class="btn btn-primary" id="place-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./common.js"></script>
+  <script>
+  /* ════════════════════════════════════════════════════════════════
+   * Family OS — Travel Trip (Phase B)
+   * 개별 여행 페이지. URL: travel-trip.html?trip={trip_id}
+   * ════════════════════════════════════════════════════════════════ */
+
+  const DASHBOARD_ID = 'travel';
+  const MAPBOX_TOKEN_KEY = 'familyOS.mapboxToken';
+  const { escapeHtml } = FamilyOS;
+
+  /* ─── 카테고리 메타 ─────────────────────────────────────── */
+  const CATEGORIES = [
+    { id: 'hotel',      kr: '호텔',     icon: 'hotel' },
+    { id: 'restaurant', kr: '식당',     icon: 'restaurant' },
+    { id: 'cafe',       kr: '카페',     icon: 'cafe' },
+    { id: 'mart',       kr: '마트',     icon: 'mart' },
+    { id: 'shop',       kr: '샵',       icon: 'shop' },
+    { id: 'beach',      kr: '해변',     icon: 'beach' },
+    { id: 'park',       kr: '공원',     icon: 'park' },
+    { id: 'themepark',  kr: '놀이공원', icon: 'themepark' },
+    { id: 'sight',      kr: '관광지',   icon: 'sight' },
+    { id: 'other',      kr: '기타',     icon: 'other' }
+  ];
+
+  /* 카테고리별 line-icon SVG path (Lucide 기반 단순화) */
+  function catIconPath(cat) {
+    switch (cat) {
+      case 'hotel':      return '<path d="M2 20v-8a2 2 0 012-2h16a2 2 0 012 2v8"/><path d="M2 16h20"/><path d="M6 10V6a2 2 0 012-2h8a2 2 0 012 2v4"/><path d="M9 14h2"/>';
+      case 'restaurant': return '<path d="M6 2v9"/><path d="M10 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V2"/><path d="M14 22V11a3 3 0 013-3v0a3 3 0 013 3v6"/><path d="M17 17h6"/>';
+      case 'cafe':       return '<path d="M17 8h2a2 2 0 012 2v2a2 2 0 01-2 2h-2"/><path d="M3 8h14v8a4 4 0 01-4 4H7a4 4 0 01-4-4V8z"/><path d="M6 2v3"/><path d="M10 2v3"/><path d="M14 2v3"/>';
+      case 'mart':       return '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 4h3l3 12h11l2-8H6"/>';
+      case 'shop':       return '<path d="M5 7h14l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7z"/><path d="M9 7V5a3 3 0 016 0v2"/>';
+      case 'beach':      return '<path d="M12 21v-9"/><path d="M3 12c0-5 4-9 9-9s9 4 9 9"/><path d="M3 12c3-1 6-1 9 1"/><path d="M21 12c-3-1-6-1-9 1"/>';
+      case 'park':       return '<path d="M12 22V12"/><path d="M9 18l3 4 3-4"/><circle cx="12" cy="8" r="5"/><path d="M7 6c-2 1-3 3-3 5"/><path d="M17 6c2 1 3 3 3 5"/>';
+      case 'themepark':  return '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><path d="M5.6 5.6l12.8 12.8"/><path d="M5.6 18.4L18.4 5.6"/>';
+      case 'sight':      return '<path d="M14 19l-2-2-2 2v3h4v-3z"/><path d="M21 12V7a2 2 0 00-2-2h-2l-2-2H9L7 5H5a2 2 0 00-2 2v12a2 2 0 002 2h6"/><circle cx="12" cy="12" r="3"/>';
+      case 'other':      return '<circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>';
+    }
+    return '<circle cx="12" cy="12" r="3"/>';
+  }
+  function catIconSvg(cat, size = 20) {
+    return '<svg viewBox="0 0 24 24" width="' + size + '" height="' + size + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + catIconPath(cat) + '</svg>';
+  }
+
+  /* ─── 헤더/푸터 마운트 ─────────────────────────────────── */
+  document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+    title: 'Travel', sub: '개별 여행'
+  });
+  document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+    left: 'Travel · Phase B · 개별 여행',
+    right: 'v0.2.0'
+  });
+  document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
+  FamilyOS.attachSettingsModal({ onSave: () => location.reload() });
+  document.getElementById('fos-btn-refresh').addEventListener('click', () => loadAll());
+
+  /* ─── 상태 ─────────────────────────────────────────────── */
+  const state = {
+    tripId: getQueryParam('trip'),
+    trip: null,
+    places: [],          // 현재 trip 의 places
+    otherPlaces: [],     // 같은 city_key + country_code 의 다른 trip 의 visited
+    status: 'loading',
+    error: null,
+    map: null,
+    markers: [],         // mapboxgl.Marker 인스턴스 배열
+    filter: 'all',       // 'all' | date string
+    modal: {
+      mode: 'add',         // 'add' | 'edit'
+      placeId: null,
+      category: null,
+      selectedPlace: null, // { name, lat, lng, address, mapbox_id }
+      visitStatus: 'planned',
+      ratingStar: 0,
+      searchSessionToken: null
+    }
+  };
+
+  function getQueryParam(k) {
+    return new URLSearchParams(location.search).get(k);
+  }
+
+  /* ─── 부트스트랩 ──────────────────────────────────────── */
+  if (!state.tripId) {
+    showError('URL 에 trip 파라미터가 없어요. 예: travel-trip.html?trip=tokyo-2026');
+  } else {
+    loadAll();
+  }
+
+  async function loadAll() {
+    if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+      showUnset();
+      return;
+    }
+    state.status = 'loading';
+    renderMain();
+    FamilyOS.setLastSync('동기화 중…');
+    try {
+      const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+      const trips = data.trips || [];
+      const places = data.places || [];
+      const trip = trips.find(t => t.trip_id === state.tripId);
+      if (!trip) throw new Error('trip_id 를 찾을 수 없음: ' + state.tripId);
+      state.trip = trip;
+      state.places = places.filter(p => p.trip_id === state.tripId);
+      // 같은 도시 (country_code + city_key) 다른 trip 의 visited
+      state.otherPlaces = places.filter(p =>
+        p.trip_id !== state.tripId
+        && p.visit_status === 'visited'
+        && isSameCity(trips.find(t => t.trip_id === p.trip_id), trip)
+      );
+      state.status = 'ok';
+      FamilyOS.setSyncedNow();
+    } catch (err) {
+      console.error('[travel-trip] load failed:', err);
+      state.error = err.message;
+      state.status = 'error';
+    }
+    renderMain();
+    if (state.status === 'ok') initMap();
+  }
+
+  function isSameCity(tripA, tripB) {
+    if (!tripA || !tripB) return false;
+    return (tripA.country_code || '') === (tripB.country_code || '')
+        && (tripA.city_key || '')     === (tripB.city_key || '');
+  }
+
+  /* ─── 메인 렌더 ─────────────────────────────────────────── */
+  function renderMain() {
+    const main = document.getElementById('main');
+    if (state.status === 'loading') {
+      main.innerHTML = '<div class="state-block"><div class="spinner-lg"></div><div class="title">불러오는 중</div></div>';
+      return;
+    }
+    if (state.status === 'unset') {
+      main.innerHTML = '<div class="state-block"><div class="title">설정이 필요해요</div><div class="msg">우측 상단 톱니에서 Travel Web App URL 을 입력하세요.</div><button onclick="document.getElementById(\'fos-btn-settings\').click()">URL 설정</button></div>';
+      return;
+    }
+    if (state.status === 'error') {
+      main.innerHTML = '<div class="state-block"><div class="title">불러오기 실패</div><div class="msg">' + escapeHtml(state.error || '') + '</div><button onclick="history.back()">뒤로 가기</button></div>';
+      return;
+    }
+
+    const t = state.trip;
+    const periodStr = formatPeriod(t.period_start, t.period_end);
+    const visitedCount = state.places.filter(p => p.visit_status === 'visited').length;
+    const plannedCount = state.places.filter(p => p.visit_status === 'planned').length;
+
+    main.innerHTML = `
+      <div class="trip-head">
+        <span class="back-link" onclick="location.href='./travel.html'">${iconBack()} Travel 메인으로</span>
+        <h1>
+          ${escapeHtml(t.display_name || t.trip_id)}
+          <span class="trip-status ${escapeHtml(t.status)}">${t.status === 'upcoming' ? '계획 중' : '다녀온'}</span>
+          <span class="trip-id-chip">${escapeHtml(t.trip_id)}</span>
+        </h1>
+        <div class="trip-meta">
+          ${t.city ? `<span class="pip">${iconPin()} ${escapeHtml(t.city)}${t.country_code ? ' · ' + escapeHtml(t.country_code) : ''}</span>` : ''}
+          ${periodStr ? `<span class="pip">${iconCal()} ${escapeHtml(periodStr)}</span>` : ''}
+          ${t.members ? `<span class="pip">${iconUsers()} ${escapeHtml(t.members)}</span>` : ''}
+          <span class="pip">${iconCheck()} 방문 ${visitedCount} · 희망 ${plannedCount}</span>
+        </div>
+      </div>
+
+      <div class="actionbar">
+        <div class="filter-chips" id="filter-chips"></div>
+        <div class="actionbar-right">
+          <button class="add-place-btn" id="add-place-btn">+ 방문장소 추가</button>
+        </div>
+      </div>
+
+      <div class="map-section">
+        <div id="map"></div>
+        <div class="map-overlay">
+          <strong>${escapeHtml(t.city || '')}</strong> · ${state.places.length + state.otherPlaces.length}개 마커
+        </div>
+      </div>
+    `;
+
+    renderFilterChips();
+    document.getElementById('add-place-btn').addEventListener('click', openAddPlaceModal);
+  }
+
+  function formatPeriod(start, end) {
+    if (!start && !end) return '';
+    if (start && end) return start + ' ~ ' + end;
+    return start || end;
+  }
+
+  /* ─── 필터 칩 ─────────────────────────────────────────── */
+  function renderFilterChips() {
+    const wrap = document.getElementById('filter-chips');
+    if (!wrap) return;
+    // 모든 visited_date 모음 (현재 trip + 다른 trip)
+    const dates = new Set();
+    state.places.filter(p => p.visit_status === 'visited' && p.visited_date).forEach(p => dates.add(p.visited_date));
+    state.otherPlaces.filter(p => p.visited_date).forEach(p => dates.add(p.visited_date));
+    const sortedDates = Array.from(dates).sort();
+
+    const totalCount = state.places.length + state.otherPlaces.length;
+    let html = `<span class="filter-chip${state.filter === 'all' ? ' active' : ''}" data-filter="all">전체 <span class="cnt">${totalCount}</span></span>`;
+    // planned 필터
+    const plannedCount = state.places.filter(p => p.visit_status === 'planned').length;
+    if (plannedCount > 0) {
+      html += `<span class="filter-chip${state.filter === 'planned' ? ' active' : ''}" data-filter="planned">희망 <span class="cnt">${plannedCount}</span></span>`;
+    }
+    // 날짜별 필터
+    for (const d of sortedDates) {
+      const cnt = countByDate(d);
+      const short = d.substring(5); // MM-DD
+      html += `<span class="filter-chip${state.filter === d ? ' active' : ''}" data-filter="${escapeHtml(d)}">${escapeHtml(short)} <span class="cnt">${cnt}</span></span>`;
+    }
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.filter-chip').forEach(c => {
+      c.addEventListener('click', () => {
+        state.filter = c.dataset.filter;
+        renderFilterChips();
+        renderMarkers();
+        fitMapToMarkers();
+      });
+    });
+  }
+  function countByDate(d) {
+    return state.places.filter(p => p.visited_date === d).length
+         + state.otherPlaces.filter(p => p.visited_date === d).length;
+  }
+
+  /* ─── Mapbox 지도 초기화 ──────────────────────────────── */
+  function getMapboxToken() {
+    return localStorage.getItem(MAPBOX_TOKEN_KEY) || '';
+  }
+  function setMapboxToken(t) {
+    if (t) localStorage.setItem(MAPBOX_TOKEN_KEY, t);
+    else localStorage.removeItem(MAPBOX_TOKEN_KEY);
+  }
+
+  function initMap() {
+    const token = getMapboxToken();
+    if (!token) {
+      openTokenModal();
+      return;
+    }
+    if (typeof mapboxgl === 'undefined') {
+      const wrap = document.getElementById('map');
+      if (wrap) wrap.innerHTML = '<div class="map-overlay-empty"><div class="title">Mapbox 로드 실패</div><div>네트워크 또는 CSP 차단 가능성. 새로고침해 보세요.</div></div>';
+      return;
+    }
+    mapboxgl.accessToken = token;
+
+    const t = state.trip;
+    const center = [Number(t.center_lng) || 0, Number(t.center_lat) || 0];
+    const zoom = Number(t.zoom) || 11;
+
+    try {
+      state.map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: center,
+        zoom: zoom,
+        attributionControl: { compact: true }
+      });
+      state.map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+      state.map.on('load', () => {
+        renderMarkers();
+        if (state.places.length + state.otherPlaces.length > 0) fitMapToMarkers();
+      });
+      state.map.on('error', (e) => {
+        // token 잘못된 경우 등
+        if (e && e.error && /401|403|access token|unauthorized/i.test(String(e.error.message || e.error))) {
+          setMapboxToken('');
+          state.map.remove(); state.map = null;
+          openTokenModal('token-error');
+        }
+      });
+    } catch (err) {
+      console.error('Mapbox 초기화 실패:', err);
+      alert('지도를 초기화하지 못했어요: ' + err.message);
+    }
+  }
+
+  function renderMarkers() {
+    // 기존 마커 제거
+    state.markers.forEach(m => m.remove());
+    state.markers = [];
+
+    const visible = visiblePlaces();
+    for (const p of visible) {
+      const el = createPinElement(p);
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([Number(p.lng), Number(p.lat)])
+        .addTo(state.map);
+      state.markers.push(marker);
+    }
+  }
+
+  function visiblePlaces() {
+    const all = [
+      ...state.places.map(p => ({ ...p, _source: 'current' })),
+      ...state.otherPlaces.map(p => ({ ...p, _source: 'other' }))
+    ];
+    // 같은 mapbox_id (또는 lat/lng 근접) 가 양쪽에 있으면 current 가 우선 (회색 위에 컬러 덮어쓰기)
+    // — 단순화: 같은 mapbox_id 의 'other' 는 제외 (current 가 있으면)
+    const currentMapboxIds = new Set(state.places.map(p => p.mapbox_id).filter(Boolean));
+    const dedup = all.filter(p => !(p._source === 'other' && currentMapboxIds.has(p.mapbox_id)));
+
+    // 필터 적용
+    if (state.filter === 'all') return dedup;
+    if (state.filter === 'planned') return dedup.filter(p => p.visit_status === 'planned' && p._source === 'current');
+    // 날짜 필터
+    return dedup.filter(p => p.visited_date === state.filter);
+  }
+
+  function createPinElement(p) {
+    const el = document.createElement('div');
+    el.className = 'pin';
+    el.dataset.status = p.visit_status || 'planned';
+    el.dataset.source = p._source || 'current';
+    el.dataset.placeId = p.place_id;
+
+    const subParts = [];
+    if (p.visited_date) subParts.push(p.visited_date);
+    if (p.rating_star) subParts.push('★'.repeat(p.rating_star));
+    if (p._source === 'other') subParts.push('재방문지');
+    const sub = subParts.join(' · ');
+
+    el.innerHTML = `
+      <div class="pin-circle">${catIconSvg(p.category || 'other', 18)}</div>
+      <div class="pin-label">${escapeHtml(p.name || '')}${sub ? '<br><span style="color: var(--text-tertiary); font-size: 10px;">' + escapeHtml(sub) + '</span>' : ''}</div>
+    `;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // 다른 trip 의 visited 는 편집 불가 (정보만 표시 → 팝업)
+      if (p._source === 'other') {
+        showOtherPlacePopup(p);
+        return;
+      }
+      openEditPlaceModal(p);
+    });
+
+    return el;
+  }
+
+  function showOtherPlacePopup(p) {
+    const otherTrip = (state.trip && p.trip_id) ? p.trip_id : '다른 여행';
+    new mapboxgl.Popup({ offset: 20, closeButton: true })
+      .setLngLat([Number(p.lng), Number(p.lat)])
+      .setHTML(`
+        <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">
+          <strong>${escapeHtml(p.name || '')}</strong>
+        </div>
+        <div style="font-size: 11px; color: var(--text-tertiary);">
+          이전 여행 (<strong>${escapeHtml(p.trip_id || '')}</strong>) 에서 방문<br>
+          ${p.visited_date ? '방문일: ' + escapeHtml(p.visited_date) + '<br>' : ''}
+          ${p.rating_star ? '별점: ' + '★'.repeat(p.rating_star) : ''}
+        </div>
+      `)
+      .addTo(state.map);
+  }
+
+  function fitMapToMarkers() {
+    const visible = visiblePlaces();
+    if (visible.length === 0) return;
+    if (visible.length === 1) {
+      state.map.flyTo({ center: [Number(visible[0].lng), Number(visible[0].lat)], zoom: 14 });
+      return;
+    }
+    const bounds = new mapboxgl.LngLatBounds();
+    visible.forEach(p => bounds.extend([Number(p.lng), Number(p.lat)]));
+    state.map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
+  }
+
+  /* ─── Token 모달 ──────────────────────────────────────── */
+  function openTokenModal(reason) {
+    if (reason === 'token-error') {
+      document.querySelector('#token-modal .modal-desc').innerHTML +=
+        '<br><span style="color: var(--loss);">⚠ 직전 토큰으로 지도 로드 실패. 토큰을 다시 확인하세요.</span>';
+    }
+    document.getElementById('token-modal').classList.add('open');
+    document.getElementById('token-input').focus();
+  }
+  function closeTokenModal() {
+    document.getElementById('token-modal').classList.remove('open');
+  }
+  document.getElementById('token-save').addEventListener('click', () => {
+    const v = document.getElementById('token-input').value.trim();
+    if (!v) { alert('토큰을 입력하세요'); return; }
+    if (!v.startsWith('pk.')) {
+      if (!confirm('public token 은 보통 pk. 로 시작해요. 그래도 저장할까요?')) return;
+    }
+    setMapboxToken(v);
+    closeTokenModal();
+    initMap();
+  });
+  document.getElementById('token-cancel').addEventListener('click', closeTokenModal);
+  document.getElementById('token-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'token-modal') closeTokenModal();
+  });
+
+  /* ─── Place 모달 ──────────────────────────────────────── */
+  function openAddPlaceModal() {
+    state.modal = {
+      mode: 'add',
+      placeId: null,
+      category: null,
+      selectedPlace: null,
+      visitStatus: state.trip.status === 'past' ? 'visited' : 'planned',
+      ratingStar: 0,
+      searchSessionToken: uuidv4()
+    };
+    fillPlaceModal(null);
+    document.getElementById('place-modal').classList.add('open');
+  }
+
+  function openEditPlaceModal(p) {
+    state.modal = {
+      mode: 'edit',
+      placeId: p.place_id,
+      category: p.category,
+      selectedPlace: {
+        name: p.name,
+        lat: p.lat,
+        lng: p.lng,
+        address: p.address,
+        mapbox_id: p.mapbox_id
+      },
+      visitStatus: p.visit_status,
+      ratingStar: Number(p.rating_star) || 0,
+      searchSessionToken: uuidv4()
+    };
+    fillPlaceModal(p);
+    document.getElementById('place-modal').classList.add('open');
+  }
+
+  function closePlaceModal() {
+    document.getElementById('place-modal').classList.remove('open');
+  }
+
+  function fillPlaceModal(p) {
+    const isEdit = state.modal.mode === 'edit';
+    document.getElementById('place-modal-title').textContent = isEdit ? '방문장소 편집' : '방문장소 추가';
+    document.getElementById('place-modal-desc').textContent = isEdit
+      ? '필요한 항목만 수정한 뒤 저장하세요.'
+      : '카테고리를 고르고 장소를 검색하세요.';
+
+    // 카테고리 그리드
+    const grid = document.getElementById('cat-grid');
+    grid.innerHTML = CATEGORIES.map(c =>
+      `<div class="cat-chip${state.modal.category === c.id ? ' active' : ''}" data-cat="${c.id}">
+        ${catIconSvg(c.id, 22)}
+        <span>${escapeHtml(c.kr)}</span>
+      </div>`
+    ).join('');
+
+    // 검색·좌표
+    document.getElementById('place-search').value = '';
+    document.getElementById('search-results').classList.remove('shown');
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('place-name').value = state.modal.selectedPlace ? state.modal.selectedPlace.name : '';
+    document.getElementById('place-coords').textContent = state.modal.selectedPlace
+      ? `${Number(state.modal.selectedPlace.lat).toFixed(4)}, ${Number(state.modal.selectedPlace.lng).toFixed(4)}`
+      : '좌표 미설정';
+
+    // visited 필드 (status 가 visited 면 표시)
+    syncVisitedFields(p);
+
+    // 삭제 버튼 (편집 시)
+    document.getElementById('place-delete').style.display = isEdit ? 'inline-block' : 'none';
+  }
+
+  function syncVisitedFields(p) {
+    const isVisited = state.modal.visitStatus === 'visited';
+    document.getElementById('visited-fields').style.display = isVisited ? 'block' : 'none';
+    if (!isVisited) return;
+    // 방문일
+    document.getElementById('place-visited-date').value = p && p.visited_date ? p.visited_date : (state.trip.period_start || '');
+    document.getElementById('visited-date-hint').textContent = state.trip.period_start
+      ? `여행 기간: ${state.trip.period_start} ~ ${state.trip.period_end || '—'}`
+      : '';
+    // 별점
+    renderStars();
+    document.getElementById('place-rating-text').value = p && p.rating_text ? p.rating_text : '';
+  }
+
+  function renderStars() {
+    const wrap = document.getElementById('rating-stars');
+    if (!wrap) return;
+    let html = '';
+    for (let i = 1; i <= 5; i++) {
+      const filled = i <= state.modal.ratingStar;
+      html += `<button class="star-btn${filled ? ' filled' : ''}" data-star="${i}" type="button">${iconStar()}</button>`;
+    }
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.star-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        state.modal.ratingStar = Number(b.dataset.star);
+        renderStars();
+      });
+    });
+  }
+
+  document.getElementById('rating-clear').addEventListener('click', () => {
+    state.modal.ratingStar = 0;
+    renderStars();
+  });
+
+  /* 카테고리 그리드 이벤트 위임 */
+  document.getElementById('cat-grid').addEventListener('click', (e) => {
+    const chip = e.target.closest('.cat-chip');
+    if (!chip) return;
+    state.modal.category = chip.dataset.cat;
+    document.querySelectorAll('#cat-grid .cat-chip').forEach(x => {
+      x.classList.toggle('active', x.dataset.cat === state.modal.category);
+    });
+  });
+
+  /* 검색 자동완성 — Mapbox Search Box API */
+  let searchDebounce;
+  document.getElementById('place-search').addEventListener('input', (e) => {
+    clearTimeout(searchDebounce);
+    const q = e.target.value.trim();
+    if (q.length < 2) {
+      document.getElementById('search-results').classList.remove('shown');
+      return;
+    }
+    searchDebounce = setTimeout(() => mapboxSuggest(q), 350);
+  });
+
+  async function mapboxSuggest(q) {
+    const token = getMapboxToken();
+    if (!token) { openTokenModal(); return; }
+    const t = state.trip;
+    const proximity = (t.center_lng && t.center_lat) ? `${t.center_lng},${t.center_lat}` : '';
+    const url = 'https://api.mapbox.com/search/searchbox/v1/suggest?'
+      + new URLSearchParams({
+        q: q,
+        access_token: token,
+        session_token: state.modal.searchSessionToken,
+        ...(proximity ? { proximity } : {}),
+        limit: '6',
+        language: 'ko'
+      }).toString();
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      renderSearchResults(json.suggestions || []);
+    } catch (err) {
+      renderSearchResults([], err.message);
+    }
+  }
+
+  function renderSearchResults(suggestions, errMsg) {
+    const wrap = document.getElementById('search-results');
+    wrap.classList.add('shown');
+    if (errMsg) {
+      wrap.innerHTML = '<div class="search-result-empty" style="color: var(--loss);">검색 오류: ' + escapeHtml(errMsg) + '</div>';
+      return;
+    }
+    if (!suggestions || suggestions.length === 0) {
+      wrap.innerHTML = '<div class="search-result-empty">결과 없음</div>';
+      return;
+    }
+    wrap.innerHTML = suggestions.map(s => `
+      <div class="search-result-item" data-mapbox-id="${escapeHtml(s.mapbox_id)}">
+        <div class="name">${escapeHtml(s.name || '')}</div>
+        <div class="sub">${escapeHtml(s.full_address || s.place_formatted || '')}</div>
+      </div>
+    `).join('');
+    wrap.querySelectorAll('.search-result-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const suggestion = suggestions.find(s => s.mapbox_id === item.dataset.mapboxId);
+        if (suggestion) mapboxRetrieve(suggestion);
+      });
+    });
+  }
+
+  async function mapboxRetrieve(suggestion) {
+    const token = getMapboxToken();
+    if (!token) return;
+    const url = 'https://api.mapbox.com/search/searchbox/v1/retrieve/'
+      + encodeURIComponent(suggestion.mapbox_id) + '?'
+      + new URLSearchParams({
+        access_token: token,
+        session_token: state.modal.searchSessionToken
+      }).toString();
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      const feature = (json.features && json.features[0]) || null;
+      if (!feature) throw new Error('retrieve 응답 비어있음');
+      const coords = feature.geometry && feature.geometry.coordinates;
+      const props = feature.properties || {};
+      state.modal.selectedPlace = {
+        name: props.name || suggestion.name || '',
+        lat: coords ? coords[1] : null,
+        lng: coords ? coords[0] : null,
+        address: props.full_address || props.place_formatted || '',
+        mapbox_id: suggestion.mapbox_id
+      };
+      document.getElementById('place-name').value = state.modal.selectedPlace.name;
+      document.getElementById('place-coords').textContent =
+        state.modal.selectedPlace.lat != null
+          ? `${state.modal.selectedPlace.lat.toFixed(4)}, ${state.modal.selectedPlace.lng.toFixed(4)} · ${state.modal.selectedPlace.address || ''}`
+          : '좌표 미설정';
+      document.getElementById('search-results').classList.remove('shown');
+      // 새 세션 토큰 (1 retrieve = 1 billable session)
+      state.modal.searchSessionToken = uuidv4();
+    } catch (err) {
+      alert('장소 정보를 가져오지 못했어요: ' + err.message);
+    }
+  }
+
+  /* Save / Delete */
+  document.getElementById('place-save').addEventListener('click', savePlace);
+  document.getElementById('place-delete').addEventListener('click', deletePlace);
+  document.getElementById('place-cancel').addEventListener('click', closePlaceModal);
+  document.getElementById('place-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'place-modal') closePlaceModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const pm = document.getElementById('place-modal');
+    const tm = document.getElementById('token-modal');
+    if (pm.classList.contains('open')) closePlaceModal();
+    else if (tm.classList.contains('open')) closeTokenModal();
+  });
+
+  async function savePlace() {
+    const btn = document.getElementById('place-save');
+    btn.disabled = true;
+    btn.textContent = '저장 중…';
+    try {
+      const payload = readPlaceModalPayload();
+      if (state.modal.mode === 'add') {
+        await callPost('addPlace', payload);
+      } else {
+        await callPost('updatePlace', Object.assign({ place_id: state.modal.placeId }, payload));
+      }
+      closePlaceModal();
+      await loadAll();
+    } catch (err) {
+      alert('저장 실패: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '저장';
+    }
+  }
+
+  async function deletePlace() {
+    if (state.modal.mode !== 'edit') return;
+    if (!confirm('이 방문장소를 삭제할까요?')) return;
+    const btn = document.getElementById('place-delete');
+    btn.disabled = true;
+    btn.textContent = '삭제 중…';
+    try {
+      await callPost('deletePlace', { place_id: state.modal.placeId });
+      closePlaceModal();
+      await loadAll();
+    } catch (err) {
+      alert('삭제 실패: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '삭제';
+    }
+  }
+
+  function readPlaceModalPayload() {
+    const m = state.modal;
+    if (!m.category) throw new Error('카테고리를 선택하세요');
+    const name = document.getElementById('place-name').value.trim();
+    if (!name) throw new Error('장소명이 비어있음');
+    let lat = m.selectedPlace ? m.selectedPlace.lat : null;
+    let lng = m.selectedPlace ? m.selectedPlace.lng : null;
+    if (lat == null || lng == null) throw new Error('좌표가 없음. 검색 결과를 선택하세요.');
+
+    const isVisited = m.visitStatus === 'visited';
+    return {
+      trip_id: state.tripId,
+      category: m.category,
+      name: name,
+      address: m.selectedPlace ? m.selectedPlace.address : '',
+      lat: Number(lat),
+      lng: Number(lng),
+      mapbox_id: m.selectedPlace ? m.selectedPlace.mapbox_id : '',
+      visit_status: m.visitStatus,
+      visited_date: isVisited ? (document.getElementById('place-visited-date').value || null) : null,
+      rating_star: isVisited ? (m.ratingStar || null) : null,
+      rating_text: isVisited ? (document.getElementById('place-rating-text').value || '') : ''
+    };
+  }
+
+  /* ─── POST helper ────────────────────────────────────── */
+  async function callPost(action, payload) {
+    const url = FamilyOS.getWebAppUrl(DASHBOARD_ID);
+    if (!url) throw new Error('Web App URL 미설정');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, payload }),
+      redirect: 'follow'
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || '응답 오류');
+    return json.data;
+  }
+
+  /* ─── 빈 상태 헬퍼 ───────────────────────────────────── */
+  function showUnset() {
+    state.status = 'unset';
+    renderMain();
+  }
+  function showError(msg) {
+    state.status = 'error';
+    state.error = msg;
+    renderMain();
+  }
+
+  /* ─── 유틸 ────────────────────────────────────────────── */
+  function uuidv4() {
+    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+    );
+  }
+
+  /* ─── 인라인 아이콘 ─────────────────────────────────── */
+  function iconBack() {
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
+  }
+  function iconCal() {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+  }
+  function iconPin() {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+  }
+  function iconUsers() {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>';
+  }
+  function iconCheck() {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+  }
+  function iconStar() {
+    return '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+  }
+  </script>
+</body>
+</html>

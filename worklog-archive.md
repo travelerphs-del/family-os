@@ -1419,3 +1419,122 @@ readRealestate @ Code.gs:530
 - [완료] Session 6 종료
 
 ────────────────────────────────────────────────────────────────────
+
+## Session 7 — Travel Phase B (개별 여행 페이지)
+
+**기간**: 2026-05-17 (Session 6 직후)
+**범위**: `travel-trip.html` 신규. Mapbox 통합, 카테고리 핀, 검색 자동완성, 별점, 방문일 필터, 같은 도시 재방문 시각화.
+
+### [DECISION] Phase B 진입 전 5가지 결정 (사용자 답)
+
+| # | 사항 | 답 |
+|---|---|---|
+| Q1 | Mapbox token | 사용자 발급 완료. **사용자가 Mapbox 가입 시 카드 정보 요구받음** → 내 사전 안내 "카드 등록 불필요"는 부정확. 사과 + Usage limits 안전책 안내 |
+| Q2 | URL 구조 | 별도 `travel-trip.html?trip={id}` (B). 메인 페이지 코드 안 건드림 |
+| Q3 | Travel↔Expense 비용 | 수동 입력 (B). Phase B 단순화 |
+| Q4 | 카테고리 아이콘 | **사용자 선호 (b)** + 내 우려 (c) 의 혼합 → **통일된 원형 핀 외곽 + 내부 의미적 line-icon** |
+| Q5 | 별점·평가 | 둘 다 선택 입력 |
+
+### [DECISION] Multi-city trip 한계 (이미지에서 발견)
+
+사용자가 추가한 "미국 가족여행 2027"이 `city=샌프란시스코, LA` / `city_key=san-francisco` 로 입력됨. 한 trip 에 두 도시 들어감. 데이터 모델은 trip=1도시 가정.
+- 영향: 다음에 LA만 가는 trip 추가하면 매칭 안 됨 (city_key=la 가 되어 다른 마커로 표시)
+- 영향: 개별 여행 페이지는 한 도시 중심으로 zoom. SF/LA 600km 떨어져 한 지도 fit 시 디테일 손실
+- 결정: 데이터 모델 변경하지 않음. 사용자가 추후 분할하거나 그대로 두면 됨
+
+### [CODE] 산출물
+
+| 파일 | 줄수 | 종류 |
+|---|---|---|
+| `travel-trip.html` | ~990 | 신규 (HTML+CSS+JS, 인라인 JS 29,968자) |
+| `travel.html` | 1372 → 1372 | 수정 (마커 클릭 + 타일 클릭 둘 다 navigate 로 변경) |
+| `travel-apps-script.gs` | 변경 없음 | buildFullPayload 가 이미 모든 trips+places 반환 → 클라이언트 필터링으로 충분 |
+| `worklog.md` (슬림) | (갱신) | Travel 행 v0.2.0 으로 |
+| `worklog-archive.md` | (이 섹션 추가) | |
+
+### [CODE] 핵심 패턴
+
+1. **Mapbox GL JS v3 사용**: `https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js`. dark-v11 스타일
+2. **DOM 기반 Marker (mapboxgl.Marker)**: 원형 핀 + 내부 line-icon. GeoJSON Symbol layer 대신 DOM 사용 → 인터랙티브 (호버 라벨, 클릭, 카테고리별 다른 모양) 더 쉬움. 100개 미만에서 성능 OK
+3. **Search Box API (Suggest + Retrieve)**: session_token UUID v4. 1 retrieve = 1 billable session. proximity 파라미터로 현재 trip center 주변 우선 검색
+4. **카테고리 line-icon SVG**: Lucide 아이콘 단순화. 10개 (hotel/restaurant/cafe/mart/shop/beach/park/themepark/sight/other)
+5. **핀 3가지 상태**:
+   - `visited` (현재 trip): coral 채워짐, 흰색 아이콘
+   - `planned` (현재 trip): 외곽선만 coral, coral 아이콘
+   - `other` (다른 trip visited, 같은 도시): 회색 외곽선 + 회색 아이콘, opacity 0.7
+6. **재방문 매칭 dedup**: 현재 trip 에 같은 `mapbox_id` 가 있으면 other 핀 숨김 (회색 위에 컬러 덮어쓰기)
+7. **방문일 필터 칩**: '전체' + 'planned' + 각 visited_date. 클릭 시 visible places 재계산 + fitBounds 자동
+8. **Token 입력 모달**: travel-trip.html 첫 로드 시 token 없으면 자동 팝업. Mapbox API 401/403 에러 시에도 자동 재요청
+9. **Token 저장**: LocalStorage `familyOS.mapboxToken`. travel-trip.html 안에서만 묻고 끝. 메인 허브 영향 0
+
+### [CODE] 5가지 핀 동작 시나리오
+
+| 시나리오 | 핀 표시 |
+|---|---|
+| past trip A 에 식당 등록 (visited) | 채워진 coral 핀 |
+| upcoming trip B 에 식당 등록 (planned) | 외곽선만 coral |
+| trip B (도쿄, upcoming) 페이지 진입 + 과거 도쿄 trip A 의 visited 식당 X | 회색 핀으로 X 표시 (다른 trip) |
+| 사용자가 X 를 trip B 에도 등록 (planned) → 같은 mapbox_id | 회색 사라지고 coral 외곽선 핀 |
+| 다른 trip 의 회색 핀 클릭 | 편집 모달 X. popup 으로 정보만 (이전 여행 trip_id, 방문일, 별점) |
+
+### [VERIFICATION]
+
+| 항목 | 결과 |
+|---|---|
+| `travel-trip.html` 인라인 JS (`node --check`) | ✅ 29,968 chars 통과 |
+| `travel-trip.html` 태그 균형 | ✅ div 63/63, main 1/1, script 3/3, style 1/1, button 9/9 |
+| `travel.html` 수정 후 JS 검증 | ✅ 통과 |
+| Mapbox GL JS CDN URL 유효성 | ✅ v3.0.1 안정 버전 (2024 릴리즈) |
+| Search Box API endpoints | ✅ suggest + retrieve, session_token 패턴 |
+| 카테고리 10개 line-icon path 정의 | ✅ Lucide 기반 단순화 |
+| Apps Script 추가 endpoint 필요성 | ❌ 불필요 (기존 buildFullPayload 가 모든 데이터 반환) |
+
+### [DEPLOYMENT] 사용자 안내
+
+1. **Mapbox token 발급** (이미 함):
+   - mapbox.com → Account → Tokens → "Default public token" 복사
+
+2. **Mapbox usage limits 설정** (강력 권장):
+   - mapbox.com → Account → Billing → Usage limits
+   - "Set a usage limit" → 월 $0 또는 $1 입력
+   - 한도 초과 시 청구 대신 서비스 중단됨 (가족 사용량으로는 절대 도달 안 함)
+
+3. **GitHub 푸시**:
+   - 신규: `travel-trip.html`
+   - 수정: `travel.html` (마커/타일 클릭 → navigate)
+   - 문서: `worklog.md`, `worklog-archive.md`, `context-travel.md`
+
+4. **첫 사용 검증**:
+   - 메인 허브 → Travel 카드의 도쿄 슬롯 클릭 (또는 travel.html 의 타일/마커 클릭)
+   - `travel-trip.html?trip=tokyo-2026` 열림
+   - Mapbox token 입력 모달 표시 → `pk.` 토큰 붙여넣기 → 저장
+   - 지도 로드되면 OK. center 가 도쿄 (35.6762, 139.6503) 인지 확인
+   - "+ 방문장소 추가" → 카테고리 선택 → 검색 (예: "Tsukiji") → 결과 선택 → 저장
+   - 핀이 지도에 표시되면 끝
+
+### [LESSON]
+
+1. **Mapbox 가입은 카드 등록 요구**: 무료 사용도 마찬가지. 다만 usage limits 로 청구 차단 가능. 사전에 정확히 안내 못한 점 사과해야 함
+2. **DOM Marker vs Symbol Layer**: DOM 이 인터랙티브에 유리. 1000개 이상에서만 Symbol Layer 고려
+3. **Search Box API session token**: 1 retrieve = 1 billable session. retrieve 마다 새 UUID 발급. suggest 만 하는 동안엔 같은 token 재사용
+4. **재방문 시각화의 dedup**: 같은 `mapbox_id` 우선. 사용자가 검색을 통해 추가하면 자동으로 매칭됨. 직접 좌표 입력은 매칭 안 됨 (mapbox_id 없으므로)
+5. **Phase 분리의 가치 재확인**: Phase A 95KB + Phase B 30KB = 단일 세션 안전권. 둘 다 한 번에 했으면 토큰 한도 위험
+6. **multi-city trip 한계**: 현재 모델은 단일 도시 가정. 사용자가 다중 도시 trip 만들면 부분적으로만 작동. 추후 hotfix 후보
+
+### [COST]
+
+- 운영 비용: Mapbox 무료 한도 충분. 개인 사용 월 수백 load 수준 → 한도의 0.001%. usage limit 설정으로 절대 청구 X
+- 작업 토큰: travel-trip.html 만 새로 작성, travel.html 미세 수정, Apps Script 변경 없음. Phase A 보다 약 30% 작은 토큰. Phase 분리가 효과
+
+### [PENDING] 다음 후보
+
+(슬림 worklog.md 의 Cross-cutting Pending 참조)
+
+1. **Travel ↔ Expense 비용 표기 자동화** — Phase B 는 수동 입력 (현재 미구현, 추후 hotfix). 메인 허브 경유로 양쪽 결합 가능
+2. **Multi-city trip 지원** — 데이터 모델 변경 또는 trip 분할 가이드
+3. **Wealth/Health 수정** — 별도 컨텍스트 파일 참조
+4. **세계지도 정밀도** — 13개 추상 path → 더 정밀한 topojson 교체 (낮은 우선순위)
+
+- [완료] Session 7 종료
+
+────────────────────────────────────────────────────────────────────

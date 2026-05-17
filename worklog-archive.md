@@ -1538,3 +1538,87 @@ readRealestate @ Code.gs:530
 - [완료] Session 7 종료
 
 ────────────────────────────────────────────────────────────────────
+
+## Session 7.1 — 회귀 fix + 세계지도 Mapbox 교체
+
+**기간**: 2026-05-17 (Session 7 직후)
+**범위**: index.html 카드 클릭 회귀 수정 + travel.html 세계지도를 인라인 SVG → Mapbox 로 교체
+
+### [REGRESSION] 카드 클릭 망가짐
+
+**원인**: Session 6 Phase A 에서 index.html 의 카드 영역 CSS 를 수정할 때 Session 5.3 의 fix 를 모르고 덮어씀.
+
+**Session 5.3 fix 가 사라진 부분**:
+1. CSS: `<a class="card-link-overlay">` 의 `pointer-events: none` + `:focus-visible` 처리
+2. JS: `#cards` 의 두 번째 클릭 위임 (내부 인터랙티브 요소 가드 + 오버레이 href navigate)
+
+**복구**: Session 5.3 archive 의 spec 그대로 CSS + JS 양쪽 복구. 변경 라인 ~20.
+
+### [DECISION] 메인 카드 사양 — A 유지 확정
+
+사용자가 일시적으로 "최근 다녀온 4개"라고 했으나 다시 확인 후 원래 사양 (향후 후보 4개) 유지. 코드 변경 없음.
+
+### [DECISION] 세계지도 — Mapbox 로 교체
+
+**배경**: Session 6 Phase A 의 13개 추상 polygon SVG 세계지도가 시각적으로 별로. 사용자 직접 지적.
+
+**선택**:
+| 옵션 | 채택 | 이유 |
+|---|---|---|
+| A. Mapbox 줌아웃 세계지도 | ✅ | travel-trip 와 디자인 톤 통일. 정밀도 ↑↑. 코드 단순. 비용 미미 |
+| B. 정밀 GeoJSON 인라인 | ❌ | 파일 크기 +50KB. 외관도 Mapbox 보단 단조 |
+| C. D3 + TopoJSON CDN | ❌ | 학습곡선. 의존성 ↑ |
+
+**구현**:
+- Mapbox GL JS v3 (travel-trip 와 동일 버전)
+- style: dark-v11
+- projection: globe (살짝 곡면 효과, fog 적용)
+- center: [10, 25], zoom: 0.8 (세계 전체)
+- 마커는 DOM Marker (기존 SVG 의 동그라미+위아래 진동 역삼각형 디자인 그대로 재현)
+- 같은 city_key 그룹화 (여러 번 방문해도 마커 하나, 라벨에 "(N)" 표기)
+- 마커 클릭 → 같은 city 의 가장 최근 trip 으로 navigate
+
+**Token 처리**:
+- LocalStorage `familyOS.mapboxToken` (travel-trip 과 공유)
+- travel-trip 안 가본 기기 → 첫 진입 시 token 모달
+- 401/403 응답 시 자동 모달 재오픈
+- 한 번 입력하면 travel-trip 도 같은 token 사용 (메인 ↔ trip 페이지 토큰 1회 입력)
+
+### [CODE] 변경 요약
+
+| 파일 | 변경 |
+|---|---|
+| `index.html` | CSS pointer-events 패턴 복구 + JS 클릭 위임 복구 (Session 5.3 spec 재구현) |
+| `travel.html` | head 에 Mapbox CSS/JS CDN 추가. style 의 세계지도 CSS 전체 교체. 마크업 `#world-svg-wrap` → `#world-map`. token 모달 추가. JS: `renderWorld()` Mapbox 버전으로 교체. `projectEquirect` / `CONTINENT_PATHS` / `GRATICULES` / `buildWorldSvg` / `bindWorldMarkers` 제거 (149줄). `state` 에 `worldMap`, `worldMarkers` 추가. token 헬퍼 추가 |
+
+### [VERIFICATION]
+
+| 항목 | 결과 |
+|---|---|
+| `index.html` 인라인 JS | ✅ 21,253 chars 통과 |
+| `index.html` CSS pointer-events 복구 | ✅ |
+| `index.html` JS 두 번째 클릭 위임 | ✅ |
+| `travel.html` 인라인 JS | ✅ 29,224 chars 통과 |
+| `travel.html` 잔여 옛 참조 (buildWorldSvg 등) | ✅ 없음 |
+| `travel.html` 태그 균형 | ✅ div 77/77, script 3/3, style 1/1 |
+| 줄 수 변화 (travel.html) | 1627 → 1478 (-149) |
+
+### [LESSON]
+
+1. **archive 참조 누락 → 회귀**: 슬림 worklog 만 보고 작업 시작했음. 같은 파일을 여러 세션이 손대면 archive 의 해당 영역 grep 필수. 다음 세션부턴 작업 시작 시 `grep <파일명> worklog-archive.md` 루틴 추가
+2. **세계지도 자체 그리기는 미관 측면에서 항상 부족**: 13개 path 든 200개 path 든 손으로 그리면 비전문가 외관. Mapbox 같은 전문 도구 사용이 효율적
+3. **token 공유 (메인 ↔ trip)**: LocalStorage 가 같은 origin 안에서 자동 공유. 양쪽이 같은 키 (`familyOS.mapboxToken`) 쓰면 끝. 추가 동기화 코드 X
+4. **globe projection 의 fog**: setFog 으로 우주 배경 분위기. Mapbox v3 기본 기능, 코드 5줄
+
+### [COST]
+
+- 운영 비용: Mapbox 무료 한도 50K loads/월. travel.html 진입마다 1 load. 가족 사용 월 ~60회 → 한도의 0.12%. 무료 유지
+- 작업 토큰: index.html 미세 패치 + travel.html 부분 교체. 작은 세션
+
+### [PENDING] 다음 후보
+
+(슬림 worklog.md Cross-cutting Pending 참조)
+
+- [완료] Session 7.1 종료
+
+────────────────────────────────────────────────────────────────────

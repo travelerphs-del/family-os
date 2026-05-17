@@ -24,7 +24,7 @@ family-os/
 ├── future.html  + future-apps-script.gs   ← Phase 2 완료 (v0.1.1)
 ├── travel.html + travel-trip.html + travel-apps-script.gs  ← Session 6+7 완료
 ├── worklog.md              ← 이 파일 (슬림 현재 상태)
-├── worklog-archive.md      ← Session 1 ~ 7 누적 (참조용, 첨부 X)
+├── worklog-archive.md      ← Session 1 ~ 7.1 누적 (참조용, 첨부 X)
 └── context-{dashboard}.md  ← 대시보드별 작업 시작용 컨텍스트
                               (현재: wealth, health, travel)
 ```
@@ -58,7 +58,7 @@ family-os/
 | Expense | 배포됨 | OAuth 폐기 (doPost 통일). 안정 |
 | Health | 배포됨 | **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
-| Travel | **v0.2.0** | Phase A (메인) + Phase B (개별 여행) 완료. Mapbox 통합. 카테고리 핀 10개. 같은 도시 재방문 시각화 |
+| Travel | **v0.2.1** | Phase A+B 완료. Mapbox 통합 (메인 세계지도 + 개별 여행). 카테고리 핀 10개. 같은 도시 재방문 시각화 |
 
 ## Cross-cutting Pending
 
@@ -68,7 +68,6 @@ family-os/
 4. **Health 기능 추가** — 아이들 운동 스케줄 입출력 → 다음 Health 세션 (`context-health.md` 참조)
 5. **LocalStorage 영속성 진단 결과** — Session 5.2 의 자동 배너/콘솔 로그 사용자 보고 미수령
 6. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
-7. **세계지도 정밀도** — 인라인 SVG 의 13개 추상 path 를 더 정밀한 topojson 으로 교체 (낮은 우선순위)
 
 ## 세션 종료 시 worklog 업데이트 규칙
 

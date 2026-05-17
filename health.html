@@ -899,6 +899,111 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
 /* ─── 뷰 전환 ──────────────────────────────────────── */
 .view { display: none; }
 .view.active { display: block; }
+
+/* ─── 운동 스케줄 카드 ───────────────────────────── */
+.sched-card { margin-bottom: var(--s5); }
+.sched-section { padding: var(--s3) 0; border-bottom: 1px solid var(--border); }
+.sched-section:last-child { border-bottom: none; padding-bottom: 0; }
+.sched-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s2); margin-bottom: var(--s3);
+}
+.sched-who {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+}
+.sched-who-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: var(--r-sm);
+  font-family: var(--font-mono); letter-spacing: 0.04em;
+}
+.sched-who-badge.robi { background: rgba(192, 132, 252, 0.15); color: var(--m-robi); }
+.sched-who-badge.dobi { background: rgba(251, 146, 60, 0.15); color: var(--m-dobi); }
+.sched-empty {
+  font-size: 12px; color: var(--text-quiet);
+  padding: var(--s2) 0; font-style: italic;
+}
+
+/* 주간 캘린더 (weekly) */
+.week-cal {
+  display: grid;
+  grid-template-columns: 110px repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  font-size: 11px;
+}
+.week-cal-cell {
+  background: var(--surface);
+  padding: 6px 4px;
+  text-align: center;
+  color: var(--text-secondary);
+  min-height: 24px;
+  display: flex; align-items: center; justify-content: center;
+}
+.week-cal-cell.week-cal-day-header {
+  background: var(--elevated);
+  color: var(--text-quiet);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.week-cal-cell.today {
+  background: var(--elevated);
+  color: var(--acc-health);
+  font-weight: 600;
+}
+.week-cal-row-label {
+  background: var(--surface);
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.week-cal-cell.has-event {
+  background: var(--acc-health-soft);
+  color: var(--acc-health);
+  font-weight: 600;
+}
+
+/* 단발 일정 리스트 (oneoff) */
+.sched-oneoff-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sched-oneoff-item {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+}
+.sched-oneoff-item .date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-quiet);
+  min-width: 80px;
+}
+.sched-oneoff-item .date.today {
+  color: var(--acc-health);
+  font-weight: 600;
+}
+.sched-oneoff-item .title {
+  flex: 1;
+  color: var(--text-primary);
+}
+.sched-oneoff-item .meta {
+  font-size: 11px;
+  color: var(--text-quiet);
+  font-family: var(--font-mono);
+}
+.sched-oneoff-item.past {
+  opacity: 0.5;
+}
 </style>
 </head>
 <body>
@@ -986,6 +1091,7 @@ const MEMBER_COLOR_VAR = {
 
 const CATEGORIES = [
   { id: 'task',        name: '할 일',            desc: '가족별 수동 입력 task',                sheet: 'health_tasks',     icon: '✓' },
+  { id: 'schedule',    name: '운동 스케줄',       desc: '도비/로비 — 요일 반복 또는 단발 날짜',   sheet: 'schedule',         icon: '🏃' },
   { id: 'vital',       name: 'Vital',           desc: '키 / 몸무게 / 혈압 / 혈당 / 체온',      sheet: 'vital',            icon: 'V' },
   { id: 'medication',  name: 'Medication',      desc: '투약 · 영양제',                        sheet: 'medication',       icon: 'Rx' },
   { id: 'hospital',    name: 'Hospital report', desc: '외부병원 진료 (C/C · P/I · A/P)',      sheet: 'hospital_report',  icon: 'H' },
@@ -1133,6 +1239,7 @@ function renderAllView() {
 
   mount.innerHTML = `
     <div class="grid-members">${memberCardsHtml}</div>
+    ${renderScheduleCardHtml()}
     <div class="grid-2">
       <div>
         <section class="h-card">
@@ -1155,6 +1262,8 @@ function renderAllView() {
   // 이벤트 위임
   document.getElementById('add-task-link').addEventListener('click', () => openForm('task'));
   document.getElementById('refresh-link').addEventListener('click', refresh);
+  const addSchedLink = document.getElementById('add-schedule-link');
+  if (addSchedLink) addSchedLink.addEventListener('click', () => openForm('schedule'));
   // 멤버 카드 클릭 → 개인뷰
   mount.querySelectorAll('.member-card').forEach(card => {
     card.addEventListener('click', () => {
@@ -1505,6 +1614,12 @@ function renderRecentItemHtml(sheet, row) {
       icon = 'PN'; iconCls = 'progress';
       title = `경과기록${row.day_number ? ' #' + row.day_number : ''} (${row.parent_record_id || ''})`;
       detail = row.assessment || row.plan || '';
+      // PN 클릭 시 부모 HC 팝업 열기 (parent_record_id 있을 때만)
+      if (row.parent_record_id) {
+        clickable = true;
+        recordId = row.parent_record_id;
+        chartNumBadge = `<span class="chart-num">차트 ${row.parent_record_id}</span>`;
+      }
       break;
     case 'medication':
       icon = 'Rx'; iconCls = 'medication';
@@ -1589,7 +1704,152 @@ function attachRecentHandlers() {
   });
 }
 
-/* ─── Home Clinic 상세 팝업 ───────────────────── */
+/* ─── 운동 스케줄 카드 (메인 전체 화면용) ─────────── */
+function renderScheduleCardHtml() {
+  const rows = (state.sheets.schedule || []).filter(r => {
+    if (r.member_id !== 'robi' && r.member_id !== 'dobi') return false;
+    // active 필드: TRUE/true/빈값 = 활성
+    const active = r.active;
+    return active === true || active === 'TRUE' || active === 'true' || active === '' || active == null;
+  });
+
+  // 분리: weekly (weekday 있고 event_date 없음) / oneoff (event_date 있음)
+  const weeklyRows = rows.filter(r => r.weekday && !r.event_date);
+  const oneoffRows = rows.filter(r => r.event_date);
+
+  const isEmpty = weeklyRows.length === 0 && oneoffRows.length === 0;
+  const inner = isEmpty
+    ? `<div class="sched-empty">아직 등록된 스케줄이 없어요. 우측 + 추가에서 시작하세요.</div>`
+    : `
+        ${renderWeeklyCalendarHtml(weeklyRows)}
+        ${renderOneoffListHtml(oneoffRows)}
+      `;
+
+  return `
+    <section class="h-card sched-card">
+      <div class="h-card-title">
+        <span>운동 스케줄 — 도비 · 로비</span>
+        <span class="right link" id="add-schedule-link">+ 추가</span>
+      </div>
+      ${inner}
+    </section>
+  `;
+}
+
+function renderWeeklyCalendarHtml(weeklyRows) {
+  if (weeklyRows.length === 0) return '';
+
+  // 그룹: (member_id|title) 단위로 묶기. 시간 정보는 첫 행 기준 (한 활동을 여러 요일에 등록한 케이스 대응)
+  const groups = {};
+  weeklyRows.forEach(r => {
+    const key = `${r.member_id}|${r.title || ''}`;
+    if (!groups[key]) {
+      groups[key] = {
+        member_id: r.member_id,
+        title: r.title || '',
+        weekdays: new Set(),
+        sampleRow: r
+      };
+    }
+    groups[key].weekdays.add(String(r.weekday).toLowerCase());
+  });
+
+  const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const dayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+  const todayDay = new Date().getDay();
+  const todayIdx = todayDay === 0 ? 6 : todayDay - 1;
+
+  let html = `
+    <div class="sched-section">
+      <div class="sched-section-head">
+        <div class="sched-who">매주 반복</div>
+      </div>
+      <div class="week-cal">
+        <div class="week-cal-cell" style="background:transparent"></div>
+        ${dayLabels.map((lbl, i) => `
+          <div class="week-cal-cell week-cal-day-header${i === todayIdx ? ' today' : ''}">${lbl}</div>
+        `).join('')}
+  `;
+
+  // 도비 먼저, 로비 다음 정렬
+  const ordered = Object.values(groups).sort((a, b) => {
+    const memOrder = { dobi: 0, robi: 1 };
+    if (a.member_id !== b.member_id) return memOrder[a.member_id] - memOrder[b.member_id];
+    return (a.title || '').localeCompare(b.title || '');
+  });
+
+  ordered.forEach(g => {
+    const memberName = MEMBER_LABELS[g.member_id] || g.member_id;
+    const meta = [];
+    if (g.sampleRow.start_time) meta.push(escapeHtml(g.sampleRow.start_time));
+    if (g.sampleRow.location) meta.push(escapeHtml(g.sampleRow.location));
+    const metaStr = meta.length > 0 ? ` · ${meta.join(' · ')}` : '';
+    html += `
+      <div class="week-cal-row-label" title="${escapeHtml(g.title)}${metaStr}">
+        <span class="sched-who-badge ${g.member_id}">${escapeHtml(memberName)}</span>
+        ${escapeHtml(g.title)}
+      </div>
+    `;
+    dayKeys.forEach((dk, i) => {
+      const has = g.weekdays.has(dk);
+      html += `<div class="week-cal-cell${has ? ' has-event' : ''}${i === todayIdx ? ' today' : ''}">${has ? '●' : ''}</div>`;
+    });
+  });
+
+  html += `</div></div>`;
+  return html;
+}
+
+function renderOneoffListHtml(oneoffRows) {
+  if (oneoffRows.length === 0) return '';
+
+  // 미래 우선, 그 다음 과거 (오늘 포함). 30일 이상 지난 건 제외.
+  const today = formatYMD(new Date());
+  const thirtyDaysAgo = (() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return formatYMD(d);
+  })();
+  const items = oneoffRows
+    .filter(r => formatYMD(r.event_date) >= thirtyDaysAgo)
+    .map(r => ({
+      row: r,
+      dateStr: formatYMD(r.event_date),
+      isPast: formatYMD(r.event_date) < today,
+      isToday: formatYMD(r.event_date) === today
+    }))
+    .sort((a, b) => {
+      // 미래 (today 포함) 먼저, 가까운 순. 과거는 뒤에 최근 순
+      if (a.isPast !== b.isPast) return a.isPast ? 1 : -1;
+      if (a.isPast) return b.dateStr.localeCompare(a.dateStr);
+      return a.dateStr.localeCompare(b.dateStr);
+    })
+    .slice(0, 10);
+
+  if (items.length === 0) return '';
+
+  return `
+    <div class="sched-section">
+      <div class="sched-section-head">
+        <div class="sched-who">단발 일정</div>
+      </div>
+      <div class="sched-oneoff-list">
+        ${items.map(({ row, dateStr, isPast, isToday }) => {
+          const memberName = MEMBER_LABELS[row.member_id] || row.member_id;
+          const time = row.start_time ? `${row.start_time}${row.end_time ? '~' + row.end_time : ''}` : '';
+          const loc = row.location ? ` · ${escapeHtml(row.location)}` : '';
+          return `
+            <div class="sched-oneoff-item${isPast ? ' past' : ''}">
+              <span class="date${isToday ? ' today' : ''}">${escapeHtml(dateStr)}${isToday ? ' (오늘)' : ''}</span>
+              <span class="sched-who-badge ${row.member_id}">${escapeHtml(memberName)}</span>
+              <span class="title">${escapeHtml(row.title || '')}</span>
+              <span class="meta">${escapeHtml(time)}${loc}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
 function openHomeClinicDetail(recordId) {
   if (!recordId) return;
   const row = (state.sheets.home_clinic || []).find(r => r.record_id === recordId);
@@ -2035,12 +2295,81 @@ function openForm(catId, defaultMember, parentRecordId) {
         <div class="mn-error-msg">기타 정보를 입력하세요</div>
       </div>
     `;
+  } else if (catId === 'schedule') {
+    // 아이들만 표시. 기본값은 도비/로비 중 마지막 선택값 또는 robi
+    const kidsIds = ['robi', 'dobi'];
+    const defKid = kidsIds.includes(defMem) ? defMem : 'robi';
+    const kidsPicker = `<div class="mem-picker" data-name="member_id">${
+      kidsIds.map(id => `
+        <button type="button" class="mem-pick-btn ${id === defKid ? 'active' : ''}" data-value="${id}">
+          <span class="mdot" style="background:${MEMBER_COLOR_VAR[id]}"></span>${escapeHtml(MEMBER_LABELS[id])}
+        </button>
+      `).join('')
+    }</div>`;
+
+    html = `
+      <div class="form-group"><label class="form-label">누구의 스케줄?<span class="req">*</span></label>${kidsPicker}</div>
+      <div class="form-group"><label class="form-label">활동명<span class="req">*</span></label>
+        <input type="text" class="form-input" name="title" placeholder="예: 수영, 축구, 태권도" required></div>
+      <div class="form-group">
+        <label class="form-label">반복 방식<span class="req">*</span></label>
+        <div class="mem-picker" data-name="_mode_picker" id="sched-mode-picker">
+          <button type="button" class="mem-pick-btn active" data-value="weekly">매주 반복</button>
+          <button type="button" class="mem-pick-btn" data-value="oneoff">특정 날짜만</button>
+        </div>
+      </div>
+      <div class="form-group" id="sched-weekly-fields">
+        <label class="form-label">요일<span class="req">*</span> <span style="font-size:11px;color:var(--text-quiet)">여러 요일이면 각각 행으로 추가</span></label>
+        <select class="form-select" name="weekday">
+          <option value="mon">월요일</option>
+          <option value="tue">화요일</option>
+          <option value="wed">수요일</option>
+          <option value="thu">목요일</option>
+          <option value="fri">금요일</option>
+          <option value="sat">토요일</option>
+          <option value="sun">일요일</option>
+        </select>
+      </div>
+      <div class="form-group" id="sched-oneoff-fields" style="display:none">
+        <label class="form-label">날짜<span class="req">*</span></label>
+        <input type="date" class="form-input" name="event_date" value="${today}">
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">시작 시간</label>
+          <input type="time" class="form-input" name="start_time"></div>
+        <div><label class="form-label">종료 시간</label>
+          <input type="time" class="form-input" name="end_time"></div>
+      </div>
+      <div class="form-group"><label class="form-label">장소</label>
+        <input type="text" class="form-input" name="location" placeholder="선택"></div>
+      <div class="form-group"><label class="form-label">메모</label>
+        <input type="text" class="form-input" name="notes" placeholder="선택"></div>
+      <input type="hidden" name="category" value="exercise">
+      <input type="hidden" name="active" value="TRUE">
+    `;
   }
   document.getElementById('h-modal-body').innerHTML = html;
   // 멤버 picker 핸들러
   document.getElementById('h-modal-body').querySelectorAll('.mem-pick-btn').forEach(btn => {
     btn.addEventListener('click', () => pickMember(btn));
   });
+  // schedule 폼: 반복 방식 토글
+  if (catId === 'schedule') {
+    const modePicker = document.getElementById('sched-mode-picker');
+    const weeklyFields = document.getElementById('sched-weekly-fields');
+    const oneoffFields = document.getElementById('sched-oneoff-fields');
+    if (modePicker && weeklyFields && oneoffFields) {
+      modePicker.addEventListener('click', () => {
+        // pickMember 가 active 토글한 후 호출되므로 setTimeout으로 늦춤
+        setTimeout(() => {
+          const active = modePicker.querySelector('.mem-pick-btn.active');
+          const mode = active ? active.dataset.value : 'weekly';
+          weeklyFields.style.display = (mode === 'weekly') ? '' : 'none';
+          oneoffFields.style.display = (mode === 'oneoff') ? '' : 'none';
+        }, 0);
+      });
+    }
+  }
   openHModal();
 }
 
@@ -2200,6 +2529,38 @@ async function submitForm() {
       return;
     }
     data.completed_at = '';
+  }
+
+  // schedule 카테고리: weekly/oneoff 분기 처리
+  if (cat.id === 'schedule') {
+    if (!data.title || !data.title.trim()) {
+      showToast('error', '활동명을 입력하세요');
+      return;
+    }
+    // mode picker 값 추출 (id=sched-mode-picker)
+    const modePicker = body.querySelector('#sched-mode-picker');
+    const modeActive = modePicker ? modePicker.querySelector('.mem-pick-btn.active') : null;
+    const mode = modeActive ? modeActive.dataset.value : 'weekly';
+    if (mode === 'weekly') {
+      // event_date 비우기 (시트의 weekday만 사용)
+      data.event_date = '';
+      if (!data.weekday) {
+        showToast('error', '요일을 선택하세요');
+        return;
+      }
+    } else {
+      // weekday 비우기
+      data.weekday = '';
+      if (!data.event_date) {
+        showToast('error', '날짜를 선택하세요');
+        return;
+      }
+    }
+    // 도비/로비만 가능
+    if (data.member_id !== 'robi' && data.member_id !== 'dobi') {
+      showToast('error', '도비 또는 로비를 선택하세요');
+      return;
+    }
   }
 
   // idempotency

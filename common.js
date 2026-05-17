@@ -25,7 +25,8 @@ window.FamilyOS = (function () {
     { id: 'wealth',  label: 'Wealth',  kr: '자산', href: './wealth.html',  accent: 'var(--acc-wealth)'  },
     { id: 'expense', label: 'Expense', kr: '지출', href: './expense.html', accent: 'var(--acc-expense)' },
     { id: 'health',  label: 'Health',  kr: '건강', href: './health.html',  accent: 'var(--acc-health)'  },
-    { id: 'future',  label: 'Future',  kr: '미래', href: './future.html',  accent: 'var(--acc-future)'  }
+    { id: 'future',  label: 'Future',  kr: '미래', href: './future.html',  accent: 'var(--acc-future)'  },
+    { id: 'travel',  label: 'Travel',  kr: '여행', href: './travel.html',  accent: 'var(--acc-travel)'  }
   ];
 
   function getDashboardMeta(id) {

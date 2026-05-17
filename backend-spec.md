@@ -1,9 +1,14 @@
 # Family OS — Backend (Apps Script) Spec
 
-> 4개 서브 대시보드의 Apps Script가 **반드시** 따라야 하는 응답 포맷.
-> 메인 허브는 이 표준에 의존해 4개 카드를 동기화한다.
+> 5개 서브 대시보드의 Apps Script가 **반드시** 따라야 하는 응답 포맷.
+> 메인 허브는 이 표준에 의존해 5개 카드를 동기화한다.
 >
-> **v0.2 (Session 5)** — Future 대시보드 추가에 따라 다음 변경:
+> **v0.3 (Session 6)** — Travel 대시보드 추가:
+> - 5번째 대시보드 `travel` 정식 추가
+> - `trips` / `places` 시트 스키마 표준화
+> - 같은 도시 재방문 매칭 키 (`country_code` + `city_key`) 명문화
+>
+> **v0.2 (Session 5)** — Future 대시보드 추가에 따라:
 > - Wealth `kpi`에 `retirement_value_krw` 추가
 > - Future `kpi` 구조를 실제 운영에 맞게 재정의
 > - 마일스톤 금액 컬럼 표준화
@@ -12,12 +17,14 @@
 
 ## 1. 큰 그림
 
-- 대시보드별로 **별도 스프레드시트 1개 + 별도 Apps Script 1개 + 별도 Web App URL 1개** (총 4세트).
+- 대시보드별로 **별도 스프레드시트 1개 + 별도 Apps Script 1개 + 별도 Web App URL 1개** (총 **5세트**).
 - 각 Apps Script는 `doGet(e)`에서 **두 가지 모드**를 지원:
   - `?mode=full` (또는 mode 생략) — 해당 대시보드 화면 그릴 전체 데이터. 형식 자유.
   - `?mode=summary` — 메인 허브용 가벼운 요약. **이 포맷은 엄격하게 표준화.**
 - **대시보드는 본인 시트만 읽음.** 다른 대시보드 시트 직접 참조 금지.
   - 결합 표시는 메인 허브가 중재 (예: Future 진행률 = Wealth 노후 잔액 ÷ Future 목표).
+  - Travel↔Expense 연동은 **메모 태깅 (`#trip_id`)** 방식 — 양쪽 시트가 서로를 직접 안 봄. Travel은 trip_id를 Expense 메모에 노출, Expense는 메모 텍스트 매칭으로 자동 집계.
+- **Write 작업**은 모두 `doPost` + `text/plain;charset=utf-8` (CORS preflight 회피 패턴, Session 3에서 확립).
 
 ---
 
@@ -50,18 +57,30 @@
 ### 2-2. envelope 규칙
 
 - `ok: boolean` — 성공 여부. **항상 포함**.
-- `data.dashboard: string` — `"wealth"` / `"expense"` / `"health"` / `"future"` 중 하나. 메인이 검증용으로 씀.
-- `data.updated_at: ISO8601 string` — 데이터 기준 시각. 메인 카드 하단에 "X분 전 업데이트" 표시 위해 필수.
+- `data.dashboard: string` — `"wealth"` / `"expense"` / `"health"` / `"future"` / `"travel"` 중 하나.
+- `data.updated_at: ISO8601 string` — 데이터 기준 시각.
 - `data.kpi: object` — 카드에 표시할 지표. **포맷은 대시보드별로 다름** (아래 섹션 3).
 - `data.tasks: array` — 메인 Task 섹션에 표시할 항목. 없으면 빈 배열 `[]`.
 
 ### 2-3. CORS / 호출 형식
 
+**GET (read)**:
 ```js
 ContentService
   .createTextOutput(JSON.stringify(payload))
   .setMimeType(ContentService.MimeType.JSON);
 ```
+
+**POST (write)** — 클라이언트 측:
+```js
+fetch(WEBAPP_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // ← 이게 핵심
+  body: JSON.stringify({ action: 'addTrip', payload: { ... } })
+});
+```
+- `text/plain;charset=utf-8`로 보내야 simple request로 분류되어 CORS preflight가 안 생김.
+- Apps Script `doPost(e)`에서 `JSON.parse(e.postData.contents)`로 읽음.
 
 배포는 **웹 앱 / 액세스: 모든 사용자** 로. 인증은 URL 비밀성으로만.
 
@@ -92,7 +111,7 @@ ContentService
 - `value_krw`: KRW 환산 정수. 메인은 그대로 ₩ 포맷팅.
 - `weight_pct`: 전체 자산 대비 비중 %. 합 100 근사.
 - 일일 스냅샷 시트(`📅 일일스냅샷`)에서 MoM/YoY 계산.
-- **`retirement_value_krw` (Session 5 추가)**: 노후 자금 계좌의 평가금액 합계 (KRW).
+- **`retirement_value_krw`**: 노후 자금 계좌의 평가금액 합계 (KRW).
   - 보유종목 시트 `📊 보유종목`의 `계좌ID == 'acc_dad_jh'` 행들의 `평가금액` 합.
   - 메인 허브가 Future 카드의 진행률 계산에 사용.
   - 노후 계좌가 없거나 데이터 없으면 `0` (null 아님).
@@ -122,8 +141,8 @@ ContentService
   "members": [
     { "id": "dad",  "name": "아빠 실명", "status": "ok"   },
     { "id": "mom",  "name": "엄마 실명", "status": "warn" },
-    { "id": "robi", "name": "로비 실명", "status": "ok"   },
-    { "id": "dobi", "name": "도비 실명", "status": "ok"   }
+    { "id": "son1", "name": "도비",     "status": "ok"   },
+    { "id": "son2", "name": "로비",     "status": "ok"   }
   ]
 }
 ```
@@ -132,7 +151,7 @@ ContentService
 - 판정 로직은 Health 대시보드 내부에서. 메인은 그냥 표시만.
 - 멤버 순서는 응답 그대로 사용.
 
-### 3-4. Future (`dashboard: "future"`) — Session 5 재정의
+### 3-4. Future (`dashboard: "future"`)
 
 ```json
 {
@@ -144,17 +163,12 @@ ContentService
 }
 ```
 
-- `years_to_retirement`: 노후 목표 프로젝트(시트 `Project` 탭에서 `유형='목표'`)의 종료일까지 년수.
-  - **소수점 1자리, 반올림하지 말고 잘라서.**
-  - 과거면 음수. 목표 없으면 `null`.
-- `goal_progress_pct`: **항상 `null`을 반환.**
-  - Future Apps Script는 본인 시트로 노후 잔액을 모름.
-  - 메인 허브가 Wealth `retirement_value_krw` ÷ `retirement_target_krw` × 100으로 계산.
+- `years_to_retirement`: 노후 목표 프로젝트의 종료일까지 년수. **소수점 1자리, 잘라서**. 과거면 음수. 없으면 `null`.
+- `goal_progress_pct`: **항상 `null`을 반환.** 메인 허브가 Wealth `retirement_value_krw` ÷ `retirement_target_krw` × 100으로 계산.
 - `retirement_target_krw`: 노후 목표 프로젝트의 `예상비용` 또는 fallback `1500000000`.
-- `next_milestone`, `next_milestone_date`: 노후 목표 프로젝트의 미완료 Task 중 가장 가까운 미래의 것.
-  - Task 없으면 둘 다 `null`.
+- `next_milestone`, `next_milestone_date`: 가장 가까운 미래의 미완료 Task. 없으면 `null`.
 
-### 3-5. Future 시트 구조 — Session 5
+### 3-5. Future 시트 구조
 
 **Project 탭** (메타 9 컬럼):
 
@@ -167,10 +181,10 @@ ContentService
 | `종료일` | date | 노후 목표는 이 날짜 기준 `years_to_retirement` 계산 |
 | `예상비용` | KRW | `1.5억`, `5000만원`, `1500000` 모두 파싱 가능 |
 | `요약내용` | string | 본문 설명 |
-| `관련인` | string | 가족 멤버명 (아빠/엄마/도비/로비) 콤마/스페이스 구분 |
-| `유형` | enum | `일반` (기본) 또는 `목표` (노후 자금 같은 마일스톤형) |
+| `관련인` | string | 가족 멤버명 |
+| `유형` | enum | `일반` (기본) 또는 `목표` |
 
-**Task 탭** (8 컬럼, Session 5에서 `마일스톤_금액` 추가):
+**Task 탭** (8 컬럼):
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -181,9 +195,95 @@ ContentService
 | `비용` | KRW | Task 단위 비용 |
 | `상세내용` | string | 본문 |
 | `관련인` | string | 가족 멤버명 |
-| **`마일스톤_금액`** | **KRW** | **(Session 5 신규) 노후 목표 마일스톤일 때만 사용. 누적 목표액 (원).** |
-|  |  | **일반 Task는 비워둠. 노후 마일스톤 차트의 Y축으로 사용.** |
-|  |  | **예: 300000000 (3억), 380000000 (3.8억)** |
+| `마일스톤_금액` | KRW | 노후 목표 마일스톤일 때만. 누적 목표액 (원). |
+
+### 3-6. Travel (`dashboard: "travel"`) — Session 6 신규
+
+메인 카드: 향후 여행 후보군 최대 4개. 각 항목에 도시명 + 희망 방문장소 수.
+
+```json
+{
+  "upcoming_count": 6,
+  "upcoming_trips": [
+    {
+      "trip_id": "tokyo-2026",
+      "display_name": "도쿄 가족여행 2026",
+      "city": "도쿄",
+      "country_code": "JP",
+      "planned_count": 12,
+      "period_start": "2026-08-01"
+    },
+    {
+      "trip_id": "seoul-2026",
+      "display_name": "서울",
+      "city": "서울",
+      "country_code": "KR",
+      "planned_count": 50,
+      "period_start": null
+    }
+  ]
+}
+```
+
+- `upcoming_count`: 전체 향후 여행 개수 (잘라내기 전).
+- `upcoming_trips`: 최대 4개. **정렬: `period_start` 가까운 미래순, null은 뒤로 (그 안에선 `created_at` 최신순).**
+  - 메인 카드에 4개 슬롯으로 표시. 4개 미만이면 빈 슬롯에 "여행 추가 +" 점선 박스.
+- `planned_count`: 해당 trip의 places 중 `visit_status='planned'` 개수.
+- `period_start`: ISO 날짜 또는 `null`.
+
+**Tasks (Phase A)**: 빈 배열 `[]`. Phase B에서 임박 여행 D-N 알림 추가 검토.
+
+### 3-7. Travel 시트 구조 — Session 6
+
+**`trips` 탭** (13 컬럼):
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `trip_id` | string | 고유 ID. 영문 소문자+숫자+하이픈 (예: `tokyo-2026`, `barcelona-2024`). 추가 시 자동 생성하되 사용자 편집 가능 |
+| `display_name` | string | 표시명. 자유 입력 (예: "도쿄 가족여행 2026") |
+| `status` | enum | `upcoming` / `past` |
+| `period_start` | date | 시작일 (선택). 빈 값 허용 |
+| `period_end` | date | 종료일 (선택) |
+| `members` | string | 콤마 구분 (예: "아빠,엄마,도비,로비") |
+| `country_code` | string | ISO 2글자 대문자 (예: `JP`, `KR`, `ES`, `HR`). 도시명 geocoding 결과에서 자동 |
+| `city` | string | 도시 표시명 (예: "도쿄") |
+| `city_key` | string | 정규화 키 (영문 소문자, 공백 제거). 같은 도시 재방문 매칭용 |
+| `center_lat` | number | 도시 중심 위도 |
+| `center_lng` | number | 도시 중심 경도 |
+| `zoom` | number | 초기 줌 레벨 (11=도시, 9=지방) |
+| `created_at` | ISO string | |
+
+**`places` 탭** (13 컬럼):
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `place_id` | string | 고유 ID (예: `pl_tokyo-2026_001`). 자동 생성 |
+| `trip_id` | string | `trips.trip_id` 참조 |
+| `category` | enum | `hotel` / `restaurant` / `cafe` / `mart` / `shop` / `beach` / `park` / `themepark` / `sight` / `other` |
+| `name` | string | 장소명 |
+| `address` | string | 주소 (선택) |
+| `lat` | number | |
+| `lng` | number | |
+| `mapbox_id` | string | Mapbox feature ID (있으면). 같은 장소 재매칭용 |
+| `visit_status` | enum | `planned` / `visited` |
+| `visited_date` | date | `visited`일 때만. `planned`은 빈 값 |
+| `rating_star` | integer | 1~5 정수. `visited` && 평가 있을 때만 |
+| `rating_text` | string | 평가 서술 |
+| `created_at` | ISO string | |
+
+**같은 도시 재방문 매칭** (Phase B에서 사용):
+- 현재 trip 페이지를 열 때, 같은 `country_code` + `city_key`를 가진 **다른 trip들**의 `visit_status='visited'` places를 함께 가져와 회색 아이콘으로 지도에 표시.
+- 같은 `mapbox_id`가 현재 trip의 places에도 있으면 (재방문 등록) → 회색 대신 유색 표시.
+- Mapbox id가 없는 케이스의 보조 매칭: 같은 도시 내에서 `lat`/`lng` 거리 < 50m + 이름 매칭. (Phase B 구현 시 결정)
+
+### 3-8. Travel ↔ Expense 연동 (메모 태깅)
+
+Travel은 Expense 시트를 직접 보지 않는다. 대신:
+- Travel에서 trip 추가 시 `trip_id`가 표시됨 (예: `tokyo-2026`)
+- 사용자는 Expense에서 해당 여행 관련 거래의 메모에 `#tokyo-2026` 식으로 태그를 직접 입력
+- Expense의 기존 "여행 타일 자동 집계" 기능이 이 태그를 인식해 합산
+
+Travel 측은 합산 결과를 알 필요 없음. **여행 페이지 안에서 비용 표기는 Phase B에서 별도 결정** (옵션 A: Expense API 호출 / 옵션 B: 사용자가 수동 입력 / 옵션 C: 표기 안 함).
 
 ---
 
@@ -204,19 +304,12 @@ ContentService
 |---|---|---|
 | `id` | string | 고유 ID. `<dashboard>.<topic>.<detail>` 형식 권장 |
 | `label` | string | 사용자에게 보일 한 줄. 50자 이내 권장 |
-| `urgency` | `"info"` / `"warn"` / `"bad"` | 색 매핑: info=text-secondary, warn=neutral(노란색), bad=loss(빨강) |
-| `due` | ISO 날짜 또는 `null` | 마감일. 메인이 "D-N" 등 표시에 사용 |
-
-**Task 생성 예시 (대시보드별)**:
-
-- **Wealth**: 부동산 마지막 업데이트가 N일 전이면 `urgency: warn` 생성. N > 60 이면 `bad`.
-- **Expense**: 매달 1~5일 사이, 전월 import 안 됐으면 `bad`. import 완료되면 task 사라짐.
-- **Health**: 오늘 약 복용 체크 안 된 멤버 있으면 멤버당 1개 task. 우선순위 `warn`.
-- **Future**: Task `상태 ≠ 완료` 중에서, 기한 지남 = `bad`, 14일 이내 = `warn`, 60일 이내 = `info`. 그 이상은 task 생성 안 함. 최대 10개.
+| `urgency` | `"info"` / `"warn"` / `"bad"` | 색 매핑 |
+| `due` | ISO 날짜 또는 `null` | 마감일 |
 
 ---
 
-## 5. Apps Script 코드 골격 (4개 대시보드 공통 보일러플레이트)
+## 5. Apps Script 코드 골격 (보일러플레이트)
 
 ```javascript
 function doGet(e) {
@@ -231,78 +324,70 @@ function doGet(e) {
   }
 }
 
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    const action = body.action;
+    const payload = body.payload || {};
+    let result;
+    switch (action) {
+      case 'addTrip':    result = addTrip(payload); break;
+      case 'updateTrip': result = updateTrip(payload); break;
+      // ...
+      default: throw new Error('Unknown action: ' + action);
+    }
+    return jsonResponse({ ok: true, data: result });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: err.toString(), stack: err.stack });
+  }
+}
+
 function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
-
-function buildSummaryPayload() {
-  // 대시보드별로 구현. 반드시 다음 5개 키 반환:
-  return {
-    dashboard: 'wealth',  // ← 대시보드 ID로 변경
-    kpi: { /* 섹션 3 참고 */ },
-    tasks: [ /* 섹션 4 참고 */ ],
-    updated_at: new Date().toISOString()
-  };
-}
-
-function buildFullPayload() {
-  // 해당 대시보드 화면을 그리는 전체 데이터. 형식 자유.
-  // (기존 Wealth Apps Script의 buildDashboardPayload() 와 동일 컨셉)
-}
 ```
 
 ---
 
-## 6. 메인 허브가 호출하는 방식 (참고)
-
-메인이 4개 Web App URL을 LocalStorage에서 읽어와 병렬로 호출:
+## 6. 메인 허브 호출 방식
 
 ```js
 const url = localStorage.getItem('familyOS.webAppUrl.wealth');
-const res = await fetch(`${url}?mode=summary&_=${Date.now()}`, {
-  method: 'GET',
-  redirect: 'follow'
-});
+const res = await fetch(`${url}?mode=summary&_=${Date.now()}`, { method: 'GET', redirect: 'follow' });
 const json = await res.json();
 if (!json.ok) throw new Error(json.error);
-// json.data.kpi, json.data.tasks, json.data.updated_at 사용
 ```
 
 캐시 무효화를 위해 `_=${Date.now()}` 같은 cachebust 파라미터를 항상 붙임.
 
-### 6-1. 메인 허브의 데이터 결합 (Session 5 추가)
+### 6-1. 메인 허브의 데이터 결합
 
 Future 카드의 진행률은 두 응답을 결합해 계산:
 
 ```js
-// Wealth summary 와 Future summary 둘 다 받은 후
 const retireValue = wealth.kpi.retirement_value_krw || 0;
 const retireTarget = future.kpi.retirement_target_krw || 1500000000;
 const progressPct = retireTarget > 0
   ? Math.min(100, (retireValue / retireTarget) * 100)
   : null;
-// progressPct 를 Future 카드 진행률 표시에 사용
 ```
 
-둘 중 하나라도 로드 실패하면 진행률은 표시하지 않음. `years_to_retirement` 와 `next_milestone` 은 Future 단독으로 표시 가능.
+Travel 카드는 단독 응답으로 충분 (결합 계산 없음).
 
 ---
 
-## 7. 호환성 체크리스트 (새 대시보드 만들 때 확인)
+## 7. 호환성 체크리스트 (새 대시보드 만들 때)
 
-- [ ] `?mode=summary` 응답이 위 envelope 포맷 (`{ok, data:{dashboard, kpi, tasks, updated_at}}`)
-- [ ] `data.dashboard` 가 정확히 `"wealth"` / `"expense"` / `"health"` / `"future"` 중 하나
+- [ ] `?mode=summary` 응답이 envelope 포맷 (`{ok, data:{dashboard, kpi, tasks, updated_at}}`)
+- [ ] `data.dashboard`가 `"wealth"` / `"expense"` / `"health"` / `"future"` / `"travel"` 중 하나
 - [ ] `kpi` 필드명이 섹션 3 정의와 정확히 일치
 - [ ] `tasks` 배열의 각 항목이 `{id, label, urgency, due}` 4개 키 보유
-- [ ] `updated_at` 이 ISO 8601 문자열
-- [ ] 에러 시에도 `{ok: false, error: "..."}` 형태로 반환 (HTTP 200으로)
-- [ ] CORS 헤더 신경 안 써도 OK (Apps Script 웹앱은 자동)
-- [ ] Web App URL이 LocalStorage 키 `familyOS.webAppUrl.<dashboardId>` 에 저장됨
-- [ ] **본인 시트만 읽음.** 다른 대시보드 시트 직접 접근 금지. 결합은 메인 허브가 처리
-
-이 8개만 충족하면 메인 허브가 자동으로 해당 카드를 채운다.
+- [ ] `updated_at`이 ISO 8601 문자열
+- [ ] 에러 시에도 `{ok: false, error: "..."}` (HTTP 200으로)
+- [ ] Write 작업은 `doPost` + `text/plain;charset=utf-8` 패턴
+- [ ] **본인 시트만 읽음.** 결합은 메인 허브가 처리
 
 ---
 
@@ -311,4 +396,5 @@ const progressPct = retireTarget > 0
 | 버전 | 시기 | 변경 |
 |---|---|---|
 | v0.1 | Session 1 | 최초 작성. 4개 대시보드 기본 envelope/kpi/tasks |
-| v0.2 | Session 5 | Wealth `retirement_value_krw` 추가. Future `kpi` 5키로 재정의 (`goal_progress_pct`는 항상 `null`, 메인 허브가 결합 계산). Task 탭에 `마일스톤_금액` 컬럼 표준화. "본인 시트만 읽음" 원칙 명문화 |
+| v0.2 | Session 5 | Wealth `retirement_value_krw` 추가. Future `kpi` 5키로 재정의. Task 탭에 `마일스톤_금액` 컬럼 표준화. "본인 시트만 읽음" 원칙 명문화 |
+| v0.3 | Session 6 | Travel 대시보드 정식 추가 (kpi/trips/places). 같은 도시 재방문 매칭 키(`country_code`+`city_key`) 명문화. Travel↔Expense 메모 태깅 패턴. `doPost`+`text/plain` 패턴을 spec 본문에 명시 |

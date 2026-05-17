@@ -94,6 +94,12 @@
     .card:nth-child(2) { animation-delay: 0.10s; }
     .card:nth-child(3) { animation-delay: 0.15s; }
     .card:nth-child(4) { animation-delay: 0.20s; }
+    .card:nth-child(5) { animation-delay: 0.25s; }
+    /* Travel 카드는 5번째이며 가로 2칸 차지 (비대칭) */
+    .card[data-id="travel"] { grid-column: 1 / -1; }
+    @media (max-width: 767px) {
+      .card[data-id="travel"] { grid-column: auto; }
+    }
     @keyframes cardIn {
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -110,6 +116,7 @@
     .card[data-id="expense"] { --card-accent: var(--acc-expense); }
     .card[data-id="health"]  { --card-accent: var(--acc-health); }
     .card[data-id="future"]  { --card-accent: var(--acc-future); }
+    .card[data-id="travel"]  { --card-accent: var(--acc-travel); }
     .card-head {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: var(--s5);
@@ -402,26 +409,72 @@
     }
     footer.ftr .ftr-r { font-family: var(--font-mono); }
 
-    /* 카드 전체 클릭 영역 — JS 핸들러가 처리. 오버레이 링크는 키보드 접근성용 */
-    .card { cursor: pointer; }
+    /* 카드 전체 클릭 영역 */
     .card a.card-link-overlay {
       position: absolute; inset: 0; z-index: 1;
-      /* 마우스/터치 클릭은 JS가 위임 처리하므로 링크가 가리는 영역을 줄임 */
-      pointer-events: none;
-    }
-    /* 키보드 Tab 으로 포커스 시에만 외곽선 표시 + 클릭 가능하게 */
-    .card a.card-link-overlay:focus-visible {
-      pointer-events: auto;
-      outline: 2px solid var(--accent);
-      outline-offset: -3px;
-      border-radius: var(--r-lg);
     }
     .card .card-interactive { position: relative; z-index: 2; }
     .card:hover { border-color: var(--border-hi); }
     .card:active { transform: scale(0.998); }
-    /* 카드 안의 펼치기/버튼은 카드 클릭과 별개로 작동해야 함 */
-    .card details.wealth-expand summary,
-    .card button { cursor: pointer; }
+
+    /* ─── Travel 카드 (5번째, 2x2 슬롯) ─────────────────────── */
+    .travel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--s3);
+    }
+    @media (max-width: 480px) {
+      .travel-grid { grid-template-columns: 1fr; }
+    }
+    .travel-slot {
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: var(--s3) var(--s4);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--s3);
+      transition: border-color var(--t-fast);
+      min-height: 56px;
+    }
+    .travel-slot:hover { border-color: var(--border-hi); }
+    .travel-slot .city {
+      font-family: var(--font-display);
+      font-size: 15px;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .travel-slot .sub {
+      font-size: 10px; color: var(--text-quiet);
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+    .travel-slot .planned {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--acc-travel);
+      padding: 3px 9px;
+      background: var(--acc-travel-soft);
+      border-radius: var(--r-full);
+      flex-shrink: 0;
+    }
+    .travel-slot.empty {
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--text-quiet);
+      font-size: 12px;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .travel-slot.empty:hover {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+    }
+    .travel-meta {
+      margin-top: var(--s3);
+      font-size: 11px; color: var(--text-quiet);
+      font-family: var(--font-mono);
+    }
   </style>
 </head>
 
@@ -438,6 +491,7 @@
         <article class="card" data-id="expense" id="card-expense"></article>
         <article class="card" data-id="health" id="card-health"></article>
         <article class="card" data-id="future" id="card-future"></article>
+        <article class="card" data-id="travel" id="card-travel"></article>
       </section>
 
       <section class="tasks-section">
@@ -485,9 +539,9 @@
 
   /* ─── 상태 ────────────────────────────────────────────── */
   const state = {
-    data:   { wealth: null, expense: null, health: null, future: null },
-    status: { wealth: 'unset', expense: 'unset', health: 'unset', future: 'unset' },
-    error:  { wealth: null,   expense: null,   health: null,   future: null }
+    data:   { wealth: null, expense: null, health: null, future: null, travel: null },
+    status: { wealth: 'unset', expense: 'unset', health: 'unset', future: 'unset', travel: 'unset' },
+    error:  { wealth: null,   expense: null,   health: null,   future: null,   travel: null }
   };
 
   /* ─── 데이터 fetch ───────────────────────────────────── */
@@ -536,6 +590,7 @@
         case 'expense': bodyHtml = renderExpense(state.data[id]); break;
         case 'health':  bodyHtml = renderHealth(state.data[id]); break;
         case 'future':  bodyHtml = renderFuture(state.data[id]); break;
+        case 'travel':  bodyHtml = renderTravel(state.data[id]); break;
       }
     }
 
@@ -708,6 +763,45 @@
     return Number(n).toLocaleString('ko-KR');
   }
 
+  function renderTravel(data) {
+    const k = data.kpi || {};
+    const trips = Array.isArray(k.upcoming_trips) ? k.upcoming_trips : [];
+    const total = k.upcoming_count || trips.length;
+
+    // 4슬롯 채우기. 부족하면 빈 슬롯 (점선 + "여행 추가 +")
+    const slots = [];
+    for (let i = 0; i < 4; i++) {
+      const t = trips[i];
+      if (t) {
+        const sub = t.period_start
+          ? t.period_start
+          : (t.country_code || '');
+        slots.push(`
+          <div class="travel-slot">
+            <div>
+              <div class="city">${escapeHtml(t.city || t.display_name || '—')}</div>
+              ${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ''}
+            </div>
+            <span class="planned">${t.planned_count || 0}곳</span>
+          </div>
+        `);
+      } else {
+        slots.push(`<div class="travel-slot empty">+ 여행 추가</div>`);
+      }
+    }
+
+    const meta = total > 4
+      ? '향후 ' + total + '개 · 가까운 시작일 순 4개 표시'
+      : (total > 0 ? '향후 ' + total + '개' : '아직 계획 없음');
+
+    return `
+      <div class="travel-grid">
+        ${slots.join('')}
+      </div>
+      <div class="travel-meta">${escapeHtml(meta)}</div>
+    `;
+  }
+
   /* ─── Tasks 통합 ────────────────────────────────────── */
   function renderTasks() {
     const ul = document.getElementById('tasks-list');
@@ -764,23 +858,6 @@
     } else if (action === 'retry') {
       const id = btn.dataset.id;
       if (id) refreshOne(id);
-    }
-  });
-
-  /* ─── Session 5.3 — 카드 전체 영역 클릭 → 대시보드 열기 ─────────
-   * 기존엔 오버레이 <a>가 카드 상단 패딩만 차지해 클릭 영역이 좁음.
-   * 이 핸들러로 카드 어디든 클릭하면 새 탭에서 해당 대시보드 열림.
-   * 내부 상호작용 요소(버튼/펼치기 summary/링크 등)는 자체 동작 우선.
-   * 오버레이 <a>는 키보드 Tab 접근성용으로 유지 (focus-visible 시 활성).
-   * ─────────────────────────────────────────────────────────── */
-  document.getElementById('cards').addEventListener('click', (e) => {
-    // 카드 내부의 상호작용 요소는 자체 동작에 맡김
-    if (e.target.closest('button, summary, a, input, textarea, label')) return;
-    const card = e.target.closest('.card');
-    if (!card) return;
-    const overlay = card.querySelector('.card-link-overlay');
-    if (overlay && overlay.href) {
-      window.open(overlay.href, '_blank', 'noopener');
     }
   });
 

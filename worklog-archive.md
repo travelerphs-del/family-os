@@ -1260,87 +1260,162 @@ readRealestate @ Code.gs:530
 
 ────────────────────────────────────────────────────────────────────
 
-## Session 7 — Health: 운동 스케줄 추가 + PN 클릭 연동
+## Session 6 — Travel 대시보드 신규 추가 (Phase A)
 
-### [배경]
+**기간**: 2026-05-17
+**범위**: 5번째 서브 대시보드 신규. Phase A 만 (메인 페이지). 개별 여행 페이지는 Phase B 로 분리.
 
-Session 4 에서 Strava 연동·환경정보 제거하면서 운동 카드도 같이 떨어졌다. v0.9 (이전 단일 파일 버전) 에는 "아이들 주간 캘린더 + Strava + 걸음수" 종합 운동 카드가 있었음. 이번 세션은 그 중 "아이들 운동 스케줄" 부분만 부활시키되, 단발 일정도 같이 들어가도록 데이터 모델을 확장.
+### [DECISION] 9가지 핵심 결정
 
-부수 작업으로 Recent updates 에서 PN 클릭 시 부모 HC 팝업 열기 — 사용자 요구사항 (PN→HC 양방향 탐색).
-
-### [결정]
-
-| 항목 | 결정 | 비고 |
+| # | 사항 | 답 |
 |---|---|---|
-| 입력 방식 | 대시보드 폼 (CATEGORIES 에 `schedule` 추가) | 시트 직접 편집도 그대로 가능 |
-| 시간 단위 | **하이브리드 (weekly + oneoff)** | 사용자 선택. 컬럼 `event_date` 1개 추가만 필요 |
-| 모드 판정 | mode 컬럼 X · `weekday` 채워지면 weekly, `event_date` 채워지면 oneoff | redundant 컬럼 방지 |
-| 시트 구조 | `schedule` 탭 (기존), 컬럼 `event_date` 1개 추가 | Apps Script 동적 헤더라 백엔드 코드 0줄 변경 |
-| 카테고리 | `exercise` 만 (운동만) | category 컬럼은 시트에 유지, 폼에선 hidden=exercise 자동 |
-| 대상자 | 도비/로비만 (kids only) | 폼에서 4명 → 2명 picker 로 좁힘 |
-| 표시 위치 | 메인 '전체' 화면, 멤버 카드와 task/recent 사이 | 부모 확인 빈도 높은 위치 |
-| 두 자녀 표시 | 통합 캘린더 (요일 × 활동 행, 도비 먼저 → 로비) | 한눈에 보기 우선 |
-| 단발 일정 표시 | 별도 리스트 (날짜 정렬, 미래 우선) | 30일 이상 지난 건 자동 숨김, 최대 10건 |
+| 1 | 지도 공급자 | 세계지도 = 인라인 SVG (가벼움, 디자인 톤). 개별 여행 = Mapbox (Phase B). Phase A 에선 Mapbox 코드 없음 |
+| 2 | 여행 ID | 자유 텍스트 매칭 폐기 → 짧은 `trip_id` (예: `tokyo-2026`) 도입. Expense 연동은 메모 태깅 (`#trip_id`) |
+| 3 | family-os 통합 방식 | 옵션 A (5번째 카드 추가). 사용자 결정: 비대칭이라도 동일 디자인, 향후 카드 추가 여지 |
+| 4 | Travel 카드 표시 내용 | 향후 여행 후보군 4개 (2x2). 각 슬롯: 도시명 + 희망 방문장소 수 |
+| 5 | 빈 슬롯 처리 | 점선 박스 + "+ 여행 추가" 인터랙티브 |
+| 6 | 4개 정렬 기준 | `period_start` 가까운 미래순. null 은 `created_at` 최신순 |
+| 7 | 같은 도시 재방문 매칭 | `country_code` + `city_key` 조합. 자유 입력 city 텍스트는 표시용, 매칭은 정규화 키로 |
+| 8 | 카테고리 | 호텔/식당/카페/마트/샵/해변/공원/놀이공원/관광지/**기타** (10개) |
+| 9 | 악센트 색 | coral `#FF7B7B` |
 
-### [CODE]
+### [DECISION] 비판적으로 짚어둔 점
 
-**파일**: `health.html` (단일 파일 변경). Apps Script 변경 없음.
+1. **자유 텍스트 매칭은 fragile**: 도쿄/Tokyo/도쿄도/Tokyo Metropolis 가 모두 같은 도시를 가리킬 수 있음. `country_code` + `city_key` 정규화로 해결
+2. **Write-back 걱정은 outdated**: Session 3 의 OAuth 폐기 후 `doPost` + `text/plain;charset=utf-8` 패턴은 안정 작동. 사용자 우려는 과거 기억이라 짚어줌
+3. **Mapbox 무료 한도면 충분**: 50K map loads / 100K geocoding 무료. 개인용 사용량은 월 수백 수준. **카드 등록 불필요** (Google Maps 와 다른 점)
+4. **Phase A 에선 Mapbox 0 사용**: 도시 검색은 OSM Nominatim (완전 무료, 토큰 불필요). Mapbox 는 Phase B 개별 여행 페이지에만
+5. **카드 그리드 비대칭**: 5번째 카드는 `grid-column: 1 / -1` 로 가로 전체. 사용자 합의됨
+6. **메인 허브 카드 콘텐츠**: 다른 카드는 KPI (₩, %, D-N) 인데 Travel 은 "장소 수 리스트"로 톤 달라짐. 사용자 결정 그대로 진행하되, 향후 다른 카드 추가 가능성 염두에 두고 grid-column 처리
 
-| 변경 | 위치 | 내용 |
-|---|---|---|
-| PN clickable | `renderRecentItemHtml()` `case 'progress_note'` | `row.parent_record_id` 있으면 `clickable=true`, `recordId=parent_record_id` 로 부모 HC 팝업과 동일 동작 |
-| CATEGORIES | `const CATEGORIES` | `schedule` 카테고리 1줄 추가 (`{ id:'schedule', name:'운동 스케줄', icon:'🏃', sheet:'schedule' }`) |
-| 폼 분기 | `openForm()` `else if (catId === 'schedule')` | weekly/oneoff 토글 picker, 도비/로비 picker, weekday/event_date 분기 필드 |
-| 토글 핸들러 | `openForm()` 끝 | `#sched-mode-picker` 의 active 변경에 따라 `#sched-weekly-fields` / `#sched-oneoff-fields` 표시 토글 |
-| submitForm 검증 | `submitForm()` schedule 분기 | mode=weekly 면 event_date='', oneoff 면 weekday=''. 모드별 필수 검증 |
-| 렌더 함수 | `renderScheduleCardHtml()`, `renderWeeklyCalendarHtml()`, `renderOneoffListHtml()` | 신규 |
-| 마운트 | `renderAllView()` | 멤버 카드 다음, grid-2 위. + 추가 버튼 핸들러 연결 |
-| CSS | `<style>` 끝 | `.sched-card`, `.week-cal`, `.sched-oneoff-*` 등 ~100줄 |
+### [CODE] 산출물
 
-**총 변경**: +363 / -2 라인 (HTML 단일 파일)
+| 파일 | 줄수 | 종류 | 주요 내용 |
+|---|---|---|---|
+| `backend-spec.md` (v0.3) | 314 | 문서 | §3-6 Travel kpi, §3-7 trips/places 스키마, §3-8 Expense 메모 태깅 패턴, `doPost+text/plain` 본문에 명시 |
+| `design-tokens.css` | 178 | CSS | `--acc-travel: #FF7B7B` + `--acc-travel-soft` 추가 |
+| `design-system.md` | 212 | 문서 | 악센트 표에 Travel/coral 행 추가 |
+| `common.js` | 408 | JS | `DASHBOARDS` 배열에 travel 추가 (5번째) |
+| `index.html` | 1025 | HTML | 5번째 카드 `data-id="travel"` article, `grid-column: 1/-1`, accent 매핑, `renderTravel()` 함수 추가 |
+| `travel-apps-script.gs` | 612 | Apps Script | 신규. doGet (`summary`/`full`) + doPost (6 액션). 시트 자동 초기화 (`ensureSheets_`). trip_id/place_id 자동 생성 |
+| `travel.html` | 945 | HTML | 신규. 세계지도 SVG (대륙 outline 인라인) + 2열 (최근/향후) + 여행 추가/편집 모달 + OSM Nominatim 도시 검색 |
+| `worklog.md` | (슬림 갱신) | 문서 | 대시보드 표에 Travel 행 추가, Pending 갱신 |
+| `worklog-archive.md` | (이 섹션 추가) | 문서 | Session 6 항목 누적 |
+| `context-travel.md` | 신규 | 문서 | Phase B 시작용 컨텍스트 |
 
-### [시트 변경 (사용자 작업)]
+### [CODE] 시트 스키마
 
-schedule 시트 컬럼 끝에 `event_date` 1개 추가:
+**`trips` 탭 (13 컬럼)**:
+`trip_id` / `display_name` / `status` / `period_start` / `period_end` / `members` / `country_code` / `city` / `city_key` / `center_lat` / `center_lng` / `zoom` / `created_at`
 
-```
-record_id | member_id | title | category | weekday | start_time | end_time | location | active | notes | created_at | client_req_id | event_date
-                                                                                                                                  └─── 신규
-```
+**`places` 탭 (13 컬럼)**:
+`place_id` / `trip_id` / `category` / `name` / `address` / `lat` / `lng` / `mapbox_id` / `visit_status` / `visited_date` / `rating_star` / `rating_text` / `created_at`
 
-기존 2행 (SCH-20260512-001, 002) 은 weekly 이므로 event_date 비우면 됨. 추가만 하면 동작. Apps Script 재배포 불필요.
+시트 헤더는 첫 doGet/doPost 호출 시 자동 삽입 (`ensureSheets_`). 사용자는 빈 시트 2개만 생성하면 됨.
+
+### [CODE] 핵심 패턴
+
+1. **CORS 회피 (write)**: `Content-Type: text/plain;charset=utf-8` → simple request → preflight 안 생김. Session 3 패턴 그대로 재사용
+2. **doPost 6 액션**: addTrip / updateTrip / deleteTrip / addPlace / updatePlace / deletePlace. deleteTrip 은 places 도 cascade 삭제
+3. **trip_id 자동 생성**: `{city_key}-{year}` 기본. 중복 시 `-2`, `-3` 등 suffix
+4. **place_id 자동 생성**: `pl_{trip_id}_{seq:3자리}` 패턴
+5. **세계지도 마커 좌표**: equirectangular projection (1000x500 viewBox). 단순 대륙 outline path 13개 인라인. 추후 정밀한 SVG 로 교체 가능
+6. **마커 애니메이션**: 동그라미 + 위아래 진동 역삼각형 (`@keyframes markerBob`). 마커별 `animation-delay` 분산 (5단계) 으로 일제히 안 움직이게
+7. **빈 슬롯 hover**: 메인 허브 카드의 link-overlay 와 슬롯 hover 가 충돌하지 않게 z-index 그대로 사용 (slot 은 overlay 아래라 클릭 시 travel.html 로 이동)
+
+### [DECISION] Phase B 로 미룬 사항
+
+| 항목 | 이유 |
+|---|---|
+| 개별 여행 페이지 (`travel.html?trip=...`) | 코드량 큼 (Mapbox 통합 + 검색 자동완성 + 카테고리 핀 9개 + 별점 + 필터) |
+| 같은 도시 재방문 시 회색/유색 시각화 | Phase A 데이터 모델만 준비됨. 시각화는 Phase B |
+| Mapbox access token 통합 | LocalStorage 저장 패턴. Phase B 진입 시 사용자 발급 필요 |
+| 방문장소 카테고리별 SVG 아이콘 | 9 카테고리 + other. Phase B 에서 디자인 |
+| Travel ↔ Expense 비용 표기 | 옵션 A/B/C 미결정. Phase B 진입 시 결정 |
+| 메인 허브 Task 통합 | Phase A 응답은 `tasks: []`. 임박 여행 D-N 등 추가 검토 |
+
+### [DECISION] Phase A 에서 의도적으로 단순화한 것
+
+1. **trip_id 변경 (편집 모달)**: trip_id 칸은 편집 모드에서 보이되, 실제 변경은 거부. 변경하려면 delete + add 가 필요. Expense 메모 태깅이 깨질 수 있어 신중하게.
+2. **`f-city-search` 의 한국어 처리**: OSM Nominatim 은 한글 검색도 어느 정도 지원하지만, 영문 검색이 더 안정적. 사용자가 한글 입력하면 검색은 한글로 가되, `f-city-key` 추출은 결과의 영문 `address.city` 에서 함
+3. **편집 시 좌표 변경**: Geocoding 결과는 빈 칸만 채우게 (이미 값이 있으면 덮어쓰지 않음). 사용자 의도 보호
+4. **에러는 alert()**: Phase A 는 빠른 검증이 목적. Phase B 에서 toast 같은 UX 로 개선
 
 ### [VERIFICATION]
 
 | 항목 | 결과 |
 |---|---|
-| JS syntax 체크 (`new Function`) | OK (67k 블록 통과) |
-| `getPickedMember` 충돌 | 없음 — 첫 `.mem-picker` 만 잡으므로 member_id picker 우선 |
-| `_mode_picker` 시트 저장 | 안 됨 — `name` 없는 button 이라 querySelectorAll input/select/textarea 에 안 잡힘 |
-| date 셀 정규화 | `normalizeValue_` 가 `yyyy-MM-dd` 로 통일. `formatYMD` 가 양쪽 다 처리 |
-| 빈 event_date 저장 | `appendRow` 에 '' 넣으면 빈 셀. 모드 분기 정상 |
-| 도비 먼저 정렬 | weekly 캘린더 그룹 정렬에서 `memOrder={dobi:0, robi:1}` 명시 (시각적으로 형이 먼저) |
+| `travel-apps-script.gs` 문법 (`node --check`) | ✅ 612 줄 통과 |
+| `travel.html` 인라인 JS (`node --check`) | ✅ 27,152 chars 통과 |
+| `travel.html` 태그 균형 | ✅ div 70/70, section 2/2, main 1/1, script 2/2, style 1/1, button 11/11, ul 2/2, svg 5/5, g 1/1 |
+| `index.html` 태그 균형 (변경 후) | ✅ div 40/40, article 5/5, section 2/2, script 2/2, button 3/3 |
+| `index.html` 인라인 JS (수정 후) | ✅ 20,700 chars 통과 |
+| `common.js` (DASHBOARDS 5개로 확장) | ✅ 통과 |
+| 모달 1개 (`trip-modal`) | ✅ 추가/편집 모드 토글 |
+| Apps Script 6 액션 매칭 | ✅ addTrip/updateTrip/deleteTrip/addPlace/updatePlace/deletePlace |
+| backend-spec §3-6 / §3-7 와 코드 일치 | ✅ summary 키 5개 (`upcoming_count`, `upcoming_trips[]`), trip 13컬럼, place 13컬럼 |
+
+### [COST] 운영 비용 / 토큰
+
+**사용자 운영 비용 (Phase A)**:
+- Apps Script: 무료
+- OSM Nominatim (도시 검색): 무료 (정책상 1 req/sec, 개인 사용은 무관)
+- Mapbox: Phase A 에선 0 호출. Phase B 부터. 무료 한도 50K loads/월, 100K geocoding/월 → 개인 사용량 (월 수백)으로는 0원
+- GitHub Pages: 무료
+- **월 운영비 합계: 0원 확정**
+
+**이번 세션 작업 토큰**:
+- Apps Script 612 줄 + HTML 945 줄 + spec/CSS/common 수정 + worklog/context 작성
+- 총 산출 코드 ~95KB. Health (594+2393=2987 줄, ~75KB) 보다 약간 큼
+- Phase B (개별 여행 페이지) 는 다음 세션에서 별도로 — Mapbox 통합 + 검색 자동완성 + 카테고리 핀 + 필터 모두 들어가야 해서 Phase A 와 비슷한 토큰량 예상
+
+### [DEPLOYMENT] 사용자 안내 (5단계)
+
+1. **새 Google Spreadsheet 생성**
+   - 빈 시트 1개 만들기. 이름은 자유 (예: "Family Travel")
+   - 시트 ID 메모 (URL 의 `/d/{SHEET_ID}/edit`)
+   - 탭 2개 추가: `trips`, `places` (둘 다 비워둬도 됨, 헤더는 자동 삽입됨)
+
+2. **Apps Script 프로젝트 생성**
+   - script.google.com → 새 프로젝트
+   - `travel-apps-script.gs` 내용 전체 복사 → `Code.gs` 에 붙여넣기
+   - 상단 `SHEET_ID = ''` 안에 1단계 ID 입력
+
+3. **권한 부여 + 디버그**
+   - 편집기에서 `debug_summary` 선택 → 실행 → 권한 팝업 → 허용
+   - 로그에 `{ ok: true, data: { upcoming_count: 0, upcoming_trips: [] } }` 나오면 OK
+   - 빈 시트면 ensureSheets_ 가 헤더 13개씩 자동 삽입한 걸 확인할 수 있음
+   - (옵션) `debug_addSampleTrip` 실행 → 샘플 도쿄 trip 추가됨. `debug_summary` 다시 실행하면 1건으로 나옴
+
+4. **웹 앱 배포**
+   - 배포 > 새 배포 > 유형: 웹 앱
+   - 액세스: 모든 사용자
+   - 게시 → URL 복사 (`/exec` 로 끝나는)
+
+5. **메인 허브 + travel.html 연결**
+   - GitHub Pages 에 새 파일들 푸시:
+     - `travel.html`, `travel-apps-script.gs` (참조용)
+     - 수정된 `index.html`, `common.js`, `design-tokens.css`, `design-system.md`, `backend-spec.md`
+   - index.html 열고 ⚙️ → 5번째 칸 "Travel" 에 4단계 URL 입력 → 저장
+   - travel.html 도 같은 URL 자동으로 사용함 (LocalStorage 공유)
 
 ### [LESSON]
 
-1. **redundant 컬럼 피하기**: weekly/oneoff 구분에 `mode` 컬럼을 따로 두는 대신 `weekday` vs `event_date` 어느 쪽이 채워졌는지로 판정. 컬럼 1개 절약 + 데이터 자기설명적.
-2. **CSS 변수 fabricate 금지**: 처음에 `--surface-elev`, `--border-subtle`, `--robi-rgb` 같은 미정의 변수 썼다가 정정. design-tokens.css 를 먼저 확인하는 게 정공법. 앞으로 모르는 변수는 fallback hex 가 아니라 정의된 변수 직접 사용.
-3. **picker 컴포넌트 재사용성 한계**: `.mem-picker` 클래스를 mode 토글에도 재사용했더니 `getPickedMember()` 가 첫 picker 만 잡는 가정과 충돌 가능성. 이번엔 우연히 첫 picker 가 member 라 OK 였지만, 향후 컴포넌트로 격리 권장.
-4. **worklog ↔ archive 일관성 미흡**: Session 6.x (Wealth) 가 worklog.md 에는 "완료" 로 적혀있지만 archive 에는 없음. Pending 에 기록 — 누군가 그 세션을 archive 로 옮겨야 함.
+1. **사용자의 과거 경험은 정확하지만 outdated 일 수 있음**: write-back 우려는 정당했음 (OAuth 시절 문제). 현재 시스템에선 해결됨. 사용자에게 "이건 과거 기억" 이라고 명시적으로 짚어주는 게 좋음
+2. **Mapbox vs Google Maps**: 한국 POI 매칭은 Google 이 강하지만 카드 등록 마찰. Mapbox 는 카드 없이 무료 + 한도 후함. 개인용 가족 대시보드는 마찰 최소화가 우선 → Mapbox 선택
+3. **자유 텍스트 매칭은 항상 fragile**: 같은 도시 매칭 같은 경우 정규화 키를 별도 컬럼으로 두면 견고. `city` (자유 입력 표시용) + `city_key` (영문 정규화 매칭용) 패턴
+4. **인라인 SVG 세계지도의 한계**: 13개 추상화된 path 로는 정밀도 부족. 일본을 점 1개로 표시 등. 사용자가 정밀도 원하면 topojson + d3 (또는 외부 SVG) 로 교체 가능. 현재 톤엔 충분
+5. **Phase 분리 효과**: Phase A 만 95KB. 다 합쳐 만들면 한 세션 토큰 한도에서 끝 못 봤을 가능성. 메인 페이지만 끝내고 검증 → 다음 세션에서 안정적으로 Phase B 진입
 
-### [COST]
+### [PENDING] 다음 후보
 
-- 외부 API 호출 없음 (Claude 토큰만)
-- 추가 운영 비용 0원
-- 사용자 작업: 시트 컬럼 1개 추가 (5초)
-- Apps Script 재배포 불필요 (동적 헤더 덕분)
+(슬림 worklog.md 의 Cross-cutting Pending 갱신 참조)
 
-### [PENDING]
+- Phase B 진입 시작 — 개별 여행 페이지, Mapbox 통합
+- Travel ↔ Expense 비용 표기 방식 결정 (옵션 A/B/C)
+- 같은 도시 재방문 시각화 (회색/유색)
+- Mapbox access token 발급 + LocalStorage 저장 패턴
 
-- Health 개인 뷰 (도비/로비 클릭 시) 에서도 본인 스케줄 표시 — 이번엔 메인 전체에만 표시. 사용자 피드백 후 결정
-- 스케줄 삭제 UI — 현재 task 만 화면 삭제 가능. 시트 직접 편집 필요. 다른 시트들과 동일한 정책 (의도된 안전성)
-- weekly 캘린더에 시간 정보 표시 보강 가능 — 현재는 title 의 hover tooltip 으로만. 필요시 셀 내부 시간 표기 추가
-- vital 시트 1만 행 도달 시 성능 점검 (사용자 Q4 답변 참고)
-- **Session 6.x (Wealth) 를 worklog-archive 로 옮기기** — worklog.md 와 불일치 상태
+- [완료] Session 6 종료
 
 ────────────────────────────────────────────────────────────────────

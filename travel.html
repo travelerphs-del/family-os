@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0B0F">
+
+  <title>Travel — Family OS</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="./design-tokens.css">
+
+  <style>
+    /* ─── 공통 레이아웃 (다른 서브 대시보드와 동일) ────────────── */
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      overflow-x: hidden;
+    }
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--s6);
+    }
+    @media (max-width: 767px) { .app { padding: 0 var(--s4); } }
+
+    header.hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: var(--s6) 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--s7);
+    }
+    @media (max-width: 767px) {
+      header.hdr { padding: var(--s4) 0; margin-bottom: var(--s5); }
+    }
+    .brand { display: flex; align-items: baseline; gap: var(--s3); }
+    .brand-title {
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 24px; letter-spacing: -0.01em; color: var(--text-primary);
+    }
+    .brand-sub {
+      font-size: 12px; color: var(--text-quiet);
+      letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    @media (max-width: 480px) {
+      .brand-title { font-size: 20px; }
+      .brand-sub { display: none; }
+    }
+    .hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+    .icon-btn {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-md); color: var(--text-tertiary);
+      transition: all var(--t-fast); cursor: pointer;
+    }
+    .icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+    .icon-btn svg { display: block; }
+    .last-sync {
+      font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+      padding-right: var(--s2);
+    }
+    @media (max-width: 480px) { .last-sync { display: none; } }
+
+    footer.ftr {
+      padding: var(--s5) 0 var(--s8);
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-quiet);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: var(--s2);
+      margin-top: var(--s8);
+    }
+    footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+    /* 설정 모달 (common.js 마운트와 짝) */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(10, 11, 15, 0.7);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; padding: var(--s4);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border-hi);
+      border-radius: var(--r-lg); padding: var(--s6);
+      width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+      animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-title {
+      font-family: var(--font-display); font-size: 20px; font-weight: 500;
+      margin-bottom: var(--s2);
+    }
+    .modal-desc {
+      font-size: 12px; color: var(--text-tertiary); line-height: 1.6;
+      margin-bottom: var(--s5);
+    }
+    .modal-field { margin-bottom: var(--s4); }
+    .modal-label {
+      display: flex; align-items: center; gap: var(--s2);
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: var(--s2);
+    }
+    .modal-input {
+      width: 100%; background: var(--canvas);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 12px; font-size: 13px; color: var(--text-primary);
+      transition: border-color var(--t-fast);
+    }
+    .modal-input.mono { font-family: var(--font-mono); font-size: 12px; }
+    .modal-input:focus { border-color: var(--acc-travel); }
+    .modal-input::placeholder { color: var(--text-quiet); }
+    .modal-row {
+      display: grid; gap: var(--s3);
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 480px) { .modal-row { grid-template-columns: 1fr; } }
+    .modal-actions {
+      display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5);
+    }
+    .btn {
+      padding: 10px 18px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500;
+      transition: all var(--t-fast); border: 1px solid transparent; cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--acc-travel); color: var(--canvas);
+    }
+    .btn-primary:hover { background: #FF9595; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      border-color: var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+    .btn-danger {
+      background: transparent; color: var(--loss);
+      border: 1px solid var(--loss);
+    }
+    .btn-danger:hover { background: var(--loss-soft); }
+
+    /* ─── 페이지 고유 스타일 ──────────────────────────────────── */
+
+    /* 세션 빈 상태 / 로딩 / 에러 */
+    .state-block {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: var(--s8);
+      text-align: center; color: var(--text-tertiary);
+    }
+    .state-block .title {
+      font-family: var(--font-display);
+      font-size: 18px; color: var(--text-secondary);
+      margin-bottom: var(--s2);
+    }
+    .state-block .msg { font-size: 13px; line-height: 1.6; max-width: 460px; margin: 0 auto; }
+    .state-block button {
+      margin-top: var(--s4);
+      padding: 10px 18px; border-radius: var(--r-sm);
+      border: 1px solid var(--border-hi); color: var(--text-primary);
+      background: transparent; cursor: pointer;
+      transition: all var(--t-fast); font-size: 13px;
+    }
+    .state-block button:hover {
+      border-color: var(--acc-travel); color: var(--acc-travel);
+    }
+    .spinner-lg {
+      width: 28px; height: 28px;
+      border: 2px solid var(--elevated-2);
+      border-top-color: var(--acc-travel);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      margin: 0 auto var(--s3);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── 섹션 헤더 공통 ──────────────────────────────────────── */
+    .section-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: var(--s4);
+      gap: var(--s4); flex-wrap: wrap;
+    }
+    .section-head h2 {
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 22px; color: var(--text-primary); letter-spacing: -0.01em;
+    }
+    .section-head .count {
+      font-size: 12px; color: var(--text-quiet); font-family: var(--font-mono);
+    }
+    .section-head .right {
+      display: flex; gap: var(--s2); align-items: center;
+    }
+
+    /* ─── 세계지도 ─────────────────────────────────────────── */
+    .world-section { margin-bottom: var(--s8); }
+    .world-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--s5);
+      overflow: hidden;
+    }
+    .world-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      aspect-ratio: 2 / 1;
+      max-height: 500px;
+    }
+    /* 대륙 outline */
+    .continent {
+      fill: var(--elevated);
+      stroke: var(--border-hi);
+      stroke-width: 0.5;
+    }
+    /* 경위도 그리드 */
+    .graticule {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 0.4;
+      stroke-dasharray: 1 3;
+    }
+    /* 마커 그룹 */
+    .marker { cursor: pointer; }
+    .marker-ring {
+      fill: none;
+      stroke: var(--acc-travel);
+      stroke-width: 1.6;
+      opacity: 0.9;
+    }
+    .marker-fill {
+      fill: var(--acc-travel-soft);
+    }
+    .marker-tri {
+      fill: var(--acc-travel);
+      animation: markerBob 2.2s ease-in-out infinite;
+      transform-origin: center;
+      transform-box: fill-box;
+    }
+    @keyframes markerBob {
+      0%, 100% { transform: translateY(-2px); }
+      50%      { transform: translateY(2px); }
+    }
+    .marker:hover .marker-ring {
+      stroke-width: 2.4;
+      opacity: 1;
+    }
+    .marker:hover .marker-fill {
+      fill: rgba(255, 123, 123, 0.32);
+    }
+    .marker-label {
+      fill: var(--text-secondary);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 500;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--t-fast);
+    }
+    .marker:hover .marker-label,
+    .marker:focus-within .marker-label {
+      opacity: 1;
+    }
+    .world-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: var(--s3);
+      font-size: 11px; color: var(--text-quiet);
+      font-family: var(--font-mono);
+      flex-wrap: wrap; gap: var(--s2);
+    }
+
+    /* ─── 2열 그리드 (최근/향후) ──────────────────────────── */
+    .trips-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--s5);
+      margin-bottom: var(--s8);
+    }
+    @media (max-width: 767px) {
+      .trips-grid { grid-template-columns: 1fr; gap: var(--s5); }
+    }
+
+    .trips-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--s5);
+      display: flex; flex-direction: column;
+    }
+    .trips-col header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: var(--s4);
+      gap: var(--s3);
+    }
+    .trips-col h3 {
+      font-family: var(--font-display);
+      font-size: 18px; font-weight: 500;
+      letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: var(--s2);
+    }
+    .trips-col h3::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--acc-travel);
+    }
+    .trips-col .add-btn {
+      font-size: 12px; color: var(--text-secondary);
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .trips-col .add-btn:hover {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+    }
+
+    /* trip 타일 리스트 */
+    .trip-list { list-style: none; display: flex; flex-direction: column; gap: var(--s3); }
+    .trip-tile {
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: var(--s4);
+      cursor: pointer;
+      transition: all var(--t-fast);
+      position: relative;
+      overflow: hidden;
+    }
+    .trip-tile:hover {
+      border-color: var(--border-hi);
+      transform: translateY(-1px);
+    }
+    .trip-tile-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: var(--s3);
+      margin-bottom: var(--s2);
+    }
+    .trip-tile-title {
+      font-family: var(--font-display);
+      font-size: 16px; font-weight: 500;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+    .trip-tile-id {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-quiet);
+      letter-spacing: 0.02em;
+    }
+    .trip-tile-meta {
+      display: flex; flex-wrap: wrap; gap: var(--s2);
+      font-size: 12px; color: var(--text-tertiary);
+      align-items: center;
+    }
+    .trip-tile-meta .pip {
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .trip-tile-meta .pip svg { opacity: 0.6; }
+    .trip-tile-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--acc-travel);
+      padding: 2px 8px;
+      background: var(--acc-travel-soft);
+      border-radius: var(--r-full);
+    }
+    .trip-actions {
+      position: absolute; top: var(--s3); right: var(--s3);
+      display: none;
+      gap: 4px;
+    }
+    .trip-tile:hover .trip-actions { display: flex; }
+    .trip-action-btn {
+      width: 28px; height: 28px;
+      border-radius: var(--r-sm);
+      background: var(--elevated-2);
+      color: var(--text-tertiary);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .trip-action-btn:hover { color: var(--text-primary); background: var(--surface); }
+
+    .trip-empty {
+      padding: var(--s6);
+      text-align: center;
+      color: var(--text-quiet);
+      font-size: 13px;
+      border: 1px dashed var(--border);
+      border-radius: var(--r-md);
+    }
+
+    .more-btn {
+      margin-top: var(--s3);
+      padding: 10px;
+      width: 100%;
+      font-size: 12px;
+      color: var(--text-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      background: transparent;
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .more-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-hi);
+    }
+    .more-btn[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* 모달 안의 도시 검색 결과 */
+    .geo-result {
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: var(--s3);
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: var(--s2);
+      display: none;
+    }
+    .geo-result.shown { display: block; }
+    .geo-result .label {
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-quiet);
+      margin-bottom: 4px;
+    }
+    .geo-result .coords {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-tertiary);
+    }
+    .geo-result.error { border-color: var(--loss); color: var(--loss); }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text-quiet);
+      margin-top: 4px;
+    }
+
+    /* status 칩 (모달) */
+    .status-pills { display: flex; gap: var(--s2); }
+    .status-pill {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: center;
+      transition: all var(--t-fast);
+    }
+    .status-pill.active {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+      background: var(--acc-travel-soft);
+    }
+    .status-pill:hover:not(.active) { border-color: var(--border-hi); }
+
+    /* 멤버 multi-select */
+    .members-pills { display: flex; gap: var(--s2); flex-wrap: wrap; }
+    .members-pill {
+      padding: 6px 12px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-full);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .members-pill.active {
+      border-color: var(--acc-travel);
+      color: var(--acc-travel);
+      background: var(--acc-travel-soft);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div id="hdr-mount"></div>
+
+    <main>
+      <!-- 세계지도 -->
+      <section class="world-section" id="world-section">
+        <div class="section-head">
+          <div>
+            <h2>가족이 다녀온 곳</h2>
+            <div style="font-size: 12px; color: var(--text-quiet); margin-top: 4px;">
+              과거 여행지를 동그라미와 코랄 마커로 표시해요.
+            </div>
+          </div>
+          <span class="count" id="world-count">—</span>
+        </div>
+        <div class="world-card">
+          <div id="world-svg-wrap"></div>
+          <div class="world-meta">
+            <span id="world-coverage">—</span>
+            <span>마커에 마우스를 올리면 여행명 표시</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2열: 최근 / 향후 -->
+      <section class="trips-grid" id="trips-grid">
+        <div class="trips-col">
+          <header>
+            <h3>최근 여행</h3>
+            <button class="add-btn" data-action="add" data-status="past">+ 추가</button>
+          </header>
+          <ul class="trip-list" id="past-list"></ul>
+          <button class="more-btn" id="past-more" style="display:none;">더 보기</button>
+        </div>
+
+        <div class="trips-col">
+          <header>
+            <h3>향후 여행</h3>
+            <button class="add-btn" data-action="add" data-status="upcoming">+ 추가</button>
+          </header>
+          <ul class="trip-list" id="upcoming-list"></ul>
+          <button class="more-btn" id="upcoming-more" style="display:none;">더 보기</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="ftr-mount"></div>
+  </div>
+
+  <!-- 설정 모달 (common.js) -->
+  <div id="modal-mount"></div>
+
+  <!-- 여행 추가/편집 모달 -->
+  <div class="modal-backdrop" id="trip-modal">
+    <div class="modal">
+      <div class="modal-title serif" id="trip-modal-title">새 여행 추가</div>
+      <div class="modal-desc" id="trip-modal-desc">
+        여행명과 도시명을 입력하세요. 도시명을 검색하면 좌표가 자동으로 채워져요.
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">구분</label>
+        <div class="status-pills">
+          <div class="status-pill" data-status="past">최근 (다녀온)</div>
+          <div class="status-pill" data-status="upcoming">향후 (계획)</div>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">여행명 표시 *</label>
+        <input class="modal-input" id="f-display-name" placeholder="예: 도쿄 가족여행 2026">
+      </div>
+
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">시작일</label>
+          <input class="modal-input mono" id="f-period-start" type="date">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">종료일</label>
+          <input class="modal-input mono" id="f-period-end" type="date">
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">구성원</label>
+        <div class="members-pills" id="f-members"></div>
+      </div>
+
+      <div class="modal-field">
+        <label class="modal-label">도시명 (검색용) *</label>
+        <input class="modal-input" id="f-city-search" placeholder="예: Tokyo, 도쿄, Barcelona, 서울">
+        <div class="field-hint">한글/영문 모두 가능. Enter 또는 검색 버튼을 눌러 좌표를 자동 채움. (OSM Nominatim 무료 검색)</div>
+        <div style="margin-top: var(--s2);">
+          <button class="btn btn-ghost" id="btn-geocode" type="button" style="font-size: 12px; padding: 6px 12px;">📍 검색</button>
+        </div>
+        <div class="geo-result" id="geo-result"></div>
+      </div>
+
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">표시 도시명 *</label>
+          <input class="modal-input" id="f-city" placeholder="도쿄">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">city_key (영문) *</label>
+          <input class="modal-input mono" id="f-city-key" placeholder="tokyo">
+          <div class="field-hint">같은 도시 재방문 매칭용. 영문 소문자.</div>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">국가 코드 *</label>
+          <input class="modal-input mono" id="f-country-code" placeholder="JP" maxlength="2">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">초기 줌</label>
+          <div class="status-pills">
+            <div class="status-pill" data-zoom="11">도시</div>
+            <div class="status-pill" data-zoom="9">지방</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">위도 *</label>
+          <input class="modal-input mono" id="f-lat" placeholder="35.6762">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">경도 *</label>
+          <input class="modal-input mono" id="f-lng" placeholder="139.6503">
+        </div>
+      </div>
+
+      <div class="modal-field" id="f-trip-id-block" style="display: none;">
+        <label class="modal-label">trip_id (편집)</label>
+        <input class="modal-input mono" id="f-trip-id">
+        <div class="field-hint">Expense 메모에 <code>#trip_id</code> 형식으로 태깅해서 비용 연동.</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="trip-delete" style="display:none; margin-right: auto;">삭제</button>
+        <button class="btn btn-ghost" id="trip-cancel">취소</button>
+        <button class="btn btn-primary" id="trip-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./common.js"></script>
+  <script>
+  /* ════════════════════════════════════════════════════════════════
+   * Family OS — Travel 대시보드 (Phase A)
+   * - 세계지도 (SVG, equirectangular)
+   * - 최근/향후 여행 2열
+   * - 여행 추가/편집/삭제 (Apps Script doPost)
+   * - 도시 검색: OSM Nominatim (무료, 토큰 불필요)
+   * ════════════════════════════════════════════════════════════════ */
+
+  const DASHBOARD_ID = 'travel';
+  const PAGE_LIMIT = 5;  // 한 컬럼에 보이는 최대 개수 (더 보기 누르면 더)
+  const FAMILY_MEMBERS = ['아빠', '엄마', '도비', '로비'];
+
+  const { fmtKRW, escapeHtml, timeAgo } = FamilyOS;
+
+  /* ─── 헤더/푸터/설정 모달 마운트 ──────────────────────────── */
+  document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+    title: 'Travel', sub: '여행 기록 & 계획'
+  });
+  document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+    left: 'Travel · Phase A · 메인 페이지',
+    right: 'v0.1.0'
+  });
+  document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
+  FamilyOS.attachSettingsModal({ onSave: refresh });
+  document.getElementById('fos-btn-refresh').addEventListener('click', refresh);
+
+  /* ─── 상태 ───────────────────────────────────────────── */
+  const state = {
+    status: 'unset', // 'unset' | 'loading' | 'ok' | 'error'
+    error: null,
+    data: null,
+    showAll: { past: false, upcoming: false },
+    modal: {
+      mode: 'add', // 'add' | 'edit'
+      status: 'past',
+      tripId: null,  // edit 모드일 때 원본 trip_id
+      members: new Set(),
+      zoom: 11
+    }
+  };
+
+  /* ─── 데이터 fetch ──────────────────────────────────── */
+  async function refresh() {
+    if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+      state.status = 'unset';
+      renderAll();
+      return;
+    }
+    state.status = 'loading';
+    renderAll();
+    FamilyOS.setLastSync('동기화 중…');
+    try {
+      const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+      state.data = data;
+      state.status = 'ok';
+      state.error = null;
+      FamilyOS.setSyncedNow();
+    } catch (err) {
+      console.error('[travel] fetch failed:', err);
+      state.error = err.message;
+      state.status = err.message === 'UNSET' ? 'unset' : 'error';
+    }
+    renderAll();
+  }
+
+  /* ─── 렌더 ──────────────────────────────────────────── */
+  function renderAll() {
+    renderWorld();
+    renderTripsColumn('past');
+    renderTripsColumn('upcoming');
+  }
+
+  /* 세계지도 */
+  function renderWorld() {
+    const wrap = document.getElementById('world-svg-wrap');
+    const countEl = document.getElementById('world-count');
+    const coverEl = document.getElementById('world-coverage');
+
+    if (state.status === 'unset') {
+      wrap.innerHTML = renderUnsetState(
+        '아직 Web App URL이 설정되지 않았어요',
+        '우측 상단 톱니 아이콘에서 Travel Web App URL을 입력하면 여행 데이터를 불러올 수 있어요.'
+      );
+      countEl.textContent = '';
+      coverEl.textContent = '';
+      return;
+    }
+    if (state.status === 'loading') {
+      wrap.innerHTML = '<div class="state-block"><div class="spinner-lg"></div><div class="title">불러오는 중</div></div>';
+      countEl.textContent = '';
+      coverEl.textContent = '';
+      return;
+    }
+    if (state.status === 'error') {
+      wrap.innerHTML = renderErrorState(state.error);
+      countEl.textContent = '';
+      coverEl.textContent = '';
+      return;
+    }
+
+    // ok 상태
+    const past = (state.data.trips || []).filter(t => t.status === 'past');
+    countEl.textContent = past.length > 0 ? past.length + '개 여행' : '아직 기록 없음';
+
+    // 국가 수 표기
+    const countries = new Set(past.map(t => t.country_code).filter(Boolean));
+    coverEl.textContent = countries.size > 0
+      ? '국가 ' + countries.size + '개 · 도시 ' + (new Set(past.map(t => t.country_code + '|' + t.city_key)).size) + '개'
+      : '—';
+
+    wrap.innerHTML = buildWorldSvg(past);
+    bindWorldMarkers(past);
+  }
+
+  /* trip 컬럼 */
+  function renderTripsColumn(statusKey) {
+    const listEl = document.getElementById(statusKey + '-list');
+    const moreEl = document.getElementById(statusKey + '-more');
+
+    if (state.status === 'unset') {
+      listEl.innerHTML = '<div class="trip-empty">우측 상단 톱니에서 URL을 먼저 설정해주세요.</div>';
+      moreEl.style.display = 'none';
+      return;
+    }
+    if (state.status === 'loading') {
+      listEl.innerHTML = '<div class="trip-empty">불러오는 중…</div>';
+      moreEl.style.display = 'none';
+      return;
+    }
+    if (state.status === 'error') {
+      listEl.innerHTML = '<div class="trip-empty" style="color: var(--loss);">로드 실패: ' + escapeHtml(state.error || '') + '</div>';
+      moreEl.style.display = 'none';
+      return;
+    }
+
+    const trips = (state.data.trips || []).filter(t => t.status === statusKey);
+    if (trips.length === 0) {
+      listEl.innerHTML = '<div class="trip-empty">' +
+        (statusKey === 'past' ? '아직 다녀온 여행 기록이 없어요.' : '아직 계획 중인 여행이 없어요.') +
+        '<br><span style="font-size: 11px;">위 + 추가 버튼으로 시작해보세요.</span></div>';
+      moreEl.style.display = 'none';
+      return;
+    }
+
+    const sorted = sortTrips(trips, statusKey);
+    const shownAll = state.showAll[statusKey];
+    const visible = shownAll ? sorted : sorted.slice(0, PAGE_LIMIT);
+
+    listEl.innerHTML = visible.map(t => renderTripTile(t, statusKey)).join('');
+
+    // 더 보기 버튼
+    if (sorted.length > PAGE_LIMIT) {
+      moreEl.style.display = 'block';
+      moreEl.textContent = shownAll
+        ? '접기'
+        : '더 보기 (' + (sorted.length - PAGE_LIMIT) + '개)';
+      moreEl.onclick = () => {
+        state.showAll[statusKey] = !shownAll;
+        renderTripsColumn(statusKey);
+      };
+    } else {
+      moreEl.style.display = 'none';
+    }
+  }
+
+  function sortTrips(trips, statusKey) {
+    // past: period_start 최신순, null 은 created_at 최신순으로
+    // upcoming: period_start 가까운 미래순 (오늘 이후), null 은 created_at 최신순
+    const now = Date.now();
+    return trips.slice().sort((a, b) => {
+      const at = a.period_start ? new Date(a.period_start).getTime() : null;
+      const bt = b.period_start ? new Date(b.period_start).getTime() : null;
+      if (statusKey === 'upcoming') {
+        const aFuture = (at != null && at >= now) ? at : null;
+        const bFuture = (bt != null && bt >= now) ? bt : null;
+        if (aFuture != null && bFuture != null) return aFuture - bFuture;
+        if (aFuture != null) return -1;
+        if (bFuture != null) return 1;
+      } else {
+        // past: 최근에 다녀온 게 위로
+        if (at != null && bt != null) return bt - at;
+        if (at != null) return -1;
+        if (bt != null) return 1;
+      }
+      // fallback created_at desc
+      const ac = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bc = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bc - ac;
+    });
+  }
+
+  function renderTripTile(t, statusKey) {
+    const periodStr = formatPeriod(t.period_start, t.period_end);
+    const countLabel = statusKey === 'upcoming'
+      ? (t.planned_count || 0) + '곳 희망'
+      : (t.visited_count || 0) + '곳 방문';
+
+    return `
+      <li class="trip-tile" data-trip-id="${escapeHtml(t.trip_id)}">
+        <div class="trip-tile-head">
+          <div>
+            <div class="trip-tile-title">${escapeHtml(t.display_name || t.trip_id)}</div>
+            <div class="trip-tile-id">${escapeHtml(t.trip_id)}</div>
+          </div>
+          <span class="trip-tile-count">${escapeHtml(countLabel)}</span>
+        </div>
+        <div class="trip-tile-meta">
+          ${periodStr ? `<span class="pip">${iconCal()} ${escapeHtml(periodStr)}</span>` : ''}
+          ${t.city ? `<span class="pip">${iconPin()} ${escapeHtml(t.city)}${t.country_code ? ' · ' + escapeHtml(t.country_code) : ''}</span>` : ''}
+          ${t.members ? `<span class="pip">${iconUsers()} ${escapeHtml(t.members)}</span>` : ''}
+        </div>
+        <div class="trip-actions">
+          <button class="trip-action-btn" data-edit="${escapeHtml(t.trip_id)}" title="편집">${iconEdit()}</button>
+        </div>
+      </li>
+    `;
+  }
+
+  function formatPeriod(start, end) {
+    if (!start && !end) return '';
+    if (start && end) return start + ' ~ ' + end;
+    return start || end;
+  }
+
+  /* ─── 세계지도 SVG ─────────────────────────────────── */
+
+  // Equirectangular: lng -180..180 → x 0..1000, lat 90..-90 → y 0..500
+  function projectEquirect(lat, lng) {
+    return {
+      x: (Number(lng) + 180) * (1000 / 360),
+      y: (90 - Number(lat)) * (500 / 180)
+    };
+  }
+
+  /**
+   * 단순화된 대륙 outline. equirectangular 1000x500.
+   * 매우 추상화된 형태로, 디자인 톤 (미니멀 다크) 에 맞춤.
+   * 추후 더 정밀한 SVG로 교체 가능.
+   */
+  const CONTINENT_PATHS = [
+    // 북아메리카 (Canada + USA + Mexico, 단순화)
+    "M 130,90 L 200,80 L 270,85 L 290,110 L 310,140 L 295,175 L 270,200 L 230,215 L 200,225 L 170,225 L 145,210 L 130,180 L 120,145 L 130,90 Z M 290,210 L 320,230 L 300,260 L 280,255 L 290,210 Z",
+    // 남아메리카
+    "M 270,260 L 310,265 L 325,290 L 335,330 L 325,370 L 305,400 L 280,415 L 265,395 L 255,360 L 260,310 L 270,260 Z",
+    // 유럽 (Europe western)
+    "M 480,90 L 530,85 L 555,95 L 555,125 L 540,145 L 510,150 L 485,140 L 475,115 L 480,90 Z",
+    // 아프리카
+    "M 490,180 L 545,175 L 580,195 L 595,235 L 580,290 L 555,330 L 530,355 L 510,355 L 490,325 L 480,275 L 480,225 L 490,180 Z",
+    // 아시아 (Eurasia eastern + South Asia)
+    "M 555,100 L 640,85 L 720,80 L 800,90 L 855,110 L 855,140 L 820,165 L 770,170 L 720,190 L 680,210 L 640,225 L 605,215 L 585,195 L 575,170 L 555,150 L 555,100 Z",
+    // 인도 (남아시아 반도)
+    "M 680,200 L 720,200 L 730,235 L 715,260 L 690,250 L 680,225 L 680,200 Z",
+    // 동남아 군도 (단순)
+    "M 770,225 L 805,225 L 820,245 L 800,255 L 775,250 L 770,225 Z",
+    // 호주
+    "M 820,330 L 880,330 L 900,355 L 885,380 L 845,385 L 820,365 L 820,330 Z",
+    // 일본 (단순 점)
+    "M 855,150 L 865,150 L 870,170 L 860,180 L 855,170 L 855,150 Z",
+    // 영국 (단순 점)
+    "M 470,105 L 478,103 L 482,118 L 475,125 L 467,118 L 470,105 Z",
+    // 마다가스카르 (단순)
+    "M 605,310 L 615,310 L 620,335 L 612,345 L 605,335 L 605,310 Z",
+    // 그린란드 (단순)
+    "M 320,60 L 370,55 L 385,75 L 375,100 L 345,105 L 325,90 L 320,60 Z",
+    // 뉴질랜드 (단순)
+    "M 920,380 L 930,378 L 935,395 L 928,402 L 920,395 L 920,380 Z"
+  ];
+
+  // Graticule lines (적도/회귀선/극권/자오선 일부)
+  const GRATICULES = [
+    { type: 'h', lat: 0 },          // 적도
+    { type: 'h', lat: 23.5 },       // 북회귀선
+    { type: 'h', lat: -23.5 },      // 남회귀선
+    { type: 'h', lat: 66.5 },       // 북극권
+    { type: 'h', lat: -66.5 },      // 남극권
+    { type: 'v', lng: 0 },          // 본초자오선
+    { type: 'v', lng: -90 },
+    { type: 'v', lng: 90 },
+    { type: 'v', lng: 180 }
+  ];
+
+  function buildWorldSvg(pastTrips) {
+    const grat = GRATICULES.map(g => {
+      if (g.type === 'h') {
+        const y = (90 - g.lat) * (500 / 180);
+        return `<line class="graticule" x1="0" y1="${y}" x2="1000" y2="${y}" />`;
+      } else {
+        const x = (g.lng + 180) * (1000 / 360);
+        return `<line class="graticule" x1="${x}" y1="0" x2="${x}" y2="500" />`;
+      }
+    }).join('');
+
+    const conts = CONTINENT_PATHS.map(d => `<path class="continent" d="${d}" />`).join('');
+
+    // 같은 city_key + country_code 끼리 그룹화 (같은 도시 여러 번 방문해도 마커는 하나)
+    const groups = {};
+    for (const t of pastTrips) {
+      if (!t.center_lat || !t.center_lng) continue;
+      const key = (t.country_code || '') + '|' + (t.city_key || '');
+      if (!groups[key]) {
+        groups[key] = {
+          lat: Number(t.center_lat),
+          lng: Number(t.center_lng),
+          city: t.city,
+          country_code: t.country_code,
+          trips: []
+        };
+      }
+      groups[key].trips.push(t);
+    }
+
+    const markers = Object.keys(groups).map((key, i) => {
+      const g = groups[key];
+      const p = projectEquirect(g.lat, g.lng);
+      const tripsLabel = g.trips.map(t => t.display_name).join(', ');
+      const visitCount = g.trips.length;
+      // 마커: 동그라미 + 위아래 진동하는 역삼각형
+      return `
+        <g class="marker" tabindex="0" data-key="${escapeHtml(key)}"
+           role="button" aria-label="${escapeHtml(g.city)}: ${escapeHtml(tripsLabel)}">
+          <circle class="marker-fill" cx="${p.x}" cy="${p.y}" r="5.5" />
+          <circle class="marker-ring" cx="${p.x}" cy="${p.y}" r="5.5" />
+          <polygon class="marker-tri"
+                   points="${p.x - 3},${p.y - 9} ${p.x + 3},${p.y - 9} ${p.x},${p.y - 4}"
+                   style="animation-delay: ${(i % 5) * 0.18}s;" />
+          <rect x="${p.x + 8}" y="${p.y - 12}" width="${(g.city || '').length * 7 + 16}" height="18"
+                fill="var(--surface)" stroke="var(--border-hi)" rx="4"
+                style="opacity: 0;" class="marker-label-bg" />
+          <text class="marker-label" x="${p.x + 16}" y="${p.y + 1}">
+            ${escapeHtml(g.city || '')}${visitCount > 1 ? ' (' + visitCount + ')' : ''}
+          </text>
+        </g>
+      `;
+    }).join('');
+
+    return `
+      <svg class="world-svg" viewBox="0 0 1000 500" xmlns="http://www.w3.org/2000/svg"
+           role="img" aria-label="가족 여행 세계지도">
+        <rect width="1000" height="500" fill="transparent" />
+        ${grat}
+        ${conts}
+        ${markers}
+      </svg>
+    `;
+  }
+
+  function bindWorldMarkers(pastTrips) {
+    document.querySelectorAll('.marker').forEach(m => {
+      m.addEventListener('click', () => {
+        const key = m.dataset.key;
+        // Phase B 가 오면 여기서 trip 페이지로 이동
+        // Phase A 에선 같은 city_key 의 첫 trip 을 편집 모달로 열기
+        const [cc, ck] = key.split('|');
+        const trip = pastTrips.find(t => (t.country_code || '') === cc && (t.city_key || '') === ck);
+        if (trip) openEditModal(trip);
+      });
+      // 키보드 접근성
+      m.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          m.click();
+        }
+      });
+    });
+  }
+
+  /* ─── 여행 추가/편집 모달 ───────────────────────────── */
+
+  function openAddModal(statusKey) {
+    state.modal = {
+      mode: 'add',
+      status: statusKey,
+      tripId: null,
+      members: new Set(),
+      zoom: 11
+    };
+    fillModal(null);
+    document.getElementById('trip-modal').classList.add('open');
+  }
+
+  function openEditModal(trip) {
+    state.modal = {
+      mode: 'edit',
+      status: trip.status,
+      tripId: trip.trip_id,
+      members: new Set((trip.members || '').split(',').map(s => s.trim()).filter(Boolean)),
+      zoom: Number(trip.zoom) || 11
+    };
+    fillModal(trip);
+    document.getElementById('trip-modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('trip-modal').classList.remove('open');
+  }
+
+  function fillModal(trip) {
+    const isEdit = state.modal.mode === 'edit';
+    document.getElementById('trip-modal-title').textContent = isEdit ? '여행 편집' : '새 여행 추가';
+    document.getElementById('trip-modal-desc').textContent = isEdit
+      ? '필요한 항목만 수정한 뒤 저장하세요. trip_id 수정은 신중히. (Expense 메모 태깅과 연결됨)'
+      : '여행명과 도시명을 입력하세요. 도시명을 검색하면 좌표가 자동으로 채워져요.';
+
+    document.getElementById('f-display-name').value = trip ? (trip.display_name || '') : '';
+    document.getElementById('f-period-start').value = trip ? (trip.period_start || '') : '';
+    document.getElementById('f-period-end').value   = trip ? (trip.period_end   || '') : '';
+    document.getElementById('f-city').value         = trip ? (trip.city         || '') : '';
+    document.getElementById('f-city-key').value     = trip ? (trip.city_key     || '') : '';
+    document.getElementById('f-country-code').value = trip ? (trip.country_code || '') : '';
+    document.getElementById('f-lat').value          = trip ? (trip.center_lat   || '') : '';
+    document.getElementById('f-lng').value          = trip ? (trip.center_lng   || '') : '';
+    document.getElementById('f-trip-id').value      = trip ? (trip.trip_id      || '') : '';
+    document.getElementById('f-city-search').value  = '';
+    document.getElementById('geo-result').classList.remove('shown', 'error');
+
+    // status pills
+    document.querySelectorAll('.status-pill[data-status]').forEach(el => {
+      el.classList.toggle('active', el.dataset.status === state.modal.status);
+    });
+    // zoom pills
+    document.querySelectorAll('.status-pill[data-zoom]').forEach(el => {
+      el.classList.toggle('active', Number(el.dataset.zoom) === state.modal.zoom);
+    });
+    // member pills
+    const mc = document.getElementById('f-members');
+    mc.innerHTML = FAMILY_MEMBERS.map(m => {
+      const on = state.modal.members.has(m);
+      return `<div class="members-pill${on ? ' active' : ''}" data-member="${escapeHtml(m)}">${escapeHtml(m)}</div>`;
+    }).join('');
+
+    // 편집 시 trip_id 블록 표시 + 삭제 버튼
+    document.getElementById('f-trip-id-block').style.display = isEdit ? 'block' : 'none';
+    document.getElementById('trip-delete').style.display = isEdit ? 'inline-block' : 'none';
+  }
+
+  function readModalToPayload() {
+    const display_name = document.getElementById('f-display-name').value.trim();
+    const period_start = document.getElementById('f-period-start').value || null;
+    const period_end   = document.getElementById('f-period-end').value || null;
+    const city         = document.getElementById('f-city').value.trim();
+    const city_key     = document.getElementById('f-city-key').value.trim().toLowerCase();
+    const country_code = document.getElementById('f-country-code').value.trim().toUpperCase();
+    const lat          = parseFloat(document.getElementById('f-lat').value);
+    const lng          = parseFloat(document.getElementById('f-lng').value);
+    const trip_id_edit = document.getElementById('f-trip-id').value.trim();
+    const members      = Array.from(state.modal.members).join(',');
+
+    // 필수 검증
+    const errs = [];
+    if (!display_name) errs.push('여행명');
+    if (!city)         errs.push('표시 도시명');
+    if (!city_key)     errs.push('city_key');
+    if (!country_code) errs.push('국가 코드');
+    if (isNaN(lat))    errs.push('위도');
+    if (isNaN(lng))    errs.push('경도');
+
+    if (errs.length > 0) {
+      throw new Error('필수 항목 누락: ' + errs.join(', '));
+    }
+    if (country_code.length !== 2) {
+      throw new Error('국가 코드는 ISO 2글자 (예: JP, KR, ES)');
+    }
+    if (!/^[a-z0-9-]+$/.test(city_key)) {
+      throw new Error('city_key 는 영문 소문자/숫자/하이픈만 가능 (예: tokyo, new-york)');
+    }
+
+    return {
+      display_name,
+      status: state.modal.status,
+      period_start,
+      period_end,
+      members,
+      country_code,
+      city,
+      city_key,
+      center_lat: lat,
+      center_lng: lng,
+      zoom: state.modal.zoom,
+      // 편집 모드에서만 사용
+      trip_id_new: state.modal.mode === 'edit' ? trip_id_edit : null
+    };
+  }
+
+  /* 모달 인터랙션 바인딩 */
+  (function bindModal() {
+    // status pills
+    document.querySelectorAll('.status-pill[data-status]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.modal.status = el.dataset.status;
+        document.querySelectorAll('.status-pill[data-status]').forEach(x => {
+          x.classList.toggle('active', x.dataset.status === state.modal.status);
+        });
+      });
+    });
+    // zoom pills
+    document.querySelectorAll('.status-pill[data-zoom]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.modal.zoom = Number(el.dataset.zoom);
+        document.querySelectorAll('.status-pill[data-zoom]').forEach(x => {
+          x.classList.toggle('active', Number(x.dataset.zoom) === state.modal.zoom);
+        });
+      });
+    });
+    // member pills (event delegation)
+    document.getElementById('f-members').addEventListener('click', (e) => {
+      const pill = e.target.closest('.members-pill');
+      if (!pill) return;
+      const m = pill.dataset.member;
+      if (state.modal.members.has(m)) state.modal.members.delete(m);
+      else state.modal.members.add(m);
+      pill.classList.toggle('active');
+    });
+
+    document.getElementById('btn-geocode').addEventListener('click', geocodeCity);
+    document.getElementById('f-city-search').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); geocodeCity(); }
+    });
+
+    document.getElementById('trip-cancel').addEventListener('click', closeModal);
+    document.getElementById('trip-save').addEventListener('click', saveTrip);
+    document.getElementById('trip-delete').addEventListener('click', deleteTrip);
+
+    document.getElementById('trip-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'trip-modal') closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('trip-modal');
+      if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+
+    // 외부의 추가 버튼들 (헤더의 두 + 추가)
+    document.querySelectorAll('[data-action="add"]').forEach(btn => {
+      btn.addEventListener('click', () => openAddModal(btn.dataset.status));
+    });
+
+    // 타일 클릭 (편집) — 이벤트 위임
+    document.body.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('[data-edit]');
+      if (editBtn) {
+        e.stopPropagation();
+        const tripId = editBtn.dataset.edit;
+        const trip = (state.data?.trips || []).find(t => t.trip_id === tripId);
+        if (trip) openEditModal(trip);
+        return;
+      }
+      const tile = e.target.closest('.trip-tile');
+      if (tile) {
+        const tripId = tile.dataset.tripId;
+        const trip = (state.data?.trips || []).find(t => t.trip_id === tripId);
+        // Phase B 가 오면 개별 여행 페이지로 navigate
+        // Phase A 에선 일단 편집 모달
+        if (trip) openEditModal(trip);
+      }
+    });
+  })();
+
+  /* ─── 도시 검색 (Nominatim) ───────────────────────── */
+  async function geocodeCity() {
+    const q = document.getElementById('f-city-search').value.trim();
+    const out = document.getElementById('geo-result');
+    if (!q) {
+      out.classList.add('shown', 'error');
+      out.innerHTML = '검색어를 입력하세요';
+      return;
+    }
+
+    out.classList.remove('error');
+    out.classList.add('shown');
+    out.innerHTML = '<div class="label">검색 중…</div>';
+
+    try {
+      const url = 'https://nominatim.openstreetmap.org/search?'
+        + new URLSearchParams({
+          q: q,
+          format: 'json',
+          limit: '1',
+          addressdetails: '1',
+          'accept-language': 'en'
+        }).toString();
+      const res = await fetch(url);
+      const arr = await res.json();
+      if (!Array.isArray(arr) || arr.length === 0) {
+        throw new Error('검색 결과 없음');
+      }
+      const r = arr[0];
+      const lat = parseFloat(r.lat);
+      const lng = parseFloat(r.lon);
+      const cc = String((r.address && r.address.country_code) || '').toUpperCase();
+      const cityEn = (r.address && (r.address.city || r.address.town || r.address.village || r.address.state)) || q;
+      const cityKey = cityEn.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+      // 폼에 자동 채움 (이미 값이 있는 칸은 덮어쓰지 않음 — 사용자 의도 보호)
+      function setIfEmpty(id, val) {
+        const el = document.getElementById(id);
+        if (!el.value || el.value === '') el.value = val;
+      }
+      setIfEmpty('f-lat', lat.toFixed(6));
+      setIfEmpty('f-lng', lng.toFixed(6));
+      setIfEmpty('f-country-code', cc);
+      setIfEmpty('f-city', q);  // 사용자가 적은 그대로 (한글일 수도)
+      setIfEmpty('f-city-key', cityKey);
+
+      out.innerHTML = `
+        <div class="label">검색 결과</div>
+        <div>${escapeHtml(r.display_name || '')}</div>
+        <div class="coords">${lat.toFixed(4)}, ${lng.toFixed(4)} · ${cc} · key=${escapeHtml(cityKey)}</div>
+      `;
+    } catch (err) {
+      out.classList.add('error');
+      out.innerHTML = '검색 실패: ' + escapeHtml(err.message || String(err));
+    }
+  }
+
+  /* ─── Save / Delete ────────────────────────────── */
+  async function saveTrip() {
+    const btn = document.getElementById('trip-save');
+    btn.disabled = true;
+    btn.textContent = '저장 중…';
+    try {
+      const payload = readModalToPayload();
+      if (state.modal.mode === 'add') {
+        await callPost('addTrip', payload);
+      } else {
+        // 편집: trip_id 변경 시 처리는 v0.1 에선 막아 두자 (delete + add 가 필요)
+        const newId = payload.trip_id_new;
+        if (newId && newId !== state.modal.tripId) {
+          throw new Error('trip_id 변경은 별도 작업으로 (현재 미지원). trip_id 칸을 원래대로 돌려놔 주세요.');
+        }
+        delete payload.trip_id_new;
+        await callPost('updateTrip', Object.assign({ trip_id: state.modal.tripId }, payload));
+      }
+      closeModal();
+      await refresh();
+    } catch (err) {
+      alert('저장 실패: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '저장';
+    }
+  }
+
+  async function deleteTrip() {
+    if (state.modal.mode !== 'edit') return;
+    const tripId = state.modal.tripId;
+    if (!confirm('정말 ' + tripId + ' 을 삭제할까요? 이 여행의 방문장소도 함께 삭제돼요.')) return;
+
+    const btn = document.getElementById('trip-delete');
+    btn.disabled = true;
+    btn.textContent = '삭제 중…';
+    try {
+      await callPost('deleteTrip', { trip_id: tripId });
+      closeModal();
+      await refresh();
+    } catch (err) {
+      alert('삭제 실패: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '삭제';
+    }
+  }
+
+  /* POST helper — text/plain;charset=utf-8 패턴 */
+  async function callPost(action, payload) {
+    const url = FamilyOS.getWebAppUrl(DASHBOARD_ID);
+    if (!url) throw new Error('Web App URL 미설정');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, payload }),
+      redirect: 'follow'
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || '응답 오류');
+    return json.data;
+  }
+
+  /* ─── 빈 상태 / 에러 ──────────────────────────── */
+  function renderUnsetState(title, msg) {
+    return `
+      <div class="state-block">
+        <div class="title">${escapeHtml(title || '설정이 필요해요')}</div>
+        <div class="msg">${escapeHtml(msg || '')}</div>
+        <button onclick="document.getElementById('fos-btn-settings').click()">URL 설정</button>
+      </div>
+    `;
+  }
+
+  function renderErrorState(err) {
+    return `
+      <div class="state-block">
+        <div class="title">불러오기 실패</div>
+        <div class="msg">${escapeHtml(err || '알 수 없는 오류')}</div>
+        <button onclick="location.reload()">다시 시도</button>
+      </div>
+    `;
+  }
+
+  /* ─── 아이콘 SVG (인라인) ─────────────────────── */
+  function iconCal() {
+    return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+  }
+  function iconPin() {
+    return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+  }
+  function iconUsers() {
+    return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>';
+  }
+  function iconEdit() {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  }
+
+  /* ─── 부트스트랩 ───────────────────────────────── */
+  refresh();
+  </script>
+</body>
+</html>

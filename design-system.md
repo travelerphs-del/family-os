@@ -35,6 +35,7 @@
 | Expense | `--acc-expense` | `#818CF8` | 인디고 |
 | Health | `--acc-health` | `#34D399` | 민트 |
 | Future | `--acc-future` | `#C084FC` | 라벤더 |
+| Travel | `--acc-travel` | `#FF7B7B` | 코랄 |
 
 **사용 규칙**:
 - 헤더 brand-dot, 강조 아이콘, 카드 상단 가는 라인 등 **국소적 식별 단서**에만.

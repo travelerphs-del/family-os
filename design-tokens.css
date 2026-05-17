@@ -51,6 +51,8 @@
   --acc-health-soft:  rgba(52, 211, 153, 0.16);
   --acc-future:       #C084FC;   /* 라벤더 */
   --acc-future-soft:  rgba(192, 132, 252, 0.16);
+  --acc-travel:       #FF7B7B;   /* 코랄 */
+  --acc-travel-soft:  rgba(255, 123, 123, 0.16);
 
   /* 메인 시그니처 컬러 (브랜드 골드, Wealth와 동일) */
   --accent:       var(--acc-wealth);

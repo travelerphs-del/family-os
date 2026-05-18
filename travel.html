@@ -581,8 +581,8 @@
         <div class="field-hint">`pk.` 로 시작하는 public token 만. secret(sk.) token 은 절대 사용하지 마세요.</div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="token-cancel">취소</button>
-        <button class="btn btn-primary" id="token-save">저장</button>
+        <button class="btn btn-ghost" id="token-cancel" type="button">취소</button>
+        <button class="btn btn-primary" id="token-save" type="button">저장</button>
       </div>
     </div>
   </div>
@@ -678,9 +678,9 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn btn-danger" id="trip-delete" style="display:none; margin-right: auto;">삭제</button>
-        <button class="btn btn-ghost" id="trip-cancel">취소</button>
-        <button class="btn btn-primary" id="trip-save">저장</button>
+        <button class="btn btn-danger" id="trip-delete" type="button" style="display:none; margin-right: auto;">삭제</button>
+        <button class="btn btn-ghost" id="trip-cancel" type="button">취소</button>
+        <button class="btn btn-primary" id="trip-save" type="button">저장</button>
       </div>
     </div>
   </div>
@@ -712,6 +712,24 @@
   document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
   FamilyOS.attachSettingsModal({ onSave: refresh });
   document.getElementById('fos-btn-refresh').addEventListener('click', refresh);
+
+  /* ─── 진단 로깅 (v0.1.2 hotfix) ─────────────────────────
+   * 튕김 현상 디버깅. F12 → Console 에서 [DIAG] 추적. */
+  console.log('[DIAG] travel.html loaded at', new Date().toISOString(), 'href=' + location.href);
+  let __lastClickInfo = null;
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    const tag = t.tagName, id = t.id || '', cls = (t.className && typeof t.className === 'string') ? t.className : '';
+    __lastClickInfo = `<${tag} id="${id}" class="${cls}">`;
+    console.log('[DIAG] click:', __lastClickInfo, 'defaultPrevented=' + e.defaultPrevented);
+  }, true);
+  window.addEventListener('beforeunload', (e) => {
+    console.log('[DIAG] beforeunload — leaving. last click:', __lastClickInfo);
+    console.trace('[DIAG] navigation stack');
+  });
+  window.addEventListener('popstate', (e) => {
+    console.log('[DIAG] popstate triggered. state=', e.state);
+  });
 
   /* ─── 상태 ───────────────────────────────────────────── */
   const state = {
@@ -953,7 +971,10 @@
         return bt - at;
       });
       if (sorted[0]) {
-        location.href = './travel-trip.html?trip=' + encodeURIComponent(sorted[0].trip_id);
+        const tripId = sorted[0].trip_id;
+        setTimeout(() => {
+          location.href = './travel-trip.html?trip=' + encodeURIComponent(tripId);
+        }, 0);
       }
     });
     el.addEventListener('keydown', (e) => {
@@ -1302,6 +1323,7 @@
     document.body.addEventListener('click', (e) => {
       const editBtn = e.target.closest('[data-edit]');
       if (editBtn) {
+        e.preventDefault();
         e.stopPropagation();
         const tripId = editBtn.dataset.edit;
         const trip = (state.data?.trips || []).find(t => t.trip_id === tripId);
@@ -1310,8 +1332,15 @@
       }
       const tile = e.target.closest('.trip-tile');
       if (tile) {
+        // 가드: anchor/button 자식이면 자체 동작에 맡김
+        if (e.target.closest('a,button')) return;
+        e.preventDefault();
         const tripId = tile.dataset.tripId;
-        location.href = './travel-trip.html?trip=' + encodeURIComponent(tripId);
+        if (!tripId) return;
+        // navigate. 가끔 첫 클릭이 안 먹는 현상 방지: 새 task 로 호출
+        setTimeout(() => {
+          location.href = './travel-trip.html?trip=' + encodeURIComponent(tripId);
+        }, 0);
       }
     });
   })();

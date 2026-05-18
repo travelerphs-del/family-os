@@ -697,7 +697,7 @@
 
   const DASHBOARD_ID = 'travel';
   const PAGE_LIMIT = 5;  // 한 컬럼에 보이는 최대 개수 (더 보기 누르면 더)
-  const FAMILY_MEMBERS = ['아빠', '엄마', '도비', '로비'];
+  const FAMILY_MEMBERS = ['아빠', '엄마', '도비', '로비', '할머니', '할아버지', '외할머니', '외할아버지'];
 
   const { fmtKRW, escapeHtml, timeAgo } = FamilyOS;
 
@@ -707,7 +707,7 @@
   });
   document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
     left: 'Travel · Phase A · 메인 페이지',
-    right: 'v0.1.0'
+    right: 'v0.1.2'
   });
   document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
   FamilyOS.attachSettingsModal({ onSave: refresh });

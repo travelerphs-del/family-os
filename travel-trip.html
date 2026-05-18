@@ -196,6 +196,32 @@
       background: var(--canvas);
     }
     @media (max-width: 767px) { #map { height: 460px; } }
+    /* 지도 클릭 picking 모드 — crosshair 커서 + 안내 배너 */
+    .map-picking #map,
+    .map-picking #map .mapboxgl-canvas-container,
+    .map-picking #map canvas {
+      cursor: crosshair !important;
+    }
+    .pick-banner {
+      position: sticky; top: 0; z-index: 50;
+      display: none;
+      padding: var(--s3) var(--s4);
+      background: var(--acc-travel);
+      color: var(--canvas);
+      font-size: 13px; font-weight: 600;
+      border-radius: var(--r-md);
+      margin-bottom: var(--s3);
+      text-align: center;
+    }
+    .pick-banner button {
+      margin-left: var(--s3);
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.2);
+      color: var(--canvas);
+      border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 500;
+    }
+    .map-picking .pick-banner { display: block; }
     .mapboxgl-ctrl-attrib { font-size: 10px; }
     /* Mapbox dark overrides */
     .mapboxgl-popup-content {
@@ -565,6 +591,28 @@
     </div>
   </div>
 
+  <!-- Google Places API key 모달 -->
+  <div class="modal-backdrop" id="google-key-modal">
+    <div class="modal">
+      <div class="modal-title serif">Google Places API Key</div>
+      <div class="modal-desc">
+        장소 검색을 위해 Google Places API key가 필요해요.<br>
+        <strong>console.cloud.google.com → APIs & Services → Credentials</strong> 에서 발급.<br>
+        키는 이 기기 브라우저에만 저장돼요 (LocalStorage).<br>
+        <strong style="color: var(--info);">안전망:</strong> Google Cloud Console → Quotas → "Places API" → daily limit 을 <strong>100</strong> 으로 설정해 두면 청구 절대 안 됩니다. HTTP referrer 제한도 권장.
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">API Key</label>
+        <input class="modal-input mono" id="google-key-input" placeholder="AIza..." autocomplete="off">
+        <div class="field-hint">`AIza` 로 시작하는 39자 키. referrer 제한 걸어두는게 안전.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="google-key-cancel">취소</button>
+        <button class="btn btn-primary" id="google-key-save">저장</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 방문장소 추가/편집 모달 -->
   <div class="modal-backdrop" id="place-modal">
     <div class="modal">
@@ -579,8 +627,11 @@
       <div class="modal-field">
         <label class="modal-label">장소 검색 *</label>
         <input class="modal-input" id="place-search" placeholder="예: 츠키지 시장, Toraya, Starbucks Shibuya" autocomplete="off">
-        <div class="field-hint">한국어/영문 모두 가능. 현재 도시 주변 우선 검색.</div>
+        <div class="field-hint">한국어/영문 모두 가능. 현재 도시 주변 우선 검색. (Google Places)</div>
         <div class="search-results" id="search-results"></div>
+        <button class="btn btn-ghost" id="pick-on-map-btn" type="button" style="margin-top: var(--s2); width: 100%;">
+          또는 지도에서 직접 선택
+        </button>
       </div>
 
       <div class="modal-field">
@@ -591,10 +642,21 @@
 
       <!-- visited 일 때만 표시 -->
       <div id="visited-fields" style="display: none;">
-        <div class="modal-field">
+        <!-- 일반 카테고리: 방문일 1개 -->
+        <div class="modal-field" id="visited-date-field">
           <label class="modal-label">방문일</label>
           <input class="modal-input mono" id="place-visited-date" type="date">
           <div class="field-hint" id="visited-date-hint"></div>
+        </div>
+        <!-- 호텔 카테고리: 체크인 ~ 체크아웃 -->
+        <div class="modal-field" id="stay-range-field" style="display: none;">
+          <label class="modal-label">숙박 기간</label>
+          <div style="display: flex; gap: var(--s2); align-items: center;">
+            <input class="modal-input mono" id="place-stay-start" type="date" style="flex: 1;">
+            <span style="color: var(--text-quiet);">~</span>
+            <input class="modal-input mono" id="place-stay-end" type="date" style="flex: 1;">
+          </div>
+          <div class="field-hint" id="stay-range-hint">체크인 ~ 체크아웃 날짜. 필터에서 그 사이 모든 날짜에 핀이 표시돼요.</div>
         </div>
         <div class="modal-field">
           <label class="modal-label">별점 (선택)</label>
@@ -626,6 +688,7 @@
 
   const DASHBOARD_ID = 'travel';
   const MAPBOX_TOKEN_KEY = 'familyOS.mapboxToken';
+  const GOOGLE_KEY = 'familyOS.googlePlacesKey';
   const { escapeHtml } = FamilyOS;
 
   /* ─── 카테고리 메타 ─────────────────────────────────────── */
@@ -668,7 +731,7 @@
   });
   document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
     left: 'Travel · Phase B · 개별 여행',
-    right: 'v0.2.0'
+    right: 'v0.2.2'
   });
   document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
   FamilyOS.attachSettingsModal({ onSave: () => location.reload() });
@@ -790,6 +853,11 @@
         </div>
       </div>
 
+      <div class="pick-banner" id="pick-banner">
+        지도에서 장소를 클릭하세요
+        <button id="pick-cancel-btn" type="button">취소</button>
+      </div>
+
       <div class="map-section">
         <div id="map"></div>
         <div class="map-overlay">
@@ -800,6 +868,8 @@
 
     renderFilterChips();
     document.getElementById('add-place-btn').addEventListener('click', openAddPlaceModal);
+    const pickCancel = document.getElementById('pick-cancel-btn');
+    if (pickCancel) pickCancel.addEventListener('click', cancelPickMode);
   }
 
   function formatPeriod(start, end) {
@@ -812,10 +882,19 @@
   function renderFilterChips() {
     const wrap = document.getElementById('filter-chips');
     if (!wrap) return;
-    // 모든 visited_date 모음 (현재 trip + 다른 trip)
+    // 모든 날짜 모음 (현재 trip + 다른 trip)
+    //   - 일반 카테고리: visited_date 1개
+    //   - 호텔 카테고리: stay_start ~ stay_end 사이 모든 날짜
     const dates = new Set();
-    state.places.filter(p => p.visit_status === 'visited' && p.visited_date).forEach(p => dates.add(p.visited_date));
-    state.otherPlaces.filter(p => p.visited_date).forEach(p => dates.add(p.visited_date));
+    const collectDates = (p) => {
+      if (p.category === 'hotel' && p.stay_start) {
+        for (const d of expandStayRange(p.stay_start, p.stay_end)) dates.add(d);
+      } else if (p.visited_date) {
+        dates.add(p.visited_date);
+      }
+    };
+    state.places.filter(p => p.visit_status === 'visited').forEach(collectDates);
+    state.otherPlaces.forEach(collectDates);
     const sortedDates = Array.from(dates).sort();
 
     const totalCount = state.places.length + state.otherPlaces.length;
@@ -841,9 +920,38 @@
       });
     });
   }
+
+  /* 호텔 stay range 를 날짜 배열로 확장. end 없으면 start 1일만 */
+  function expandStayRange(start, end) {
+    if (!start) return [];
+    const result = [];
+    const s = new Date(start + 'T00:00:00');
+    const e = end ? new Date(end + 'T00:00:00') : s;
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return [];
+    // 최대 60박까지만 허용 (오타로 인한 폭주 방지)
+    const maxDays = 60;
+    for (let i = 0, cur = new Date(s); cur <= e && i < maxDays; i++, cur.setDate(cur.getDate() + 1)) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const d = String(cur.getDate()).padStart(2, '0');
+      result.push(`${y}-${m}-${d}`);
+    }
+    return result;
+  }
+
+  /* 특정 장소가 특정 날짜에 보여야 하는지 (호텔 stay range 고려) */
+  function placeMatchesDate(p, dateStr) {
+    if (p.category === 'hotel') {
+      if (!p.stay_start) return false;
+      const days = expandStayRange(p.stay_start, p.stay_end);
+      return days.indexOf(dateStr) >= 0;
+    }
+    return p.visited_date === dateStr;
+  }
+
   function countByDate(d) {
-    return state.places.filter(p => p.visited_date === d).length
-         + state.otherPlaces.filter(p => p.visited_date === d).length;
+    return state.places.filter(p => p.visit_status === 'visited' && placeMatchesDate(p, d)).length
+         + state.otherPlaces.filter(p => placeMatchesDate(p, d)).length;
   }
 
   /* ─── Mapbox 지도 초기화 ──────────────────────────────── */
@@ -927,8 +1035,8 @@
     // 필터 적용
     if (state.filter === 'all') return dedup;
     if (state.filter === 'planned') return dedup.filter(p => p.visit_status === 'planned' && p._source === 'current');
-    // 날짜 필터
-    return dedup.filter(p => p.visited_date === state.filter);
+    // 날짜 필터 (호텔은 stay_start ~ stay_end 사이, 그 외는 visited_date 일치)
+    return dedup.filter(p => placeMatchesDate(p, state.filter));
   }
 
   function createPinElement(p) {
@@ -939,7 +1047,14 @@
     el.dataset.placeId = p.place_id;
 
     const subParts = [];
-    if (p.visited_date) subParts.push(p.visited_date);
+    if (p.category === 'hotel' && p.stay_start) {
+      // 호텔: 'YYYY-MM-DD ~ YYYY-MM-DD' (end 없으면 단일일)
+      subParts.push(p.stay_end && p.stay_end !== p.stay_start
+        ? `${p.stay_start} ~ ${p.stay_end}`
+        : p.stay_start);
+    } else if (p.visited_date) {
+      subParts.push(p.visited_date);
+    }
     if (p.rating_star) subParts.push('★'.repeat(p.rating_star));
     if (p._source === 'other') subParts.push('재방문지');
     const sub = subParts.join(' · ');
@@ -964,6 +1079,9 @@
 
   function showOtherPlacePopup(p) {
     const otherTrip = (state.trip && p.trip_id) ? p.trip_id : '다른 여행';
+    const dateLine = (p.category === 'hotel' && p.stay_start)
+      ? `숙박: ${p.stay_start}${p.stay_end && p.stay_end !== p.stay_start ? ' ~ ' + p.stay_end : ''}`
+      : (p.visited_date ? '방문일: ' + p.visited_date : '');
     new mapboxgl.Popup({ offset: 20, closeButton: true })
       .setLngLat([Number(p.lng), Number(p.lat)])
       .setHTML(`
@@ -972,7 +1090,7 @@
         </div>
         <div style="font-size: 11px; color: var(--text-tertiary);">
           이전 여행 (<strong>${escapeHtml(p.trip_id || '')}</strong>) 에서 방문<br>
-          ${p.visited_date ? '방문일: ' + escapeHtml(p.visited_date) + '<br>' : ''}
+          ${dateLine ? escapeHtml(dateLine) + '<br>' : ''}
           ${p.rating_star ? '별점: ' + '★'.repeat(p.rating_star) : ''}
         </div>
       `)
@@ -1016,6 +1134,71 @@
   document.getElementById('token-cancel').addEventListener('click', closeTokenModal);
   document.getElementById('token-modal').addEventListener('click', (e) => {
     if (e.target.id === 'token-modal') closeTokenModal();
+  });
+
+  /* ─── Google Places API key 모달 ──────────────────────── */
+  function getGoogleKey() { return localStorage.getItem(GOOGLE_KEY) || ''; }
+  function setGoogleKey(k) {
+    if (k) localStorage.setItem(GOOGLE_KEY, k);
+    else localStorage.removeItem(GOOGLE_KEY);
+  }
+  function openGoogleKeyModal(reason) {
+    if (reason === 'key-error') {
+      const desc = document.querySelector('#google-key-modal .modal-desc');
+      if (desc && !desc.dataset.errored) {
+        desc.innerHTML += '<br><span style="color: var(--loss);">⚠ 직전 키로 호출 실패. 키를 다시 확인하거나 Places API (New) 가 활성화되어 있는지 확인하세요.</span>';
+        desc.dataset.errored = '1';
+      }
+    }
+    document.getElementById('google-key-modal').classList.add('open');
+    document.getElementById('google-key-input').focus();
+  }
+  function closeGoogleKeyModal() {
+    document.getElementById('google-key-modal').classList.remove('open');
+  }
+  document.getElementById('google-key-save').addEventListener('click', () => {
+    const v = document.getElementById('google-key-input').value.trim();
+    if (!v) { alert('API key 를 입력하세요'); return; }
+    if (!v.startsWith('AIza')) {
+      if (!confirm('Google API key 는 보통 AIza 로 시작해요. 그래도 저장할까요?')) return;
+    }
+    setGoogleKey(v);
+    closeGoogleKeyModal();
+  });
+  document.getElementById('google-key-cancel').addEventListener('click', closeGoogleKeyModal);
+  document.getElementById('google-key-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'google-key-modal') closeGoogleKeyModal();
+  });
+
+  /* ─── Google Places API key 모달 ───────────────────────── */
+  function getGoogleKey() {
+    return localStorage.getItem(GOOGLE_KEY) || '';
+  }
+  function setGoogleKey(k) {
+    if (k) localStorage.setItem(GOOGLE_KEY, k);
+    else localStorage.removeItem(GOOGLE_KEY);
+  }
+  function openGoogleKeyModal() {
+    const cur = getGoogleKey();
+    document.getElementById('google-key-input').value = cur;
+    document.getElementById('google-key-modal').classList.add('open');
+    document.getElementById('google-key-input').focus();
+  }
+  function closeGoogleKeyModal() {
+    document.getElementById('google-key-modal').classList.remove('open');
+  }
+  document.getElementById('google-key-save').addEventListener('click', () => {
+    const v = document.getElementById('google-key-input').value.trim();
+    if (!v) { alert('API key 를 입력하세요'); return; }
+    if (!v.startsWith('AIza')) {
+      if (!confirm('Google API key 는 보통 AIza 로 시작해요. 그래도 저장할까요?')) return;
+    }
+    setGoogleKey(v);
+    closeGoogleKeyModal();
+  });
+  document.getElementById('google-key-cancel').addEventListener('click', closeGoogleKeyModal);
+  document.getElementById('google-key-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'google-key-modal') closeGoogleKeyModal();
   });
 
   /* ─── Place 모달 ──────────────────────────────────────── */
@@ -1093,14 +1276,41 @@
     const isVisited = state.modal.visitStatus === 'visited';
     document.getElementById('visited-fields').style.display = isVisited ? 'block' : 'none';
     if (!isVisited) return;
-    // 방문일
-    document.getElementById('place-visited-date').value = p && p.visited_date ? p.visited_date : (state.trip.period_start || '');
-    document.getElementById('visited-date-hint').textContent = state.trip.period_start
-      ? `여행 기간: ${state.trip.period_start} ~ ${state.trip.period_end || '—'}`
-      : '';
-    // 별점
+
+    const isHotel = state.modal.category === 'hotel';
+    document.getElementById('visited-date-field').style.display = isHotel ? 'none' : 'block';
+    document.getElementById('stay-range-field').style.display   = isHotel ? 'block' : 'none';
+
+    if (isHotel) {
+      document.getElementById('place-stay-start').value = (p && p.stay_start) ? p.stay_start : (state.trip.period_start || '');
+      document.getElementById('place-stay-end').value   = (p && p.stay_end)   ? p.stay_end   : (state.trip.period_end   || '');
+    } else {
+      document.getElementById('place-visited-date').value = p && p.visited_date ? p.visited_date : (state.trip.period_start || '');
+      document.getElementById('visited-date-hint').textContent = state.trip.period_start
+        ? `여행 기간: ${state.trip.period_start} ~ ${state.trip.period_end || '—'}`
+        : '';
+    }
+    // 별점/평가는 공통
     renderStars();
     document.getElementById('place-rating-text').value = p && p.rating_text ? p.rating_text : '';
+  }
+
+  /* 카테고리 전환 시 visibility 만 토글 (입력값 보존) */
+  function toggleHotelFieldsOnly() {
+    if (state.modal.visitStatus !== 'visited') return;
+    const isHotel = state.modal.category === 'hotel';
+    document.getElementById('visited-date-field').style.display = isHotel ? 'none' : 'block';
+    document.getElementById('stay-range-field').style.display   = isHotel ? 'block' : 'none';
+    // 호텔 전환시 비어있으면 trip 기간으로 초기화 (1회만)
+    if (isHotel) {
+      const ss = document.getElementById('place-stay-start');
+      const se = document.getElementById('place-stay-end');
+      if (!ss.value) ss.value = state.trip.period_start || '';
+      if (!se.value) se.value = state.trip.period_end   || '';
+    } else {
+      const vd = document.getElementById('place-visited-date');
+      if (!vd.value) vd.value = state.trip.period_start || '';
+    }
   }
 
   function renderStars() {
@@ -1133,9 +1343,11 @@
     document.querySelectorAll('#cat-grid .cat-chip').forEach(x => {
       x.classList.toggle('active', x.dataset.cat === state.modal.category);
     });
+    // 호텔/non-호텔 전환 시 stay-range 필드 토글 (입력값 보존)
+    toggleHotelFieldsOnly();
   });
 
-  /* 검색 자동완성 — Mapbox Search Box API */
+  /* 검색 자동완성 — Google Places (New) Autocomplete */
   let searchDebounce;
   document.getElementById('place-search').addEventListener('input', (e) => {
     clearTimeout(searchDebounce);
@@ -1144,27 +1356,69 @@
       document.getElementById('search-results').classList.remove('shown');
       return;
     }
-    searchDebounce = setTimeout(() => mapboxSuggest(q), 350);
+    searchDebounce = setTimeout(() => googleSuggest(q), 350);
   });
 
-  async function mapboxSuggest(q) {
-    const token = getMapboxToken();
-    if (!token) { openTokenModal(); return; }
+  /**
+   * Google Places (New) Autocomplete.
+   * 동일 sessionToken 을 여러 입력 동안 공유해 1 session 으로 billing.
+   * Details 호출 시 같은 token 전달 → Autocomplete + Details 가 한 session 으로 묶임.
+   */
+  async function googleSuggest(q) {
+    const key = getGoogleKey();
+    if (!key) { openGoogleKeyModal(); return; }
     const t = state.trip;
-    const proximity = (t.center_lng && t.center_lat) ? `${t.center_lng},${t.center_lat}` : '';
-    const url = 'https://api.mapbox.com/search/searchbox/v1/suggest?'
-      + new URLSearchParams({
-        q: q,
-        access_token: token,
-        session_token: state.modal.searchSessionToken,
-        ...(proximity ? { proximity } : {}),
-        limit: '6',
-        language: 'ko'
-      }).toString();
+    const body = {
+      input: q,
+      sessionToken: state.modal.searchSessionToken,
+      languageCode: 'ko'
+    };
+    if (t.center_lat != null && t.center_lng != null) {
+      body.locationBias = {
+        circle: {
+          center: { latitude: Number(t.center_lat), longitude: Number(t.center_lng) },
+          radius: 30000.0  // 30km 도시 반경 (zoom 11 정도)
+        }
+      };
+    }
     try {
-      const res = await fetch(url);
+      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': key,
+          // 필드 마스크로 Essentials SKU 유지 (저렴)
+          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        let errMsg = res.status + ' ' + res.statusText;
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.error && errJson.error.message) errMsg = errJson.error.message;
+        } catch (_) {}
+        if (res.status === 401 || res.status === 403) {
+          // 인증 실패 → key 재입력 유도
+          renderSearchResults([], 'API key 인증 실패: ' + errMsg);
+          return;
+        }
+        renderSearchResults([], errMsg);
+        return;
+      }
       const json = await res.json();
-      renderSearchResults(json.suggestions || []);
+      // 응답: suggestions[].placePrediction.{ placeId, text:{text}, structuredFormat:{mainText:{text}, secondaryText:{text}} }
+      const normalized = (json.suggestions || []).map(s => {
+        const pp = s.placePrediction || {};
+        const sf = pp.structuredFormat || {};
+        return {
+          place_id: pp.placeId || '',
+          name: (sf.mainText && sf.mainText.text) || (pp.text && pp.text.text) || '',
+          sub:  (sf.secondaryText && sf.secondaryText.text) || ''
+        };
+      }).filter(s => s.place_id);
+      renderSearchResults(normalized);
     } catch (err) {
       renderSearchResults([], err.message);
     }
@@ -1174,49 +1428,73 @@
     const wrap = document.getElementById('search-results');
     wrap.classList.add('shown');
     if (errMsg) {
-      wrap.innerHTML = '<div class="search-result-empty" style="color: var(--loss);">검색 오류: ' + escapeHtml(errMsg) + '</div>';
+      const isAuthErr = /인증|API key|API_KEY|denied|invalid/i.test(errMsg);
+      wrap.innerHTML = '<div class="search-result-empty" style="color: var(--loss);">검색 오류: '
+        + escapeHtml(errMsg)
+        + (isAuthErr ? ' <button class="btn btn-ghost" id="reset-google-key-btn" type="button" style="margin-left: var(--s2); padding: 2px 8px; font-size: 11px;">API key 재설정</button>' : '')
+        + '</div>';
+      if (isAuthErr) {
+        const b = document.getElementById('reset-google-key-btn');
+        if (b) b.addEventListener('click', () => { openGoogleKeyModal(); });
+      }
       return;
     }
     if (!suggestions || suggestions.length === 0) {
-      wrap.innerHTML = '<div class="search-result-empty">결과 없음</div>';
+      wrap.innerHTML = '<div class="search-result-empty">결과 없음. 지도에서 직접 선택해 보세요.</div>';
       return;
     }
     wrap.innerHTML = suggestions.map(s => `
-      <div class="search-result-item" data-mapbox-id="${escapeHtml(s.mapbox_id)}">
+      <div class="search-result-item" data-place-id="${escapeHtml(s.place_id)}">
         <div class="name">${escapeHtml(s.name || '')}</div>
-        <div class="sub">${escapeHtml(s.full_address || s.place_formatted || '')}</div>
+        <div class="sub">${escapeHtml(s.sub || '')}</div>
       </div>
     `).join('');
     wrap.querySelectorAll('.search-result-item').forEach(item => {
       item.addEventListener('click', () => {
-        const suggestion = suggestions.find(s => s.mapbox_id === item.dataset.mapboxId);
-        if (suggestion) mapboxRetrieve(suggestion);
+        const suggestion = suggestions.find(s => s.place_id === item.dataset.placeId);
+        if (suggestion) googleDetails(suggestion);
       });
     });
   }
 
-  async function mapboxRetrieve(suggestion) {
-    const token = getMapboxToken();
-    if (!token) return;
-    const url = 'https://api.mapbox.com/search/searchbox/v1/retrieve/'
-      + encodeURIComponent(suggestion.mapbox_id) + '?'
-      + new URLSearchParams({
-        access_token: token,
-        session_token: state.modal.searchSessionToken
-      }).toString();
+  /**
+   * Google Places (New) Place Details.
+   * fieldMask 로 id/displayName/formattedAddress/location 만 받음 (Essentials SKU).
+   * 같은 sessionToken 으로 호출 → Autocomplete + Details 1 session billing.
+   */
+  async function googleDetails(suggestion) {
+    const key = getGoogleKey();
+    if (!key) return;
+    const url = 'https://places.googleapis.com/v1/places/'
+      + encodeURIComponent(suggestion.place_id)
+      + '?sessionToken=' + encodeURIComponent(state.modal.searchSessionToken)
+      + '&languageCode=ko';
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: {
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location'
+        }
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        let errMsg = res.status + ' ' + res.statusText;
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.error && errJson.error.message) errMsg = errJson.error.message;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const json = await res.json();
-      const feature = (json.features && json.features[0]) || null;
-      if (!feature) throw new Error('retrieve 응답 비어있음');
-      const coords = feature.geometry && feature.geometry.coordinates;
-      const props = feature.properties || {};
+      const loc = json.location || {};
       state.modal.selectedPlace = {
-        name: props.name || suggestion.name || '',
-        lat: coords ? coords[1] : null,
-        lng: coords ? coords[0] : null,
-        address: props.full_address || props.place_formatted || '',
-        mapbox_id: suggestion.mapbox_id
+        name: (json.displayName && json.displayName.text) || suggestion.name || '',
+        lat: loc.latitude != null ? Number(loc.latitude) : null,
+        lng: loc.longitude != null ? Number(loc.longitude) : null,
+        address: json.formattedAddress || suggestion.sub || '',
+        // mapbox_id 컬럼에 Google place_id 저장 (스키마 호환).
+        // worklog 에 명시: Mapbox 시절 데이터와는 매칭 안 됨 (트레이드오프).
+        mapbox_id: json.id || suggestion.place_id || ''
       };
       document.getElementById('place-name').value = state.modal.selectedPlace.name;
       document.getElementById('place-coords').textContent =
@@ -1224,10 +1502,75 @@
           ? `${state.modal.selectedPlace.lat.toFixed(4)}, ${state.modal.selectedPlace.lng.toFixed(4)} · ${state.modal.selectedPlace.address || ''}`
           : '좌표 미설정';
       document.getElementById('search-results').classList.remove('shown');
-      // 새 세션 토큰 (1 retrieve = 1 billable session)
+      document.getElementById('place-search').value = '';
+      // 1 session = 1 Autocomplete sequence + 1 Details. 다음 검색은 새 토큰.
       state.modal.searchSessionToken = uuidv4();
     } catch (err) {
       alert('장소 정보를 가져오지 못했어요: ' + err.message);
+    }
+  }
+
+  /* ─── 지도 클릭 폴백 (검색 안 되는 마이너 장소 대비) ─── */
+  document.getElementById('pick-on-map-btn').addEventListener('click', () => {
+    enterPickMode();
+  });
+
+  function enterPickMode() {
+    if (!state.map) {
+      alert('지도가 아직 로드되지 않았어요.');
+      return;
+    }
+    // 모달 임시 숨김 (state 는 보존)
+    state.pickSavedModal = { ...state.modal };
+    document.getElementById('place-modal').classList.remove('open');
+    document.body.classList.add('map-picking');
+    state.map.once('click', onPickMapClick);
+    // ESC 로 취소도 지원
+    document.addEventListener('keydown', pickEscHandler);
+  }
+
+  function cancelPickMode() {
+    document.body.classList.remove('map-picking');
+    if (state.map) state.map.off('click', onPickMapClick);
+    document.removeEventListener('keydown', pickEscHandler);
+    // 모달 다시 열기 (상태 그대로)
+    if (state.pickSavedModal) {
+      state.modal = state.pickSavedModal;
+      state.pickSavedModal = null;
+      document.getElementById('place-modal').classList.add('open');
+    }
+  }
+
+  function pickEscHandler(e) {
+    if (e.key === 'Escape') cancelPickMode();
+  }
+
+  function onPickMapClick(e) {
+    const lng = e.lngLat.lng;
+    const lat = e.lngLat.lat;
+    document.body.classList.remove('map-picking');
+    document.removeEventListener('keydown', pickEscHandler);
+    // selectedPlace 채움. 이름은 사용자가 직접 입력.
+    if (state.pickSavedModal) {
+      state.modal = state.pickSavedModal;
+      state.pickSavedModal = null;
+    }
+    state.modal.selectedPlace = {
+      name: state.modal.selectedPlace ? state.modal.selectedPlace.name : '',
+      lat: lat,
+      lng: lng,
+      address: '',
+      mapbox_id: ''   // 직접 좌표 입력 시 매칭 키 없음 (의도된 동작)
+    };
+    // 모달 다시 열기
+    document.getElementById('place-modal').classList.add('open');
+    document.getElementById('place-coords').textContent =
+      `${lat.toFixed(4)}, ${lng.toFixed(4)} · 직접 선택`;
+    // 이름이 비어있다면 사용자에게 안내
+    const nameInput = document.getElementById('place-name');
+    if (!nameInput.value) {
+      nameInput.focus();
+      nameInput.placeholder = '장소명을 직접 입력하세요';
     }
   }
 
@@ -1240,9 +1583,13 @@
   });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    // 픽킹 모드 중이면 pickEscHandler 가 처리. 여기서는 모달 close 안 함.
+    if (document.body.classList.contains('map-picking')) return;
     const pm = document.getElementById('place-modal');
     const tm = document.getElementById('token-modal');
-    if (pm.classList.contains('open')) closePlaceModal();
+    const gm = document.getElementById('google-key-modal');
+    if (pm.classList.contains('open'))      closePlaceModal();
+    else if (gm.classList.contains('open')) closeGoogleKeyModal();
     else if (tm.classList.contains('open')) closeTokenModal();
   });
 
@@ -1292,21 +1639,36 @@
     if (!name) throw new Error('장소명이 비어있음');
     let lat = m.selectedPlace ? m.selectedPlace.lat : null;
     let lng = m.selectedPlace ? m.selectedPlace.lng : null;
-    if (lat == null || lng == null) throw new Error('좌표가 없음. 검색 결과를 선택하세요.');
+    if (lat == null || lng == null) throw new Error('좌표가 없음. 검색 결과를 선택하거나 지도에서 직접 선택하세요.');
 
     const isVisited = m.visitStatus === 'visited';
+    const isHotel   = m.category === 'hotel';
+    const stayStart = (isVisited && isHotel) ? (document.getElementById('place-stay-start').value || null) : null;
+    const stayEnd   = (isVisited && isHotel) ? (document.getElementById('place-stay-end').value   || null) : null;
+    // 호텔이면 visited_date 는 stay_start 와 동일하게 저장 (호환성: 다른 코드가 visited_date 만 보면)
+    const visitedDate = (isVisited && !isHotel)
+      ? (document.getElementById('place-visited-date').value || null)
+      : (isHotel ? stayStart : null);
+
+    // 호텔 검증: stay_start 가 stay_end 보다 늦으면 에러
+    if (isVisited && isHotel && stayStart && stayEnd && stayStart > stayEnd) {
+      throw new Error('체크인 날짜가 체크아웃 날짜보다 늦습니다');
+    }
+
     return {
       trip_id: state.tripId,
       category: m.category,
       name: name,
-      address: m.selectedPlace ? m.selectedPlace.address : '',
+      address: m.selectedPlace ? (m.selectedPlace.address || '') : '',
       lat: Number(lat),
       lng: Number(lng),
-      mapbox_id: m.selectedPlace ? m.selectedPlace.mapbox_id : '',
+      mapbox_id: m.selectedPlace ? (m.selectedPlace.mapbox_id || '') : '',
       visit_status: m.visitStatus,
-      visited_date: isVisited ? (document.getElementById('place-visited-date').value || null) : null,
+      visited_date: visitedDate,
       rating_star: isVisited ? (m.ratingStar || null) : null,
-      rating_text: isVisited ? (document.getElementById('place-rating-text').value || '') : ''
+      rating_text: isVisited ? (document.getElementById('place-rating-text').value || '') : '',
+      stay_start: stayStart,
+      stay_end:   stayEnd
     };
   }
 

@@ -36,7 +36,8 @@ family-os/
 | Apps Script 응답 envelope | `{ok: true, data: {kpi, tasks, updated_at}}` |
 | Write 패턴 (필수) | `doPost` + `Content-Type: text/plain;charset=utf-8` (CORS preflight 회피) |
 | LocalStorage 키 prefix (Web App URL) | `familyOS.webAppUrl.{id}` |
-| LocalStorage 키 (Mapbox token) | `familyOS.mapboxToken` (travel-trip.html 전용) |
+| LocalStorage 키 (Mapbox token) | `familyOS.mapboxToken` (travel-trip.html 지도 표시 전용) |
+| LocalStorage 키 (Google Places key) | `familyOS.googlePlacesKey` (travel-trip.html 검색 전용, v0.2.2 추가) |
 | 대시보드 id | `wealth`, `expense`, `health`, `future`, `travel` |
 | 가족 id (시트 진실의 원천) | `dad`, `mom`, `son1`(=도비, 형), `son2`(=로비, 동생) |
 | 호스팅 | GitHub Pages (public repo) |
@@ -44,7 +45,7 @@ family-os/
 | 인증 | Web App URL 기기별 LocalStorage 저장 (백업 코드 export/import 지원) |
 | 시트 격리 원칙 | 각 대시보드 Apps Script 는 자기 시트만 읽음. 결합은 메인 허브 |
 | Travel ↔ Expense 연동 | 메모 태깅 (`#trip_id`). Travel 측은 비용 모름. Phase B 는 수동 입력 |
-| 외부 API | Mapbox (travel-trip 의 지도/검색), OSM Nominatim (travel 의 도시 검색). 둘 다 무료 |
+| 외부 API | Mapbox (travel-trip 지도 표시), Google Places New (travel-trip 장소 검색, v0.2.2 추가), OSM Nominatim (travel 도시 검색). Mapbox/Nominatim 무료. Google Places 는 가족 사용량 < 무료 한도, 추가로 quota cap 100/일 설정 |
 | 테마 | 다크 전용 (`#0A0B0F` + 골드 `#E5C158`) |
 | 폰트 | Fraunces (display), Pretendard (body), JetBrains Mono (mono) |
 | 악센트 | Wealth=골드, Expense=인디고, Health=민트, Future=라벤더, Travel=코랄 |
@@ -58,7 +59,7 @@ family-os/
 | Expense | 배포됨 | OAuth 폐기 (doPost 통일). 안정 |
 | Health | 배포됨 | **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
-| Travel | **v0.2.1** | Phase A+B 완료. Mapbox 통합 (메인 세계지도 + 개별 여행). 카테고리 핀 10개. 같은 도시 재방문 시각화 |
+| Travel | **v0.2.2** | Phase A+B + Session 7.2. 가족 8명 확장. 호텔 stay_range (체크인~체크아웃 모든 날짜에 핀). Google Places (New) 검색 교체 (동아시아 POI 강화). 지도 클릭 폴백. |
 
 ## Cross-cutting Pending
 
@@ -68,6 +69,7 @@ family-os/
 4. **Health 기능 추가** — 아이들 운동 스케줄 입출력 → 다음 Health 세션 (`context-health.md` 참조)
 5. **LocalStorage 영속성 진단 결과** — Session 5.2 의 자동 배너/콘솔 로그 사용자 보고 미수령
 6. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
+7. **Travel mapbox_id → Google place_id 마이그레이션 잔재** (v0.2.2) — 기존 Mapbox 시절 데이터의 `mapbox_id` 값과 새 Google `id` 값은 매칭 안 됨. 같은 장소 dedup 실패 가능. 사용자 시트의 기존 데이터가 적다면 무시. 별도 컬럼 분리는 추후 검토.
 
 ## 세션 종료 시 worklog 업데이트 규칙
 

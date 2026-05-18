@@ -44,13 +44,16 @@ const TRIPS_HEADERS = [
   'created_at'
 ];
 
+// 주의: stay_start/stay_end 는 v0.2.2 (Session 7.2) 추가. 기존 시트 마이그레이션
+// 안전성을 위해 created_at 뒤(14, 15)에 append. 새로 만드는 시트도 같은 순서.
 const PLACES_HEADERS = [
   'place_id', 'trip_id', 'category',
   'name', 'address', 'lat', 'lng',
   'mapbox_id',
   'visit_status', 'visited_date',
   'rating_star', 'rating_text',
-  'created_at'
+  'created_at',
+  'stay_start', 'stay_end'
 ];
 
 const CATEGORIES = [
@@ -297,7 +300,11 @@ function deleteTrip_(p) {
 /**
  * 방문장소 추가.
  * 필수: trip_id, category, name, lat, lng, visit_status
- * 선택: address, mapbox_id, visited_date, rating_star, rating_text
+ * 선택: address, mapbox_id, visited_date, rating_star, rating_text, stay_start, stay_end
+ *
+ * 호텔(category='hotel') 처리:
+ *   - stay_start, stay_end 가 진실의 원천 (visited_date 는 무시 또는 stay_start 와 동일)
+ *   - 다른 카테고리는 stay_start/stay_end 무시, visited_date 사용
  */
 function addPlace_(p) {
   if (!p.trip_id) throw new Error('trip_id 필수');
@@ -309,28 +316,38 @@ function addPlace_(p) {
   if (!p.visit_status || ['planned', 'visited'].indexOf(p.visit_status) < 0) {
     throw new Error('visit_status 는 planned 또는 visited');
   }
-  // visit_status='planned' 인 경우 rating/visited_date 는 무시
+  // visit_status='planned' 인 경우 rating/visited_date/stay_* 는 무시
   const isVisited = p.visit_status === 'visited';
+  const isHotel = p.category === 'hotel';
 
   const sheet = getSheet_(SHEET_NAMES.places);
   const existing = readSheetAsObjects_(SHEET_NAMES.places);
   const place_id = generatePlaceId_(p.trip_id, existing);
 
-  const row = [
-    place_id,
-    String(p.trip_id),
-    String(p.category),
-    String(p.name),
-    String(p.address || ''),
-    Number(p.lat),
-    Number(p.lng),
-    String(p.mapbox_id || ''),
-    String(p.visit_status),
-    (isVisited && p.visited_date) ? formatDate_(p.visited_date) : '',
-    (isVisited && p.rating_star != null) ? Number(p.rating_star) : '',
-    (isVisited && p.rating_text)         ? String(p.rating_text) : '',
-    new Date().toISOString()
-  ];
+  // 헤더 순서대로 row 작성. ensureSheets_ 가 컬럼 자동 추가하므로 실제 시트의
+  // 컬럼 순서와 PLACES_HEADERS 가 일치한다는 가정.
+  // 만약 사용자가 수동으로 헤더 순서를 바꿨다면 헤더 매핑 기반으로 작성해야 안전.
+  const rowMap = {
+    place_id:     place_id,
+    trip_id:      String(p.trip_id),
+    category:     String(p.category),
+    name:         String(p.name),
+    address:      String(p.address || ''),
+    lat:          Number(p.lat),
+    lng:          Number(p.lng),
+    mapbox_id:    String(p.mapbox_id || ''),
+    visit_status: String(p.visit_status),
+    visited_date: (isVisited && !isHotel && p.visited_date) ? formatDate_(p.visited_date) : '',
+    rating_star:  (isVisited && p.rating_star != null && p.rating_star !== '') ? Number(p.rating_star) : '',
+    rating_text:  (isVisited && p.rating_text) ? String(p.rating_text) : '',
+    created_at:   new Date().toISOString(),
+    stay_start:   (isVisited && isHotel && p.stay_start) ? formatDate_(p.stay_start) : '',
+    stay_end:     (isVisited && isHotel && p.stay_end)   ? formatDate_(p.stay_end)   : ''
+  };
+
+  // 시트 실제 헤더 순서대로 row 작성 (안전)
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+  const row = headers.map(h => rowMap[h] !== undefined ? rowMap[h] : '');
   sheet.appendRow(row);
 
   return { place_id: place_id };
@@ -353,8 +370,12 @@ function updatePlace_(p) {
   if (p.visited_date !== undefined)  updates.visited_date  = p.visited_date ? formatDate_(p.visited_date) : '';
   if (p.rating_star !== undefined)   updates.rating_star   = (p.rating_star === '' || p.rating_star == null) ? '' : Number(p.rating_star);
   if (p.rating_text !== undefined)   updates.rating_text   = String(p.rating_text);
+  if (p.stay_start !== undefined)    updates.stay_start    = p.stay_start ? formatDate_(p.stay_start) : '';
+  if (p.stay_end !== undefined)      updates.stay_end      = p.stay_end   ? formatDate_(p.stay_end)   : '';
 
-  applyUpdates_(sheet, rowIdx, PLACES_HEADERS, updates);
+  // 시트 실제 헤더 기반 매핑 (자동 마이그레이션 후 컬럼 위치가 시트마다 다를 수 있으므로)
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+  applyUpdates_(sheet, rowIdx, headers, updates);
   return { place_id: p.place_id };
 }
 
@@ -399,22 +420,29 @@ function ensureSheetWithHeader_(ss, name, headers) {
   let s = ss.getSheetByName(name);
   if (!s) s = ss.insertSheet(name);
   // 헤더 1행이 비어있으면 채움
-  const range = s.getRange(1, 1, 1, headers.length);
+  const lastCol = Math.max(1, s.getLastColumn());
+  const range = s.getRange(1, 1, 1, Math.max(headers.length, lastCol));
   const cur = range.getValues()[0];
-  const allEmpty = cur.every(v => v === '' || v == null);
+  const allEmpty = cur.slice(0, headers.length).every(v => v === '' || v == null);
   if (allEmpty) {
-    range.setValues([headers]);
+    s.getRange(1, 1, 1, headers.length).setValues([headers]);
     s.setFrozenRows(1);
-  } else {
-    // 헤더가 일부 빠져 있을 수 있음 — 누락된 컬럼만 채워줌 (idempotent 보강)
-    const missing = headers.filter(h => cur.indexOf(h) < 0);
-    if (missing.length > 0) {
-      const startCol = headers.length - missing.length + 1;
-      // 단순화: 전체 헤더 row 를 덮어씀 (기존 데이터 컬럼 순서를 spec 에 맞춤)
-      // 안전을 위해 이건 자동으로 안 하고 에러로 알림
-      throw new Error('시트 ' + name + ' 의 헤더가 spec 과 다름. 누락 컬럼: ' + missing.join(', ') + '. 시트를 비우고 다시 호출하거나 수동으로 헤더를 맞춰 주세요.');
-    }
+    return;
   }
+
+  // 기존 헤더 → 누락된 컬럼을 끝에 자동 추가 (idempotent 마이그레이션)
+  // 단, 기존 컬럼 순서/위치는 절대 바꾸지 않음 (데이터 시프트 방지)
+  const existing = cur.map(v => String(v || '').trim()).filter(Boolean);
+  const missing = headers.filter(h => existing.indexOf(h) < 0);
+  if (missing.length === 0) {
+    s.setFrozenRows(1);
+    return;
+  }
+  // 끝에 추가 (현재 lastCol 다음 컬럼부터)
+  const startCol = existing.length + 1;
+  s.getRange(1, startCol, 1, missing.length).setValues([missing]);
+  s.setFrozenRows(1);
+  Logger.log('시트 ' + name + ' 에 컬럼 자동 추가: ' + missing.join(', '));
 }
 
 function jsonResponse(obj) {
@@ -480,6 +508,8 @@ function normalizePlace_(p) {
     visited_date: formatDate_(p.visited_date),
     rating_star:  numberOrNull_(p.rating_star),
     rating_text:  String(p.rating_text || ''),
+    stay_start:   formatDate_(p.stay_start),
+    stay_end:     formatDate_(p.stay_end),
     created_at:   formatIso_(p.created_at)
   };
 }

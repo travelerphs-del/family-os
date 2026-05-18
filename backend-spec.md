@@ -253,7 +253,7 @@ fetch(WEBAPP_URL, {
 | `zoom` | number | 초기 줌 레벨 (11=도시, 9=지방) |
 | `created_at` | ISO string | |
 
-**`places` 탭** (13 컬럼):
+**`places` 탭** (15 컬럼, v0.2.2 부터):
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -264,17 +264,25 @@ fetch(WEBAPP_URL, {
 | `address` | string | 주소 (선택) |
 | `lat` | number | |
 | `lng` | number | |
-| `mapbox_id` | string | Mapbox feature ID (있으면). 같은 장소 재매칭용 |
+| `mapbox_id` | string | 외부 place provider ID (v0.2.2 부터 Google Places `id` 저장. 같은 장소 재매칭용. 이름은 호환성 위해 유지) |
 | `visit_status` | enum | `planned` / `visited` |
-| `visited_date` | date | `visited`일 때만. `planned`은 빈 값 |
+| `visited_date` | date | `visited` 일 때만. 호텔의 경우 stay_start 와 동일하게 저장 (호환성). `planned` 은 빈 값 |
 | `rating_star` | integer | 1~5 정수. `visited` && 평가 있을 때만 |
 | `rating_text` | string | 평가 서술 |
 | `created_at` | ISO string | |
+| `stay_start` | date | **v0.2.2 신규**. 호텔(`category='hotel'`) 의 체크인 날짜. 다른 카테고리는 빈 값 |
+| `stay_end` | date | **v0.2.2 신규**. 호텔의 체크아웃 날짜. 빈 값이면 stay_start 1일만 |
+
+**v0.2.2 마이그레이션**: 기존 13컬럼 시트는 Apps Script `ensureSheetWithHeader_` 가 자동으로 `stay_start`, `stay_end` 를 14, 15번 컬럼에 append. 기존 데이터는 깨지지 않음. 기존 호텔 행은 `visited_date` 만 있고 `stay_start/stay_end` 비어 있으므로 1일짜리로 동작 — 필요 시 시트에서 직접 채워주거나 편집 모달로 입력.
+
+**호텔 필터 동작**: `visiblePlaces` 의 날짜 필터에서, 호텔은 `stay_start <= filter_date <= stay_end` 면 핀 표시. 다른 카테고리는 기존 `visited_date === filter_date` 로직 그대로.
 
 **같은 도시 재방문 매칭** (Phase B에서 사용):
 - 현재 trip 페이지를 열 때, 같은 `country_code` + `city_key`를 가진 **다른 trip들**의 `visit_status='visited'` places를 함께 가져와 회색 아이콘으로 지도에 표시.
 - 같은 `mapbox_id`가 현재 trip의 places에도 있으면 (재방문 등록) → 회색 대신 유색 표시.
-- Mapbox id가 없는 케이스의 보조 매칭: 같은 도시 내에서 `lat`/`lng` 거리 < 50m + 이름 매칭. (Phase B 구현 시 결정)
+- **v0.2.2**: 검색 backend를 Google Places (New) 로 교체. `mapbox_id` 컬럼에는 Google `id` (예: `ChIJ...`) 가 저장됨. 컬럼 이름은 호환성 위해 유지.
+- **마이그레이션 트레이드오프**: Mapbox 시절에 저장된 mapbox_id 와 새 Google place_id 는 매칭 안 됨. 따라서 같은 장소를 Mapbox 시절 다른 trip 에서 등록했고 이번에 Google 로 다시 등록하면, dedup 실패해 회색 핀 + 컬러 핀이 함께 표시될 수 있음. 사용자 시트의 기존 mapbox_id 데이터가 적다면 무시 가능.
+- Mapbox id가 없는 케이스의 보조 매칭: 같은 도시 내에서 `lat`/`lng` 거리 < 50m + 이름 매칭. (미구현)
 
 ### 3-8. Travel ↔ Expense 연동 (메모 태깅)
 

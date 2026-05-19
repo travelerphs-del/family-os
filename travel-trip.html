@@ -1349,6 +1349,7 @@
     el.style.cursor = 'pointer';
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      diagLog('marker_click', { place_id: p.place_id, source: p._source, layout_mode: state.layoutMode });
       // 픽킹 모드 중엔 마커 클릭 무시 (지도 클릭으로 흘림)
       if (document.body.classList.contains('map-picking')) return;
       if (p._source === 'other') {
@@ -1403,6 +1404,16 @@
 
   /* ─── Split 레이아웃 (v0.3.2) ─────────────────────────────
    * layoutMode 전환 + 사이드 패널 렌더링 + 마커 줌인 */
+
+  /* 사이드 패널 자식 모두 제거. 단 폼 모달 노드는 backdrop으로 안전 복귀 후 제거 */
+  function clearSide() {
+    const side = document.getElementById('split-side');
+    if (!side) return;
+    // 사이드에 폼이 들어있으면 backdrop으로 되돌림 (노드 손실 방지)
+    if (side.querySelector('.modal.as-side')) moveFormBackToModal();
+    side.innerHTML = '';
+  }
+
   function setLayoutMode(mode) {
     const wrap = document.getElementById('split-wrap');
     if (!wrap) return;
@@ -1411,6 +1422,8 @@
     wrap.classList.remove('mode-date', 'mode-edit');
     if (mode === 'date-side') wrap.classList.add('mode-date');
     else if (mode === 'edit-side') wrap.classList.add('mode-edit');
+    // full 모드로 가면 사이드 안 보이지만 DOM은 남아 누적 위험. 비워서 다음 진입 청정.
+    if (mode === 'full') clearSide();
     diagLog('layout_mode_change', { from: prev, to: mode });
     // Google Maps 는 컨테이너 리사이즈 후 트리거 필요
     if (state.map) {
@@ -1550,11 +1563,17 @@
   /* ─── Place 모달 ──────────────────────────────────────── */
   /* ─── 폼 사이드 마운트 (v0.3.2) ─────────────────────────
    * 기존 .modal 노드를 사이드 패널 안으로 reparent.
-   * 닫을 때 모달 backdrop 안으로 다시 reparent. ID 충돌 방지 위해 한쪽에만 존재. */
+   * 닫을 때 모달 backdrop 안으로 다시 reparent. ID 충돌 방지 위해 한쪽에만 존재.
+   * 진입 시 사이드의 기존 콘텐츠(.side-head, .side-list 등)는 모두 제거. */
   function moveFormToSide() {
     const modalNode = document.querySelector('#place-modal > .modal');
     const side = document.getElementById('split-side');
     if (!modalNode || !side) return;
+    // 사이드의 비-모달 콘텐츠 모두 제거 (date-side 잔여물 정리)
+    // 모달 노드가 이미 사이드 안에 있다면 그대로 두고, 다른 자식만 제거
+    Array.from(side.children).forEach(child => {
+      if (child !== modalNode) side.removeChild(child);
+    });
     if (!side.contains(modalNode)) {
       side.appendChild(modalNode);
       modalNode.classList.add('as-side');
@@ -1574,6 +1593,7 @@
         });
       }
     }
+    diagLog('move_form_to_side', { side_children: side.children.length });
     document.getElementById('place-modal').classList.remove('open');
   }
   function moveFormBackToModal() {

@@ -1186,6 +1186,12 @@
       mount.innerHTML = '';
       return;
     }
+    mount.innerHTML = buildExpenseRowHtml(d);
+  }
+
+  /* HTML 생성만 담당. 같은 컴포넌트를 trip-head 와 split-side 양쪽에서 재사용. */
+  function buildExpenseRowHtml(d) {
+    if (!d || d.transaction_count === 0) return '';
     const total = d.total_krw || 0;
     const subs = Array.isArray(d.by_subcategory) ? d.by_subcategory : [];
     const unsupported = d.unsupported_currency_count || 0;
@@ -1206,7 +1212,7 @@
     const warnHtml = unsupported > 0
       ? `<span class="te-warn" title="KRW/VND 외 통화 ${unsupported}건이 0원으로 처리됨. 시트 currency 컬럼 확인.">⚠ ${unsupported}건 미환산</span>`
       : '';
-    mount.innerHTML = `
+    return `
       <div class="trip-expense">
         <span class="te-total mono" title="${d.transaction_count}건 합계">
           ₩${total.toLocaleString('ko-KR')}
@@ -1219,6 +1225,41 @@
         ${warnHtml}
       </div>
     `;
+  }
+
+  /* 특정 날짜의 거래만 추려 집계. trip-head 의 d 와 동일한 형식으로 반환.
+   * 데이터가 없으면 transaction_count === 0 으로 반환되어 buildExpenseRowHtml 이
+   * 자동으로 빈 string 처리 (row 숨김). */
+  function buildDateExpenseData(dateStr) {
+    const empty = {
+      total_krw: 0, transaction_count: 0,
+      by_subcategory: [], unsupported_currency_count: 0
+    };
+    const d = state.tripExpense;
+    if (!d || !Array.isArray(d.transactions) || !dateStr) return empty;
+    const matched = d.transactions.filter(t => t.date === dateStr);
+    if (matched.length === 0) return empty;
+    let total = 0;
+    const subSum = {};
+    matched.forEach(t => {
+      const amt = Number(t.amount_krw) || 0;
+      total += amt;
+      const sub = t.subcategory || '기타';
+      subSum[sub] = (subSum[sub] || 0) + amt;
+    });
+    const bySub = Object.keys(subSum)
+      .map(name => ({
+        name: name,
+        amount_krw: subSum[name],
+        pct: total > 0 ? Math.round((subSum[name] / total) * 1000) / 10 : 0
+      }))
+      .sort((a, b) => b.amount_krw - a.amount_krw);
+    return {
+      total_krw: total,
+      transaction_count: matched.length,
+      by_subcategory: bySub,
+      unsupported_currency_count: 0  // 이미 trip 전체에서 0 이면 날짜별도 0. 부분 케이스는 trip-head 에서만 경고
+    };
   }
 
   function formatPeriod(start, end) {
@@ -1616,6 +1657,7 @@
           </svg>
         </div>
       </div>
+      ${buildExpenseRowHtml(buildDateExpenseData(dateStr))}
       <div class="side-list">${listHtml}</div>
     `;
 

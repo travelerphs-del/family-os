@@ -3,6 +3,12 @@
 > 5개 서브 대시보드의 Apps Script가 **반드시** 따라야 하는 응답 포맷.
 > 메인 허브는 이 표준에 의존해 5개 카드를 동기화한다.
 >
+> **v0.4 (Session 8)** — Expense ↔ Travel 비용 연동:
+> - Expense Apps Script 에 `?mode=trip_summary&trip_id=X` 엔드포인트 추가 (§3-9)
+> - 메모 매칭은 단어 경계 정규식. `#tokyo-2026` 도 `tokyo-2026` 도 매칭, `tokyo-2026-extended` 는 매칭 안 됨
+> - subcategory 단위 집계. category 필터는 X — trip_id 충돌 회피는 사용자 책임
+> - travel-trip.html 이 직접 Expense URL 을 LocalStorage 에서 읽어 호출 (cross-dashboard 호출 첫 사례)
+>
 > **v0.3 (Session 6)** — Travel 대시보드 추가:
 > - 5번째 대시보드 `travel` 정식 추가
 > - `trips` / `places` 시트 스키마 표준화
@@ -21,6 +27,7 @@
 - 각 Apps Script는 `doGet(e)`에서 **두 가지 모드**를 지원:
   - `?mode=full` (또는 mode 생략) — 해당 대시보드 화면 그릴 전체 데이터. 형식 자유.
   - `?mode=summary` — 메인 허브용 가벼운 요약. **이 포맷은 엄격하게 표준화.**
+  - 일부 대시보드는 추가 cross-dashboard 엔드포인트 보유. 현재: Expense 의 `?mode=trip_summary&trip_id=X` (§3-9).
 - **대시보드는 본인 시트만 읽음.** 다른 대시보드 시트 직접 참조 금지.
   - 결합 표시는 메인 허브가 중재 (예: Future 진행률 = Wealth 노후 잔액 ÷ Future 목표).
   - Travel↔Expense 연동은 **메모 태깅 (`#trip_id`)** 방식 — 양쪽 시트가 서로를 직접 안 봄. Travel은 trip_id를 Expense 메모에 노출, Expense는 메모 텍스트 매칭으로 자동 집계.
@@ -293,6 +300,73 @@ Travel은 Expense 시트를 직접 보지 않는다. 대신:
 
 Travel 측은 합산 결과를 알 필요 없음. **여행 페이지 안에서 비용 표기는 Phase B에서 별도 결정** (옵션 A: Expense API 호출 / 옵션 B: 사용자가 수동 입력 / 옵션 C: 표기 안 함).
 
+### 3-9. Expense `?mode=trip_summary&trip_id=X` — Session 8 신규
+
+travel-trip 페이지가 trip-head 영역에 "여행 전체 비용 + 서브카테고리별 비중" 을 표시하기 위해 호출하는 엔드포인트. Travel ↔ Expense 메모 태깅 (§3-8) 의 집계 결과를 제공.
+
+**호출 주체**: travel-trip.html (가족 OS 안에서 **다른 대시보드의 Apps Script 를 직접 호출하는 첫 사례**). LocalStorage `familyOS.webAppUrl.expense` 에서 URL 을 읽어 GET. URL 미설정 시 호출 자체 skip — UI 에 빈 row 가 사라지는 식.
+
+**요청**:
+```
+GET {ExpenseWebAppUrl}?mode=trip_summary&trip_id=tokyo-2026&_=<cachebust>
+```
+
+**응답**:
+```json
+{
+  "ok": true,
+  "data": {
+    "dashboard": "expense",
+    "trip_id": "tokyo-2026",
+    "total_krw": 4523000,
+    "transaction_count": 47,
+    "unsupported_currency_count": 0,
+    "by_subcategory": [
+      { "name": "항공", "amount_krw": 1800000, "pct": 39.8 },
+      { "name": "숙박", "amount_krw": 1500000, "pct": 33.2 },
+      { "name": "식비", "amount_krw": 850000,  "pct": 18.8 },
+      { "name": "교통", "amount_krw": 200000,  "pct": 4.4 },
+      { "name": "기타", "amount_krw": 173000,  "pct": 3.8 }
+    ],
+    "transactions": [
+      { "date": "2026-08-01", "amount_krw": 350000, "subcategory": "항공" },
+      { "date": "2026-08-01", "amount_krw": 120000, "subcategory": "식비" }
+    ],
+    "updated_at": "2026-05-20T08:00:00+09:00"
+  }
+}
+```
+
+**필드 규칙**:
+- `total_krw`: 매칭된 거래의 KRW 환산 합계. 정수. 데이터 없으면 `0`.
+- `transaction_count`: 매칭된 거래 수. 데이터 없으면 `0` (UI 측이 row 자체를 숨김).
+- `unsupported_currency_count`: KRW/VND 외 통화로 0 처리된 거래 수. 사용자 카드사가 KRW 변환을 해주므로 정상이면 0. 0 이 아니면 UI 에 ⚠ 표시.
+- `by_subcategory`: subcategory 단위 합산. **금액 내림차순 정렬.** `pct` 는 `total_krw` 대비, 소수점 1자리. 합 100 근사 (반올림 오차 허용). 데이터 없으면 빈 배열.
+  - `name` 은 Expense 시트 `subcategory` 컬럼 값. 빈 값은 `"기타"` 로 대체.
+  - 카테고리(`category`) 단위 합산이 아님 — UI 가 표시할 단위가 서브카테고리.
+- `transactions`: **raw 거래 배열 (Session 8 부분 확장).** 프론트가 날짜별 필터/집계용으로 사용. `{date, amount_krw, subcategory}` 3필드만. `memo`/`merchant`/`person` 등은 사이즈/프라이버시 이유로 제외. `amount_krw` 는 이미 환산된 정수. 100건 미만 trip 가정. 매우 큰 trip 이면 응답 사이즈 부담 검토 필요 (현재 한계 미정).
+
+**매칭 정책** (§3-8 의 메모 태깅 표준 준수):
+- Expense 시트 `memo` 컬럼에 trip_id 가 **단어 경계** 안에 포함된 거래만 집계.
+- 단어 경계 정규식: `(?:^|[^A-Za-z0-9_-])<tripId>(?:$|[^A-Za-z0-9_-])`
+- 매칭 예:
+  - `#tokyo-2026` ✅
+  - `tokyo-2026` (단독) ✅
+  - `도쿄여행 #tokyo-2026 점심값` ✅
+  - `사케 #tokyo-2026,선물` ✅ (쉼표도 경계)
+- 비매칭 예:
+  - `tokyo-2026-extended` ❌ (뒤에 `-extended` 붙음)
+  - `tokyo-20261` ❌ (뒤에 `1` 붙음)
+- `category` 필터 X. 사용자가 trip_id 를 여행 거래에만 박는다는 전제 (§3-8 사용자 책임).
+
+**환산 정책**:
+- `toKRW()` 함수 재사용. KRW 는 그대로, VND 는 `amount / fxRate` (KRW→VND 환율, 외부 API + 6시간 캐시).
+- **KRW/VND 외 통화는 0 으로 처리** (현재 한계). 사용자 카드사가 모든 외화를 KRW 로 변환해 제공하는 환경 가정. 다통화 확장 필요 시 별도 작업.
+
+**에러**:
+- `trip_id` 파라미터 누락 → `{ok: false, error: "trip_id 파라미터 필수"}`
+- 그 외 에러는 envelope 의 `error` 필드에. HTTP 200 유지.
+
 ---
 
 ## 4. `tasks` 표준 포맷 (모든 대시보드 공통)
@@ -406,3 +480,4 @@ Travel 카드는 단독 응답으로 충분 (결합 계산 없음).
 | v0.1 | Session 1 | 최초 작성. 4개 대시보드 기본 envelope/kpi/tasks |
 | v0.2 | Session 5 | Wealth `retirement_value_krw` 추가. Future `kpi` 5키로 재정의. Task 탭에 `마일스톤_금액` 컬럼 표준화. "본인 시트만 읽음" 원칙 명문화 |
 | v0.3 | Session 6 | Travel 대시보드 정식 추가 (kpi/trips/places). 같은 도시 재방문 매칭 키(`country_code`+`city_key`) 명문화. Travel↔Expense 메모 태깅 패턴. `doPost`+`text/plain` 패턴을 spec 본문에 명시 |
+| v0.4 | Session 8 | Expense `?mode=trip_summary&trip_id=X` 엔드포인트 추가 (§3-9). 단어 경계 매칭 정규식. cross-dashboard 호출 첫 사례 (travel-trip 이 Expense URL 호출). "본인 시트만 읽음" 원칙은 유지 — Travel 은 Expense 시트를 안 보고 Expense 의 API 만 호출. **부분 확장**: 응답에 raw `transactions[]` 배열 포함 (date/amount_krw/subcategory 3필드). travel-trip 사이드바의 날짜별 비용 표시용. |

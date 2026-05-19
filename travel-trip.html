@@ -129,6 +129,66 @@
     }
     .trip-head .trip-meta svg { opacity: 0.55; }
 
+    /* ─── 여행 비용 row (Session 8) ─────────────────────────
+     * Expense 시트의 memo 에 #trip_id 태그가 박힌 거래를 집계.
+     * 데이터 없으면 표시 X. trip-meta 다음 줄, actionbar 앞 위치.
+     * 기존 .pip / .cat-chip 톤과 통일.
+     * ──────────────────────────────────────────────────────── */
+    .trip-expense {
+      margin-top: var(--s3);
+      padding-top: var(--s3);
+      border-top: 1px dashed var(--border);
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: var(--s2) var(--s3);
+    }
+    .trip-expense .te-total {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--acc-travel);
+      letter-spacing: -0.01em;
+    }
+    .trip-expense .te-count {
+      font-size: 11px;
+      color: var(--text-quiet);
+      font-family: var(--font-mono);
+    }
+    .trip-expense .te-chips {
+      display: flex; gap: var(--s2); flex-wrap: wrap;
+      align-items: center;
+      flex: 1;
+    }
+    .trip-expense .te-chip {
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--r-full);
+      padding: 3px 9px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: inline-flex; align-items: baseline; gap: 5px;
+    }
+    .trip-expense .te-chip-rest {
+      border-style: dashed;
+      color: var(--text-quiet);
+    }
+    .trip-expense .te-pct {
+      font-family: var(--font-mono);
+      color: var(--text-tertiary);
+      font-size: 10px;
+    }
+    .trip-expense .te-warn {
+      font-size: 10px;
+      color: var(--neutral);
+      font-family: var(--font-mono);
+      padding: 2px 6px;
+      border: 1px solid var(--neutral);
+      border-radius: var(--r-sm);
+      opacity: 0.75;
+    }
+    @media (max-width: 480px) {
+      .trip-expense .te-total { font-size: 14px; }
+      .trip-expense .te-chip { font-size: 10px; padding: 2px 7px; }
+    }
+
     /* ─── 액션 바 (필터 + 추가 버튼) ────────────────────────── */
     .actionbar {
       display: flex; justify-content: space-between; align-items: center;
@@ -827,6 +887,7 @@
    * ════════════════════════════════════════════════════════════════ */
 
   const DASHBOARD_ID = 'travel';
+  const EXPENSE_ID = 'expense';  // 다른 대시보드 URL 도 LocalStorage 에서 읽음
   const GOOGLE_KEY = 'familyOS.googlePlacesKey';  // Maps JavaScript API + Places API 공용 key
   const { escapeHtml } = FamilyOS;
 
@@ -949,6 +1010,7 @@
     trip: null,
     places: [],          // 현재 trip 의 places
     otherPlaces: [],     // 같은 city_key + country_code 의 다른 trip 의 visited
+    tripExpense: null,   // Session 8 — Expense ?mode=trip_summary 결과. 실패/미설정 시 null
     status: 'loading',
     error: null,
     map: null,
@@ -1009,6 +1071,35 @@
     }
     renderMain();
     if (state.status === 'ok') initMap();
+    // Session 8 — Expense 비용 비동기 fetch (실패해도 메인 데이터엔 영향 X)
+    if (state.status === 'ok') fetchTripExpense();
+  }
+
+  /* ─── Session 8: Expense 비용 fetch ──────────────────────────
+   * Expense Web App URL 이 LocalStorage 에 없으면 조용히 skip.
+   * 실패해도 메인 UI 에 에러 표시 X — console.warn 만.
+   * ──────────────────────────────────────────────────────────── */
+  async function fetchTripExpense() {
+    const expenseUrl = FamilyOS.getWebAppUrl(EXPENSE_ID);
+    if (!expenseUrl) {
+      // URL 미설정 — 조용히 skip
+      return;
+    }
+    try {
+      const sep = expenseUrl.includes('?') ? '&' : '?';
+      const url = expenseUrl + sep + 'mode=trip_summary&trip_id='
+        + encodeURIComponent(state.tripId)
+        + '&_=' + Date.now();
+      const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Backend error');
+      state.tripExpense = json.data;
+      renderTripExpense();
+    } catch (err) {
+      console.warn('[travel-trip] expense fetch failed:', err.message);
+      // 실패는 조용히. UI 변화 X.
+    }
   }
 
   function isSameCity(tripA, tripB) {
@@ -1052,6 +1143,7 @@
           ${t.members ? `<span class="pip">${iconUsers()} ${escapeHtml(t.members)}</span>` : ''}
           <span class="pip">${iconCheck()} 방문 ${visitedCount} · 희망 ${plannedCount}</span>
         </div>
+        <div id="trip-expense-mount"></div>
       </div>
 
       <div class="actionbar">
@@ -1081,6 +1173,52 @@
     document.getElementById('add-place-btn').addEventListener('click', openAddPlaceModal);
     const pickCancel = document.getElementById('pick-cancel-btn');
     if (pickCancel) pickCancel.addEventListener('click', cancelPickMode);
+    renderTripExpense();  // Session 8 — state.tripExpense 있으면 mount, 없으면 빈 상태
+  }
+
+  /* ─── Session 8: Expense 비용 row 렌더 ─────────────────────── */
+  function renderTripExpense() {
+    const mount = document.getElementById('trip-expense-mount');
+    if (!mount) return;  // renderMain 전에 호출되면 무시
+    const d = state.tripExpense;
+    if (!d || d.transaction_count === 0) {
+      // 데이터 없음 — row 자체 표시 X
+      mount.innerHTML = '';
+      return;
+    }
+    const total = d.total_krw || 0;
+    const subs = Array.isArray(d.by_subcategory) ? d.by_subcategory : [];
+    const unsupported = d.unsupported_currency_count || 0;
+    // 상위 6개까지만 칩 표시 (좁은 공간 보호). 그 외는 합쳐서 '기타 N%'
+    const TOP = 6;
+    const top = subs.slice(0, TOP);
+    const rest = subs.slice(TOP);
+    const restPct = rest.reduce((s, c) => s + (c.pct || 0), 0);
+    const chipsHtml = top.map(c => `
+      <span class="te-chip">
+        ${escapeHtml(c.name || '기타')}
+        <span class="te-pct">${(c.pct != null ? c.pct.toFixed(1) : '0.0')}%</span>
+      </span>
+    `).join('');
+    const restHtml = rest.length > 0
+      ? `<span class="te-chip te-chip-rest">기타 ${rest.length}건 <span class="te-pct">${restPct.toFixed(1)}%</span></span>`
+      : '';
+    const warnHtml = unsupported > 0
+      ? `<span class="te-warn" title="KRW/VND 외 통화 ${unsupported}건이 0원으로 처리됨. 시트 currency 컬럼 확인.">⚠ ${unsupported}건 미환산</span>`
+      : '';
+    mount.innerHTML = `
+      <div class="trip-expense">
+        <span class="te-total mono" title="${d.transaction_count}건 합계">
+          ₩${total.toLocaleString('ko-KR')}
+        </span>
+        <span class="te-count">${d.transaction_count}건</span>
+        <div class="te-chips">
+          ${chipsHtml}
+          ${restHtml}
+        </div>
+        ${warnHtml}
+      </div>
+    `;
   }
 
   function formatPeriod(start, end) {

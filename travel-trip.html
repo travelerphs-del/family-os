@@ -710,7 +710,7 @@
   });
   document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
     left: 'Travel · Phase B · 개별 여행',
-    right: 'v0.3.0'
+    right: 'v0.3.1'
   });
   document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML();
   FamilyOS.attachSettingsModal({ onSave: () => location.reload() });
@@ -968,7 +968,7 @@
       window[cbName] = () => { delete window[cbName]; resolve(); };
       const s = document.createElement('script');
       s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key)
-            + '&libraries=marker&v=weekly&callback=' + cbName;
+            + '&libraries=marker&v=weekly&loading=async&callback=' + cbName;
       s.async = true;
       s.defer = true;
       s.onerror = () => { delete window[cbName]; __googleMapsLoading = null; reject(new Error('SCRIPT_LOAD_FAIL')); };
@@ -1016,7 +1016,14 @@
     const zoom = Number(t.zoom) || 11;
 
     try {
-      state.map = new google.maps.Map(document.getElementById('map'), {
+      // mapId 는 AdvancedMarkerElement 사용에 필수. DEMO_MAP_ID 는 Google 공식 testing 용
+      // (production 권장 안 되지만 가족 사용 범위에선 OK). 다크 스타일 입히려면 사용자
+      // 가 Cloud Console 에서 mapId 발급 후 Map Style 만들어 묶어야 함 (Pending #9).
+      // 사용자 mapId 발급하면 LocalStorage `familyOS.googleMapId` 에 저장하고 우선 사용.
+      const userMapId = localStorage.getItem('familyOS.googleMapId') || '';
+      const effectiveMapId = userMapId || 'DEMO_MAP_ID';
+
+      const mapOptions = {
         center: center,
         zoom: zoom,
         disableDefaultUI: false,
@@ -1024,10 +1031,16 @@
         streetViewControl: false,
         fullscreenControl: false,
         zoomControl: true,
-        styles: DARK_MAP_STYLES,
+        mapId: effectiveMapId,
         backgroundColor: '#0a0b0f',
         clickableIcons: false  // POI 클릭 비활성 (우리 마커만)
-      });
+      };
+      // mapId 와 styles 는 양립 불가. mapId 가 있으면 styles 가 무시됨.
+      // mapId 없는 fallback 케이스를 위해 styles 도 정의는 해두지만 실제 적용은 안 됨.
+      // (사용자가 LocalStorage 에 빈 값 강제 설정한 매우 드문 케이스 보호용)
+      if (!effectiveMapId) mapOptions.styles = DARK_MAP_STYLES;
+
+      state.map = new google.maps.Map(document.getElementById('map'), mapOptions);
 
       // 최초 idle 후 마커 + fit
       const idleListener = state.map.addListener('idle', () => {

@@ -1619,6 +1619,9 @@ function renderRecentItemHtml(sheet, row) {
       icon = 'H'; iconCls = 'hospital';
       title = `${row.hospital || ''}${row.department ? ' · ' + row.department : ''}`;
       detail = row.chief_complaint || '';
+      clickable = true;
+      recordId = row.record_id || '';
+      chartNumBadge = row.record_id ? `<span class="chart-num">차트 ${row.record_id}</span>` : '';
       break;
     case 'home_clinic':
       icon = 'HC'; iconCls = 'home';
@@ -1717,7 +1720,7 @@ function renderRecentItemHtml(sheet, row) {
 function attachRecentHandlers() {
   document.querySelectorAll('.recent-item.clickable').forEach(el => {
     el.addEventListener('click', () => {
-      openHomeClinicDetail(el.dataset.recordId);
+      openClinicDetail(el.dataset.recordId);
     });
   });
 }
@@ -1868,9 +1871,16 @@ function renderOneoffListHtml(oneoffRows) {
     </div>
   `;
 }
-function openHomeClinicDetail(recordId) {
+function openClinicDetail(recordId) {
   if (!recordId) return;
-  const row = (state.sheets.home_clinic || []).find(r => r.record_id === recordId);
+  // Session 9.1 — home_clinic + hospital_report 둘 다 검색.
+  // progress_note 의 parent_record_id 가 HR- 로 시작하는 경우도 자연스럽게 처리됨.
+  let row = (state.sheets.home_clinic || []).find(r => r.record_id === recordId);
+  let sheet = 'home_clinic';
+  if (!row) {
+    row = (state.sheets.hospital_report || []).find(r => r.record_id === recordId);
+    sheet = 'hospital_report';
+  }
   if (!row) return;
 
   const m = state.members.find(x => x.member_id === row.member_id);
@@ -1886,17 +1896,31 @@ function openHomeClinicDetail(recordId) {
     ? String(row.photo_drive_ids).split(',').map(s => s.trim()).filter(Boolean)
     : [];
 
-  document.getElementById('h-modal-title').textContent = `가정진료 — ${row.date || ''}`;
+  // 시트별 헤더 라벨 + 날짜 필드 분기
+  let titleLabel, dateStr, hospitalMeta, photoLabel;
+  if (sheet === 'hospital_report') {
+    titleLabel = '병원진료';
+    dateStr = row.visit_date || '';
+    hospitalMeta = [row.hospital, row.department].filter(Boolean).join(' · ');
+    photoLabel = '진료 사진';
+  } else {
+    titleLabel = '가정진료';
+    dateStr = row.date || '';
+    hospitalMeta = '';
+    photoLabel = '증상 사진';
+  }
+
+  document.getElementById('h-modal-title').textContent = titleLabel + (dateStr ? ' — ' + dateStr : '');
   document.getElementById('h-modal-back').style.display = 'none';
   document.getElementById('h-modal-foot').style.display = 'flex';
   document.getElementById('h-modal-body').innerHTML = `
     <div style="font-size:11px;color:var(--text-quiet);font-family:var(--font-mono);margin-bottom:var(--s4)">
-      ${escapeHtml(who)} · 차트 ${escapeHtml(recordId)}
+      ${escapeHtml(who)} · 차트 ${escapeHtml(recordId)}${hospitalMeta ? ' · ' + escapeHtml(hospitalMeta) : ''}
     </div>
     ${row.chief_complaint ? `<div class="hc-detail-section"><h4>C/C — 주증상</h4><div class="content">${escapeHtml(row.chief_complaint)}</div></div>` : ''}
     ${row.present_illness ? `<div class="hc-detail-section"><h4>P/I — 현병력</h4><div class="content">${escapeHtml(row.present_illness)}</div></div>` : ''}
     ${row.assessment_plan ? `<div class="hc-detail-section"><h4>A/P — 진단·계획</h4><div class="content">${escapeHtml(row.assessment_plan)}</div></div>` : ''}
-    ${ids.length > 0 ? `<div class="hc-detail-section"><h4>증상 사진 (${ids.length})</h4><div class="recent-photos">${
+    ${ids.length > 0 ? `<div class="hc-detail-section"><h4>${escapeHtml(photoLabel)} (${ids.length})</h4><div class="recent-photos">${
       ids.map(id => `<img class="recent-photo" style="width:100px;height:100px" src="https://drive.google.com/thumbnail?id=${escapeHtml(id)}&sz=w300" onclick="window.open('https://drive.google.com/file/d/${escapeHtml(id)}/view', '_blank')" alt="사진">`).join('')
     }</div></div>` : ''}
     <div class="hc-detail-section">
@@ -1927,6 +1951,11 @@ function openHomeClinicDetail(recordId) {
   document.getElementById('h-modal-cancel').textContent = '닫기';
 
   openHModal();
+}
+
+// Session 9.1 — 기존 호출자 (recent-item 클릭 핸들러) 가 사용하던 이름 호환성 유지
+function openHomeClinicDetail(recordId) {
+  return openClinicDetail(recordId);
 }
 
 /* ─── 차트 ─────────────────────────────────────── */

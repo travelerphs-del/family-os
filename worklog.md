@@ -38,6 +38,7 @@ family-os/
 | LocalStorage 키 prefix (Web App URL) | `familyOS.webAppUrl.{id}` |
 | LocalStorage 키 (Google API key, Maps + Places 공용) | `familyOS.googlePlacesKey` (travel-trip.html 지도 + 검색. v0.3.0 부터 통합) |
 | LocalStorage 키 (Mapbox token, deprecated) | `familyOS.mapboxToken` — v0.3.0 부터 미사용. 롤백 대비로 키만 남겨둠 |
+| LocalStorage 키 (Travel 진단 로그) | `familyOS.diag.travel` (v0.3.2 부터. ring buffer 200건. 설정 모달에서 복사/초기화 가능) |
 | 대시보드 id | `wealth`, `expense`, `health`, `future`, `travel` |
 | 가족 id (시트 진실의 원천) | `dad`, `mom`, `son1`(=도비, 형), `son2`(=로비, 동생) |
 | 호스팅 | GitHub Pages (public repo) |
@@ -59,19 +60,20 @@ family-os/
 | Expense | 배포됨 | OAuth 폐기 (doPost 통일). 안정 |
 | Health | 배포됨 | **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
-| Travel | **v0.3.1** | Phase A+B + Session 7.2 + 7.3. 가족 8명. 호텔 stay_range. Google Places (New) 검색. **베이스맵 Google Maps + AdvancedMarkerElement + mapId** (대만 정확도 + 알림창 해결). 다크 톤은 사용자 mapId 발급 후 적용 가능 (Pending #9). 지도 클릭 폴백. PC 튕김 진단 로그 (Pending #8). |
+| Travel | **v0.3.2** | Phase A+B + Session 7.2 + 7.3 + 7.6. 가족 8명. 호텔 stay_range. Google Places (New) 검색. **베이스맵 Google Maps + AdvancedMarkerElement + mapId**. **신규 아이콘 3개 교체 (restaurant/park/sight) + 카테고리 2개 추가 (department/massage). Split 레이아웃 (마커 클릭=50:50 편집사이드+1km 줌, 날짜 필터=75:25 방문지 사이드). localStorage ring buffer 진단 로그 (200건, 설정 모달에서 복사 가능).** 다크 톤은 사용자 mapId 발급 후 적용 가능 (Pending #9).
 
 ## Cross-cutting Pending
 
-1. **Travel ↔ Expense 비용 표기 자동화** — Phase B 는 현재 수동 입력. 메인 허브가 양쪽 결합해 LocalStorage 캐싱 후 travel-trip 이 읽는 방식 (hotfix 후보)
+1. **Travel ↔ Expense 비용 표기 자동화** — Phase B 는 현재 수동 입력. Expense Apps Script 에 `?mode=trip_summary&trip_id=` 엔드포인트 추가 + Travel 페이지에서 호출 + 여행 멤버 다음 카드에 표시. 다음 Expense 세션에서 처리 예정 (사용자 요청)
 2. **Multi-city trip 지원** — 현재 모델은 trip=1도시 가정. 사용자가 "샌프란시스코, LA" 식으로 입력 시 부분 동작. trip 분할 또는 데이터 모델 보강 검토
 3. **Wealth 대수정** — daily snapshot 복구 + 전체금액/주가 오차 + 올해 수익 계산 + 추가 기능 → 다음 Wealth 세션 (`context-wealth.md` 참조)
 4. **Health 기능 추가** — 아이들 운동 스케줄 입출력 → 다음 Health 세션 (`context-health.md` 참조)
 5. **LocalStorage 영속성 진단 결과** — Session 5.2 의 자동 배너/콘솔 로그 사용자 보고 미수령
 6. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
-7. **Travel mapbox_id → Google place_id 마이그레이션 잔재** (v0.2.2) — 기존 Mapbox 시절 데이터의 `mapbox_id` 값과 새 Google `id` 값은 매칭 안 됨. 같은 장소 dedup 실패 가능. 사용자 시트의 기존 데이터가 적다면 무시. 별도 컬럼 분리는 추후 검토.
-8. **Travel 튕김 현상 진단 진행 중** (v0.2.2 hotfix) — PC 브라우저에서 가끔 발생. travel.html / travel-trip.html 에 진단 로그(`[DIAG] click / beforeunload / popstate`) 박혀 있음. 사용자가 다음 발생 시 F12 Console 캡쳐해서 보고 → 원인 파악 후 hotfix.
-9. **Travel 다크 지도 스타일 복구** (v0.3.1) — v0.3.0 → v0.3.1 패치에서 `mapId: 'DEMO_MAP_ID'` 적용으로 AdvancedMarkerElement 정상 동작. 단 DEMO_MAP_ID 는 Google 디폴트 라이트 스타일이라 시각적으로 다른 대시보드(다크)와 톤 어긋남. 복구 방법: 사용자가 Cloud Console 에서 자체 Map ID 발급 → Map Style 다크로 정의 → LocalStorage `familyOS.googleMapId` 에 저장. 코드는 이미 준비됨.
+7. **Travel mapbox_id 잔재** (v0.2.2) — 폐기됨. 사용자 확인 결과 Mapbox 시절에는 place 추가 안 함. 모든 mapbox_id 컬럼 값은 Google `id`. 향후 컬럼명 정리는 별도 (호환성 위해 유지)
+8. **Travel 튕김 현상 진단** — v0.3.2 부터 localStorage ring buffer 진단 로그 도입. 튕김 후 다시 들어와 설정 모달 → "진단 로그 복사" → 보고하면 원인 추적 가능
+9. **Travel 다크 지도 스타일 복구** — 사용자 결정으로 폐기. 다크 배경 + 라이트 지도 톤 유지 (사용자가 그대로가 낫다고 함)
+10. **Google Photos 연동** — 폐기. Library API 2025-03 정책 변경으로 자동 표시 불가. 사용자가 별도 창에서 직접 확인하기로 결정
 
 ## 세션 종료 시 worklog 업데이트 규칙
 

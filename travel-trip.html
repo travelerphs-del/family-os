@@ -194,6 +194,162 @@
       background: var(--canvas);
     }
     @media (max-width: 767px) { #map { height: 460px; } }
+
+    /* ─── Split 레이아웃 (v0.3.2) ─────────────────────────────
+     * 데스크탑: 가로 분할 (지도 + 사이드)
+     * 모바일: 세로 스택 (지도 그대로 + 아래에 사이드)
+     * mode-date: 75:25 / mode-edit: 50:50 */
+    .split-wrap {
+      display: flex;
+      gap: var(--s4);
+      margin-bottom: var(--s5);
+    }
+    .split-wrap .map-section {
+      flex: 1 1 100%;
+      margin-bottom: 0;
+      transition: flex-basis var(--t-med);
+      min-width: 0;
+    }
+    .split-wrap.mode-date .map-section { flex: 1 1 75%; }
+    .split-wrap.mode-edit .map-section { flex: 1 1 50%; }
+
+    .split-side {
+      display: none;
+      flex: 0 0 25%;
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    .split-wrap.mode-date .split-side {
+      display: flex; flex-direction: column;
+      flex: 0 0 25%;
+    }
+    .split-wrap.mode-edit .split-side {
+      display: flex; flex-direction: column;
+      flex: 0 0 50%;
+    }
+    /* 데스크탑에서 사이드의 최대 높이는 지도와 동일 */
+    @media (min-width: 768px) {
+      .split-side { max-height: 600px; }
+    }
+    /* 모바일: 세로 스택, 사이드는 지도 아래 */
+    @media (max-width: 767px) {
+      .split-wrap { flex-direction: column; gap: var(--s3); }
+      .split-wrap .map-section,
+      .split-wrap.mode-date .map-section,
+      .split-wrap.mode-edit .map-section { flex: 1 1 auto; }
+      .split-wrap.mode-date .split-side,
+      .split-wrap.mode-edit .split-side { flex: 1 1 auto; max-height: none; }
+    }
+
+    /* date-side 안: 그 날짜의 방문지 타일 목록 */
+    .side-head {
+      padding: var(--s4) var(--s4) var(--s3);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s2);
+      flex-shrink: 0;
+    }
+    .side-head .ttl {
+      font-family: var(--font-display); font-size: 16px;
+      color: var(--text-primary); letter-spacing: -0.01em;
+    }
+    .side-head .cnt {
+      font-size: 11px; color: var(--text-quiet);
+      font-family: var(--font-mono);
+    }
+    .side-head .close-x {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-sm);
+      color: var(--text-quiet); cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .side-head .close-x:hover { background: var(--elevated); color: var(--text-primary); }
+    .side-list {
+      padding: var(--s3) var(--s4) var(--s4);
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 6px;
+      flex: 1 1 auto;
+    }
+    .side-tile {
+      display: flex; align-items: center; gap: var(--s3);
+      padding: 8px 10px;
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .side-tile:hover { border-color: var(--acc-travel); background: var(--elevated); }
+    .side-tile-ico {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1.5px solid var(--acc-travel);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .side-tile-ico svg {
+      width: 13px; height: 13px;
+      stroke: var(--acc-travel); stroke-width: 2; fill: none;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .side-tile[data-status="visited"] .side-tile-ico {
+      background: var(--acc-travel); border-color: var(--acc-travel);
+    }
+    .side-tile[data-status="visited"] .side-tile-ico svg { stroke: var(--canvas); }
+    .side-tile[data-source="other"] .side-tile-ico {
+      border-color: var(--text-quiet); opacity: 0.7;
+    }
+    .side-tile[data-source="other"] .side-tile-ico svg { stroke: var(--text-quiet); }
+    .side-tile-body { min-width: 0; flex: 1; }
+    .side-tile-name {
+      font-size: 12px; color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .side-tile-sub {
+      font-size: 10px; color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .side-empty {
+      padding: var(--s5) var(--s4);
+      text-align: center;
+      color: var(--text-quiet); font-size: 12px;
+    }
+
+    /* edit-side: 모달과 동일한 폼이지만 사이드 패널 안에 들어감
+     * .modal.as-side 클래스가 붙으면 max-width/padding 등 조정 */
+    .modal.as-side {
+      max-width: none !important;
+      max-height: none !important;
+      width: 100% !important;
+      padding: var(--s4) var(--s5) var(--s5) !important;
+      animation: none !important;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0 !important;
+      overflow-y: auto;
+    }
+    @media (min-width: 768px) {
+      .split-wrap.mode-edit .split-side .modal.as-side { max-height: 600px; }
+    }
+    .modal.as-side .modal-title {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s2);
+    }
+    .modal.as-side .side-close-x {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-sm);
+      color: var(--text-quiet); cursor: pointer;
+      transition: all var(--t-fast);
+      font-size: 16px; font-family: inherit; font-weight: normal;
+    }
+    .modal.as-side .side-close-x:hover { background: var(--elevated); color: var(--text-primary); }
     /* 지도 클릭 picking 모드 — crosshair 커서 + 안내 배너 */
     .map-picking #map,
     .map-picking #map > div,
@@ -221,6 +377,10 @@
       font-size: 12px; font-weight: 500;
     }
     .map-picking .pick-banner { display: block; }
+    /* 픽킹 모드 중에는 사이드 패널을 임시로 숨겨 지도 전체 활용 */
+    .map-picking .split-side { display: none !important; }
+    .map-picking .split-wrap.mode-date .map-section,
+    .map-picking .split-wrap.mode-edit .map-section { flex: 1 1 100% !important; }
 
     /* Google InfoWindow 다크 톤 override (selector는 Google이 생성한 클래스 기반) */
     .gm-style .gm-style-iw-c {
@@ -677,25 +837,29 @@
     { id: 'cafe',       kr: '카페',     icon: 'cafe' },
     { id: 'mart',       kr: '마트',     icon: 'mart' },
     { id: 'shop',       kr: '샵',       icon: 'shop' },
+    { id: 'department', kr: '백화점',   icon: 'department' },
     { id: 'beach',      kr: '해변',     icon: 'beach' },
     { id: 'park',       kr: '공원',     icon: 'park' },
     { id: 'themepark',  kr: '놀이공원', icon: 'themepark' },
     { id: 'sight',      kr: '관광지',   icon: 'sight' },
+    { id: 'massage',    kr: '마사지',   icon: 'massage' },
     { id: 'other',      kr: '기타',     icon: 'other' }
   ];
 
-  /* 카테고리별 line-icon SVG path (Lucide 기반 단순화) */
+  /* 카테고리별 line-icon SVG path (Lucide 기반 단순화). v0.3.2: restaurant/park/sight 교체 + department/massage 추가 */
   function catIconPath(cat) {
     switch (cat) {
       case 'hotel':      return '<path d="M2 20v-8a2 2 0 012-2h16a2 2 0 012 2v8"/><path d="M2 16h20"/><path d="M6 10V6a2 2 0 012-2h8a2 2 0 012 2v4"/><path d="M9 14h2"/>';
-      case 'restaurant': return '<path d="M6 2v9"/><path d="M10 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V2"/><path d="M14 22V11a3 3 0 013-3v0a3 3 0 013 3v6"/><path d="M17 17h6"/>';
+      case 'restaurant': return '<path d="M5 2v5a2 2 0 002 2v13"/><path d="M7 2v5"/><path d="M9 2v5a2 2 0 01-2 2"/><ellipse cx="17" cy="6" rx="2.5" ry="4"/><path d="M17 10v12"/>';
       case 'cafe':       return '<path d="M17 8h2a2 2 0 012 2v2a2 2 0 01-2 2h-2"/><path d="M3 8h14v8a4 4 0 01-4 4H7a4 4 0 01-4-4V8z"/><path d="M6 2v3"/><path d="M10 2v3"/><path d="M14 2v3"/>';
       case 'mart':       return '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 4h3l3 12h11l2-8H6"/>';
       case 'shop':       return '<path d="M5 7h14l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7z"/><path d="M9 7V5a3 3 0 016 0v2"/>';
+      case 'department': return '<path d="M4 21V5a1 1 0 011-1h14a1 1 0 011 1v16"/><path d="M2 21h20"/><path d="M8 8h2v2H8z"/><path d="M14 8h2v2h-2z"/><path d="M8 13h2v2H8z"/><path d="M14 13h2v2h-2z"/><path d="M10 21v-4h4v4"/>';
       case 'beach':      return '<path d="M12 21v-9"/><path d="M3 12c0-5 4-9 9-9s9 4 9 9"/><path d="M3 12c3-1 6-1 9 1"/><path d="M21 12c-3-1-6-1-9 1"/>';
-      case 'park':       return '<path d="M12 22V12"/><path d="M9 18l3 4 3-4"/><circle cx="12" cy="8" r="5"/><path d="M7 6c-2 1-3 3-3 5"/><path d="M17 6c2 1 3 3 3 5"/>';
+      case 'park':       return '<path d="M5 13l-2 4h4z"/><path d="M5 17v3"/><path d="M12 4l-4 9h8z"/><path d="M12 13v7"/><path d="M19 13l-2 4h4z"/><path d="M19 17v3"/><path d="M2 20h20"/>';
       case 'themepark':  return '<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><path d="M5.6 5.6l12.8 12.8"/><path d="M5.6 18.4L18.4 5.6"/>';
-      case 'sight':      return '<path d="M14 19l-2-2-2 2v3h4v-3z"/><path d="M21 12V7a2 2 0 00-2-2h-2l-2-2H9L7 5H5a2 2 0 00-2 2v12a2 2 0 002 2h6"/><circle cx="12" cy="12" r="3"/>';
+      case 'sight':      return '<path d="M2 9V7a2 2 0 012-2h16a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a2 2 0 000-4z"/><path d="M13 5v3"/><path d="M13 11v2"/><path d="M13 16v3"/>';
+      case 'massage':    return '<circle cx="12" cy="12" r="9"/><path d="M8 10c.5-1 2-1 2.5 0"/><path d="M13.5 10c.5-1 2-1 2.5 0"/><path d="M9 15.5c1 1.5 5 1.5 6 0"/>';
       case 'other':      return '<circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>';
     }
     return '<circle cx="12" cy="12" r="3"/>';
@@ -716,23 +880,67 @@
   FamilyOS.attachSettingsModal({ onSave: () => location.reload() });
   document.getElementById('fos-btn-refresh').addEventListener('click', () => loadAll());
 
-  /* ─── 진단 로깅 (v0.2.2 hotfix) ─────────────────────────
-   * 튕김 현상 디버깅용. F12 → Console 에서 [DIAG] 메시지 추적.
-   * 튕김 발생 후 콘솔 로그 + Network 탭 확인하면 원인 파악 가능. */
-  console.log('[DIAG] travel-trip.html loaded at', new Date().toISOString(), 'href=' + location.href);
+  /* ─── 진단 로깅 (v0.3.2 — localStorage ring buffer) ─────────
+   * 페이지가 튕겨도 살아남는 진단 로그. familyOS.diag.travel 에 누적.
+   * 설정 모달의 "진단 로그 복사" 버튼으로 추출해 보고. 최대 200건 ring buffer. */
+  const DIAG_KEY = 'familyOS.diag.travel';
+  const DIAG_MAX = 200;
   let __lastClickInfo = null;
+
+  function diagLog(event, detail) {
+    const entry = {
+      t: new Date().toISOString(),
+      event: event,
+      detail: detail == null ? null : detail
+    };
+    try {
+      const arr = JSON.parse(localStorage.getItem(DIAG_KEY) || '[]');
+      arr.push(entry);
+      while (arr.length > DIAG_MAX) arr.shift();
+      localStorage.setItem(DIAG_KEY, JSON.stringify(arr));
+    } catch (e) {
+      // 쓰기 실패해도 콘솔에는 남김
+    }
+    try { console.log('[DIAG]', event, detail || ''); } catch (e) {}
+  }
+
+  diagLog('page_loaded', {
+    href: location.href,
+    trip: getQueryParam('trip'),
+    ua: (navigator.userAgent || '').substring(0, 120),
+    viewport: window.innerWidth + 'x' + window.innerHeight
+  });
+
+  // 마지막 클릭 1건만 메모리에 — 언로드/에러 시 함께 기록
   document.addEventListener('click', (e) => {
     const t = e.target;
-    const tag = t.tagName, id = t.id || '', cls = (t.className && typeof t.className === 'string') ? t.className : '';
-    __lastClickInfo = `<${tag} id="${id}" class="${cls}">`;
-    console.log('[DIAG] click:', __lastClickInfo, 'defaultPrevented=' + e.defaultPrevented);
+    const tag = t.tagName, id = t.id || '';
+    const cls = (t.className && typeof t.className === 'string') ? t.className.substring(0, 60) : '';
+    __lastClickInfo = '<' + tag + ' id="' + id + '" class="' + cls + '">';
   }, true);
-  window.addEventListener('beforeunload', (e) => {
-    console.log('[DIAG] beforeunload — page is about to navigate away. last click:', __lastClickInfo);
-    console.trace('[DIAG] navigation stack');
+
+  window.addEventListener('error', (e) => {
+    diagLog('window_error', {
+      msg: e.message || '',
+      src: e.filename || '',
+      line: e.lineno || 0,
+      col: e.colno || 0,
+      last_click: __lastClickInfo
+    });
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    let reason = '';
+    try { reason = String(e.reason).substring(0, 300); } catch (err) { reason = '(unstringifiable)'; }
+    diagLog('unhandled_rejection', { reason: reason, last_click: __lastClickInfo });
+  });
+  window.addEventListener('beforeunload', () => {
+    diagLog('beforeunload', { last_click: __lastClickInfo });
+  });
+  window.addEventListener('pagehide', (e) => {
+    diagLog('pagehide', { persisted: !!e.persisted, last_click: __lastClickInfo });
   });
   window.addEventListener('popstate', (e) => {
-    console.log('[DIAG] popstate triggered. state=', e.state);
+    diagLog('popstate', { state: e.state, last_click: __lastClickInfo });
   });
 
   /* ─── 상태 ─────────────────────────────────────────────── */
@@ -747,6 +955,7 @@
     markers: [],         // google.maps.marker.AdvancedMarkerElement 인스턴스 배열
     activeInfoWindow: null,  // google.maps.InfoWindow (한 번에 하나만)
     filter: 'all',       // 'all' | date string
+    layoutMode: 'full',  // 'full' | 'date-side' | 'edit-side' (v0.3.2 split layout)
     modal: {
       mode: 'add',         // 'add' | 'edit'
       placeId: null,
@@ -857,11 +1066,14 @@
         <button id="pick-cancel-btn" type="button">취소</button>
       </div>
 
-      <div class="map-section">
-        <div id="map"></div>
-        <div class="map-overlay">
-          <strong>${escapeHtml(t.city || '')}</strong> · ${state.places.length + state.otherPlaces.length}개 마커
+      <div class="split-wrap" id="split-wrap">
+        <div class="map-section">
+          <div id="map"></div>
+          <div class="map-overlay">
+            <strong>${escapeHtml(t.city || '')}</strong> · ${state.places.length + state.otherPlaces.length}개 마커
+          </div>
         </div>
+        <div class="split-side" id="split-side"></div>
       </div>
     `;
 
@@ -912,10 +1124,28 @@
     wrap.innerHTML = html;
     wrap.querySelectorAll('.filter-chip').forEach(c => {
       c.addEventListener('click', () => {
-        state.filter = c.dataset.filter;
+        const newFilter = c.dataset.filter;
+        // 활성 칩 다시 클릭 → 전체로 토글 + full 모드
+        const isReclick = (state.filter === newFilter);
+        if (isReclick && newFilter !== 'all') {
+          state.filter = 'all';
+        } else {
+          state.filter = newFilter;
+        }
+        diagLog('filter_chip_click', { filter: state.filter, prev: c.dataset.filter, reclick: isReclick });
         renderFilterChips();
         renderMarkers();
-        fitMapToMarkers();
+
+        // 'all' 또는 'planned' → full 모드 (사이드 닫음)
+        // 날짜 필터 → date-side 모드
+        if (state.filter === 'all' || state.filter === 'planned') {
+          setLayoutMode('full');
+          fitMapToMarkers();
+        } else {
+          setLayoutMode('date-side');
+          renderDateSide();
+          fitMapToMarkers();
+        }
       });
     });
   }
@@ -1171,6 +1401,116 @@
     });
   }
 
+  /* ─── Split 레이아웃 (v0.3.2) ─────────────────────────────
+   * layoutMode 전환 + 사이드 패널 렌더링 + 마커 줌인 */
+  function setLayoutMode(mode) {
+    const wrap = document.getElementById('split-wrap');
+    if (!wrap) return;
+    const prev = state.layoutMode;
+    state.layoutMode = mode;
+    wrap.classList.remove('mode-date', 'mode-edit');
+    if (mode === 'date-side') wrap.classList.add('mode-date');
+    else if (mode === 'edit-side') wrap.classList.add('mode-edit');
+    diagLog('layout_mode_change', { from: prev, to: mode });
+    // Google Maps 는 컨테이너 리사이즈 후 트리거 필요
+    if (state.map) {
+      setTimeout(() => {
+        google.maps.event.trigger(state.map, 'resize');
+      }, 50);
+    }
+  }
+
+  /* 날짜 필터 칩이 활성일 때 사이드에 그 날짜의 방문지 타일 리스트 렌더 */
+  function renderDateSide() {
+    const side = document.getElementById('split-side');
+    if (!side) return;
+    const dateStr = state.filter;
+    // 날짜에 해당하는 places (현재 trip + 다른 trip 회색 포함)
+    const items = visiblePlaces();
+    const shortDate = dateStr.substring(5);
+
+    let listHtml = '';
+    if (items.length === 0) {
+      listHtml = '<div class="side-empty">이 날짜에 방문지가 없습니다.</div>';
+    } else {
+      listHtml = items.map(p => {
+        const subParts = [];
+        if (p.rating_star) subParts.push('★'.repeat(p.rating_star));
+        if (p._source === 'other') subParts.push('재방문지 · ' + (p.trip_id || ''));
+        const sub = subParts.join(' · ');
+        const meta = CATEGORIES.find(c => c.id === p.category);
+        const krCat = meta ? meta.kr : (p.category || '');
+        return `
+          <div class="side-tile" data-place-id="${escapeHtml(p.place_id)}" data-source="${escapeHtml(p._source || 'current')}" data-status="${escapeHtml(p.visit_status || 'planned')}">
+            <div class="side-tile-ico">${catIconSvg(p.category || 'other', 13)}</div>
+            <div class="side-tile-body">
+              <div class="side-tile-name">${escapeHtml(p.name || '')}</div>
+              <div class="side-tile-sub">${escapeHtml(krCat)}${sub ? ' · ' + escapeHtml(sub) : ''}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    side.innerHTML = `
+      <div class="side-head">
+        <div>
+          <div class="ttl">${escapeHtml(shortDate)}</div>
+          <div class="cnt">${items.length}곳</div>
+        </div>
+        <div class="close-x" id="side-close-date" title="닫기" aria-label="닫기">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </div>
+      </div>
+      <div class="side-list">${listHtml}</div>
+    `;
+
+    document.getElementById('side-close-date').addEventListener('click', () => {
+      diagLog('side_close_click', { from: 'date-side' });
+      state.filter = 'all';
+      renderFilterChips();
+      renderMarkers();
+      setLayoutMode('full');
+      fitMapToMarkers();
+    });
+
+    side.querySelectorAll('.side-tile').forEach(t => {
+      t.addEventListener('click', () => {
+        const pid = t.dataset.placeId;
+        // current 우선, 없으면 other
+        const p = state.places.find(x => x.place_id === pid)
+               || state.otherPlaces.find(x => x.place_id === pid);
+        if (!p) return;
+        diagLog('side_tile_click', { place_id: pid, source: t.dataset.source });
+        if (t.dataset.source === 'other') {
+          // 다른 trip 의 회색 핀 → InfoWindow + 줌인만, 편집 X
+          zoomToMarkerWithRadius(p.lat, p.lng, 1);
+          showOtherPlacePopup(p);
+        } else {
+          openEditPlaceModal(p);
+        }
+      });
+    });
+  }
+
+  /* 마커 중심 ±radiusKm 사방으로 fitBounds. 위도 보정 (경도는 cos 비례)
+   * 1km 박스: 위도 ±(km/111.32), 경도 ±(km/(111.32*cos(lat))) */
+  function zoomToMarkerWithRadius(lat, lng, radiusKm) {
+    if (!state.map) return;
+    const latNum = Number(lat), lngNum = Number(lng);
+    if (isNaN(latNum) || isNaN(lngNum)) return;
+    const dLat = radiusKm / 111.32;
+    const cosL = Math.cos(latNum * Math.PI / 180);
+    const dLng = radiusKm / (111.32 * Math.max(0.001, Math.abs(cosL)));
+    const bounds = new google.maps.LatLngBounds(
+      { lat: latNum - dLat, lng: lngNum - dLng },
+      { lat: latNum + dLat, lng: lngNum + dLng }
+    );
+    state.map.fitBounds(bounds, 0);
+  }
+
   /* ─── Google API key 모달 (Maps + Places 공통) ─────────── */
   function getGoogleKey() { return localStorage.getItem(GOOGLE_KEY) || ''; }
   function setGoogleKey(k) {
@@ -1208,7 +1548,46 @@
   });
 
   /* ─── Place 모달 ──────────────────────────────────────── */
+  /* ─── 폼 사이드 마운트 (v0.3.2) ─────────────────────────
+   * 기존 .modal 노드를 사이드 패널 안으로 reparent.
+   * 닫을 때 모달 backdrop 안으로 다시 reparent. ID 충돌 방지 위해 한쪽에만 존재. */
+  function moveFormToSide() {
+    const modalNode = document.querySelector('#place-modal > .modal');
+    const side = document.getElementById('split-side');
+    if (!modalNode || !side) return;
+    if (!side.contains(modalNode)) {
+      side.appendChild(modalNode);
+      modalNode.classList.add('as-side');
+      // 사이드 헤더에 닫기 X 버튼 (모달 title 안에 inject)
+      const titleEl = modalNode.querySelector('.modal-title');
+      if (titleEl && !titleEl.querySelector('.side-close-x')) {
+        const x = document.createElement('span');
+        x.className = 'side-close-x';
+        x.id = 'side-close-edit';
+        x.setAttribute('title', '닫기');
+        x.setAttribute('aria-label', '닫기');
+        x.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        titleEl.appendChild(x);
+        x.addEventListener('click', () => {
+          diagLog('side_close_click', { from: 'edit-side' });
+          closePlaceModal();
+        });
+      }
+    }
+    document.getElementById('place-modal').classList.remove('open');
+  }
+  function moveFormBackToModal() {
+    const modalNode = document.querySelector('.modal.as-side');
+    const backdrop = document.getElementById('place-modal');
+    if (!modalNode || !backdrop) return;
+    modalNode.classList.remove('as-side');
+    const x = modalNode.querySelector('#side-close-edit');
+    if (x) x.remove();
+    if (!backdrop.contains(modalNode)) backdrop.appendChild(modalNode);
+  }
+
   function openAddPlaceModal() {
+    diagLog('open_add_place', {});
     state.modal = {
       mode: 'add',
       placeId: null,
@@ -1219,10 +1598,13 @@
       searchSessionToken: uuidv4()
     };
     fillPlaceModal(null);
-    document.getElementById('place-modal').classList.add('open');
+    setLayoutMode('edit-side');
+    moveFormToSide();
+    // 신규 추가는 줌인 안 함 (마커가 아직 없음)
   }
 
   function openEditPlaceModal(p) {
+    diagLog('open_edit_place', { place_id: p.place_id, category: p.category });
     state.modal = {
       mode: 'edit',
       placeId: p.place_id,
@@ -1239,11 +1621,25 @@
       searchSessionToken: uuidv4()
     };
     fillPlaceModal(p);
-    document.getElementById('place-modal').classList.add('open');
+    setLayoutMode('edit-side');
+    moveFormToSide();
+    // 마커 중심 ±1km 줌인
+    zoomToMarkerWithRadius(p.lat, p.lng, 1);
   }
 
   function closePlaceModal() {
+    diagLog('close_place_modal', { mode: state.modal.mode });
+    moveFormBackToModal();
     document.getElementById('place-modal').classList.remove('open');
+    // layoutMode 복귀: filter 가 날짜면 date-side, 아니면 full
+    if (state.filter === 'all' || state.filter === 'planned') {
+      setLayoutMode('full');
+      fitMapToMarkers();
+    } else {
+      setLayoutMode('date-side');
+      renderDateSide();
+      fitMapToMarkers();
+    }
   }
 
   function fillPlaceModal(p) {
@@ -1526,28 +1922,26 @@
       alert('지도가 아직 로드되지 않았어요.');
       return;
     }
-    // 모달 임시 숨김 (state 는 보존)
+    // 폼 사이드는 그대로 마운트된 채. picking CSS가 임시로 숨겨 지도 전체 활용
     state.pickSavedModal = { ...state.modal };
-    document.getElementById('place-modal').classList.remove('open');
     document.body.classList.add('map-picking');
-    // Google Maps: addListenerOnce. 핸들러 reference 저장해 cancel 시 제거 가능
+    diagLog('enter_pick_mode', {});
     state.pickClickListener = state.map.addListener('click', onPickMapClick);
-    // ESC 로 취소도 지원
     document.addEventListener('keydown', pickEscHandler);
   }
 
   function cancelPickMode() {
     document.body.classList.remove('map-picking');
+    diagLog('cancel_pick_mode', {});
     if (state.pickClickListener) {
       google.maps.event.removeListener(state.pickClickListener);
       state.pickClickListener = null;
     }
     document.removeEventListener('keydown', pickEscHandler);
-    // 모달 다시 열기 (상태 그대로)
+    // 사이드 폼은 그대로. state 복원만
     if (state.pickSavedModal) {
       state.modal = state.pickSavedModal;
       state.pickSavedModal = null;
-      document.getElementById('place-modal').classList.add('open');
     }
   }
 
@@ -1560,12 +1954,12 @@
     const lat = typeof e.latLng.lat === 'function' ? e.latLng.lat() : e.latLng.lat;
     const lng = typeof e.latLng.lng === 'function' ? e.latLng.lng() : e.latLng.lng;
     document.body.classList.remove('map-picking');
+    diagLog('pick_map_click', { lat: lat, lng: lng });
     if (state.pickClickListener) {
       google.maps.event.removeListener(state.pickClickListener);
       state.pickClickListener = null;
     }
     document.removeEventListener('keydown', pickEscHandler);
-    // selectedPlace 채움. 이름은 사용자가 직접 입력.
     if (state.pickSavedModal) {
       state.modal = state.pickSavedModal;
       state.pickSavedModal = null;
@@ -1577,13 +1971,11 @@
       address: '',
       mapbox_id: ''   // 직접 좌표 입력 시 매칭 키 없음 (의도된 동작)
     };
-    // 모달 다시 열기
-    document.getElementById('place-modal').classList.add('open');
+    // 사이드 폼은 그대로. 좌표 표시 갱신만
     document.getElementById('place-coords').textContent =
       `${lat.toFixed(4)}, ${lng.toFixed(4)} · 직접 선택`;
-    // 이름이 비어있다면 사용자에게 안내
     const nameInput = document.getElementById('place-name');
-    if (!nameInput.value) {
+    if (nameInput && !nameInput.value) {
       nameInput.focus();
       nameInput.placeholder = '장소명을 직접 입력하세요';
     }
@@ -1594,19 +1986,32 @@
   document.getElementById('place-delete').addEventListener('click', deletePlace);
   document.getElementById('place-cancel').addEventListener('click', closePlaceModal);
   document.getElementById('place-modal').addEventListener('click', (e) => {
+    // 사이드 모드에서는 backdrop 클릭 닫기 비활성 (어차피 backdrop이 안 열려있지만 안전망)
+    if (state.layoutMode === 'edit-side') return;
     if (e.target.id === 'place-modal') closePlaceModal();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    // 픽킹 모드 중이면 pickEscHandler 가 처리. 여기서는 모달 close 안 함.
-    if (document.body.classList.contains('map-picking')) return;
-    const pm = document.getElementById('place-modal');
+    if (document.body.classList.contains('map-picking')) return;  // 픽킹 모드 ESC는 pickEscHandler가
     const gm = document.getElementById('google-key-modal');
-    if (pm.classList.contains('open'))      closePlaceModal();
-    else if (gm.classList.contains('open')) closeGoogleKeyModal();
+    // 우선순위: edit-side > date-side > google-key-modal
+    if (state.layoutMode === 'edit-side') {
+      diagLog('esc_pressed', { close: 'edit-side' });
+      closePlaceModal();
+    } else if (state.layoutMode === 'date-side') {
+      diagLog('esc_pressed', { close: 'date-side' });
+      state.filter = 'all';
+      renderFilterChips();
+      renderMarkers();
+      setLayoutMode('full');
+      fitMapToMarkers();
+    } else if (gm && gm.classList.contains('open')) {
+      closeGoogleKeyModal();
+    }
   });
 
   async function savePlace() {
+    diagLog('save_place_start', { mode: state.modal.mode, place_id: state.modal.placeId });
     const btn = document.getElementById('place-save');
     btn.disabled = true;
     btn.textContent = '저장 중…';
@@ -1619,7 +2024,9 @@
         await callPost('updatePlace', Object.assign({ place_id: state.modal.placeId }, payload));
       }
       saved = true;
+      diagLog('save_place_ok', { mode: state.modal.mode });
     } catch (err) {
+      diagLog('save_place_error', { msg: String(err.message || err).substring(0, 200) });
       alert('저장 실패: ' + (err.message || err));
     } finally {
       btn.disabled = false;
@@ -1631,6 +2038,7 @@
       try {
         await loadAll();
       } catch (loadErr) {
+        diagLog('save_place_loadall_error', { msg: String(loadErr.message || loadErr).substring(0, 200) });
         console.error('[savePlace] loadAll 실패:', loadErr);
         // 저장은 됐으므로 navigate 안 함. 다음 새로고침에 반영됨
       }
@@ -1640,14 +2048,17 @@
   async function deletePlace() {
     if (state.modal.mode !== 'edit') return;
     if (!confirm('이 방문장소를 삭제할까요?')) return;
+    diagLog('delete_place_start', { place_id: state.modal.placeId });
     const btn = document.getElementById('place-delete');
     btn.disabled = true;
     btn.textContent = '삭제 중…';
     try {
       await callPost('deletePlace', { place_id: state.modal.placeId });
+      diagLog('delete_place_ok', { place_id: state.modal.placeId });
       closePlaceModal();
       await loadAll();
     } catch (err) {
+      diagLog('delete_place_error', { msg: String(err.message || err).substring(0, 200) });
       alert('삭제 실패: ' + (err.message || err));
     } finally {
       btn.disabled = false;
@@ -1746,6 +2157,77 @@
   }
   function iconStar() {
     return '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+  }
+
+  /* ─── 설정 모달에 진단 로그 UI inject (v0.3.2) ─────────────
+   * common.js 의 모달 HTML 은 그대로 두고, 모달이 열릴 때 추가 영역을 동적 삽입.
+   * index.html 의 백업/복원 패턴과 동일 방식 */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#fos-btn-settings');
+    if (!btn) return;
+    setTimeout(injectDiagUI, 50);
+  });
+
+  function injectDiagUI() {
+    const modal = document.querySelector('.modal-backdrop.open .modal');
+    if (!modal) return;
+    if (modal.querySelector('#fos-diag-block')) return;
+    const actions = modal.querySelector('.modal-actions');
+    if (!actions) return;
+
+    let arr = [];
+    try { arr = JSON.parse(localStorage.getItem(DIAG_KEY) || '[]'); } catch (err) { arr = []; }
+
+    const block = document.createElement('div');
+    block.id = 'fos-diag-block';
+    block.style.cssText = 'margin-top: var(--s5); padding-top: var(--s4); border-top: 1px dashed var(--border);';
+    block.innerHTML = `
+      <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--s2);">
+        진단 로그 (Travel)
+      </div>
+      <div style="font-size:11px;color:var(--text-quiet);line-height:1.6;margin-bottom:var(--s3);">
+        페이지 튕김 등 문제 발생 시 아래 로그를 복사해 보고하세요.
+        현재 <strong style="color:var(--text-secondary);">${arr.length}건</strong> 기록됨 (최대 ${DIAG_MAX}건 ring buffer).
+      </div>
+      <div style="display:flex;gap:var(--s2);">
+        <button type="button" class="btn btn-ghost" id="fos-diag-copy" style="font-size:11px;padding:6px 12px;">로그 복사</button>
+        <button type="button" class="btn btn-ghost" id="fos-diag-clear" style="font-size:11px;padding:6px 12px;">로그 초기화</button>
+      </div>
+    `;
+    actions.parentNode.insertBefore(block, actions);
+
+    modal.querySelector('#fos-diag-copy').onclick = async () => {
+      let arr2 = [];
+      try { arr2 = JSON.parse(localStorage.getItem(DIAG_KEY) || '[]'); } catch (err) { arr2 = []; }
+      const txt = JSON.stringify(arr2, null, 2);
+      const btn2 = modal.querySelector('#fos-diag-copy');
+      try {
+        await navigator.clipboard.writeText(txt);
+        const orig = btn2.textContent;
+        btn2.textContent = '복사됨 ✓ (' + arr2.length + '건)';
+        setTimeout(() => { btn2.textContent = orig; }, 2000);
+      } catch (err) {
+        // clipboard 실패 시 textarea fallback
+        const ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.style.cssText = 'position:fixed;top:10%;left:10%;width:80vw;height:60vh;z-index:9999;background:var(--canvas);color:var(--text-primary);border:1px solid var(--border-hi);padding:12px;font-family:var(--font-mono);font-size:11px;';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e2) {}
+        alert('자동 복사가 안 돼 텍스트 영역으로 열었습니다. Ctrl/Cmd+A → C 로 복사 후 영역 클릭으로 닫기.');
+        ta.addEventListener('click', () => ta.remove());
+      }
+    };
+    modal.querySelector('#fos-diag-clear').onclick = () => {
+      let arr2 = [];
+      try { arr2 = JSON.parse(localStorage.getItem(DIAG_KEY) || '[]'); } catch (err) { arr2 = []; }
+      if (!confirm('진단 로그 ' + arr2.length + '건 삭제할까요?')) return;
+      localStorage.removeItem(DIAG_KEY);
+      const btn2 = modal.querySelector('#fos-diag-clear');
+      const orig = btn2.textContent;
+      btn2.textContent = '초기화됨 ✓';
+      setTimeout(() => { btn2.textContent = orig; }, 2000);
+    };
   }
   </script>
 </body>

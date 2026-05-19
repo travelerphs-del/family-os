@@ -59,7 +59,7 @@ family-os/
 | Expense | 배포됨 | OAuth 폐기 (doPost 통일). 안정 |
 | Health | 배포됨 | **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
-| Travel | **v0.3.0** | Phase A+B + Session 7.2 + 7.3. 가족 8명 확장. 호텔 stay_range. Google Places (New) 검색. **베이스맵 Mapbox→Google Maps 전체 교체** (대만 정확도 문제 해결). 지도 클릭 폴백. PC 튕김 진단 로그. |
+| Travel | **v0.3.1** | Phase A+B + Session 7.2 + 7.3. 가족 8명. 호텔 stay_range. Google Places (New) 검색. **베이스맵 Google Maps + AdvancedMarkerElement + mapId** (대만 정확도 + 알림창 해결). 다크 톤은 사용자 mapId 발급 후 적용 가능 (Pending #9). 지도 클릭 폴백. PC 튕김 진단 로그 (Pending #8). |
 
 ## Cross-cutting Pending
 
@@ -71,7 +71,7 @@ family-os/
 6. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
 7. **Travel mapbox_id → Google place_id 마이그레이션 잔재** (v0.2.2) — 기존 Mapbox 시절 데이터의 `mapbox_id` 값과 새 Google `id` 값은 매칭 안 됨. 같은 장소 dedup 실패 가능. 사용자 시트의 기존 데이터가 적다면 무시. 별도 컬럼 분리는 추후 검토.
 8. **Travel 튕김 현상 진단 진행 중** (v0.2.2 hotfix) — PC 브라우저에서 가끔 발생. travel.html / travel-trip.html 에 진단 로그(`[DIAG] click / beforeunload / popstate`) 박혀 있음. 사용자가 다음 발생 시 F12 Console 캡쳐해서 보고 → 원인 파악 후 hotfix.
-9. **Travel 다크 지도 스타일 정제** (v0.3.0) — Google Maps JSON styles 로 초기 구현. Mapbox dark-v11 만큼 미려하지 않음. 추후 Cloud-based mapId (Map Style ID) 로 마이그레이션 고려.
+9. **Travel 다크 지도 스타일 복구** (v0.3.1) — v0.3.0 → v0.3.1 패치에서 `mapId: 'DEMO_MAP_ID'` 적용으로 AdvancedMarkerElement 정상 동작. 단 DEMO_MAP_ID 는 Google 디폴트 라이트 스타일이라 시각적으로 다른 대시보드(다크)와 톤 어긋남. 복구 방법: 사용자가 Cloud Console 에서 자체 Map ID 발급 → Map Style 다크로 정의 → LocalStorage `familyOS.googleMapId` 에 저장. 코드는 이미 준비됨.
 
 ## 세션 종료 시 worklog 업데이트 규칙
 

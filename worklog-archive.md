@@ -1661,3 +1661,345 @@ readRealestate @ Code.gs:530
 - [완료] Session 7.2 종료
 
 ────────────────────────────────────────────────────────────────────
+
+## Session 7.3 — Google Places 시도 실패 + (c) 단독 확정
+
+**기간**: 2026-05-18
+
+**시도**: 베트남 사용자가 Google Cloud + Places API (New) 활성화 시도. 1시간 이상 헤맴.
+
+**실패 단계**:
+1. Maps API 마법사가 결제 계정 + 새 프로젝트를 함께 만들어 무한 루프. 잉여 billing account 7개 생성
+2. Family-os 프로젝트에 billing link 후 재시도 → 또 마법사
+3. Cloud Shell 명령어 (`gcloud services enable places.googleapis.com`) → "successful" 응답
+4. 그러나 manage API 클릭 시 **"In India, Google Maps Platform services need to be billed separately"** 메시지 표시
+
+**원인 분석**:
+- 베트남 거주·결제·사용임에도 Google이 사용자를 India로 오분류한 듯
+- Google 공식 문서엔 India pricing은 인도 거주자 전용으로 명시
+- 카드 BIN 또는 IP 또는 계정 메타데이터 신호로 오분류 추정
+- VPN/다른 계정/다른 카드 우회 가능하지만 ROI 안 맞음
+
+**결정**: **Google Places 완전 폐기**. (c) 단독 진행.
+- 검색은 Mapbox Search Box 그대로 (동아시아 POI 약함 받아들임)
+- 지도 클릭으로 좌표 캡쳐 + 사용자 수동 이름 입력 폴백
+- 외부 API 추가 0, 결제 마찰 0
+
+**LESSON**:
+1. **지역별 결제 마찰을 사전에 강조 안 한 게 잘못**: 사용자가 베트남 거주임을 알고도 "Google 카드 등록만 한 번 감수" 정도로 가볍게 안내했음. 실제로는 인도 정책 오적용 같은 알려진 함정이 있음
+2. **사용자 시간·감정 비용 추적**: 1시간 이상 헤맨 시점에서 미리 포기 권고했어야. 처음 무한 루프 시점에 (c) 단독으로 결정 강하게 권유했어야
+3. **외부 의존성은 최소화가 항상 정답**: 가족 사용 규모면 단순 수동 입력으로도 충분. 자동완성 편의는 좋지만 마찰 비용이 더 큼
+
+**산출물**: context-travel.md §3-3 단순화 (Google Places 폐기, 지도 클릭 폴백만)
+
+**잉여 정리 (사용자 작업)**: 
+- Google Cloud Billing → 잉여 7개 billing account close (선택, 청구 0이라 방치 무관)
+- Family-os 프로젝트도 안 쓰면 삭제
+
+- [완료] Session 7.3 종료
+
+────────────────────────────────────────────────────────────────────
+
+## Session 7.4 — Google Places 부활 (사용자 우회 성공)
+
+**기간**: 2026-05-18 (Session 7.3 직후)
+
+**결과**: 사용자가 Google Cloud 결제·API 활성화 우회 성공. 정확한 우회 방법은 모름 ("구글이랑 씨름해서 해결" 정도). API key 발급 완료.
+
+**결정**: Session 7.3 의 "Google Places 폐기" 결정 **번복**. context-travel.md §3-3 을 "Google Places + 지도 클릭 폴백 콤보" 로 복원.
+
+**Quota cap 권장값 가이드 추가**: 19개 quota 중 핵심 5개 (per day) 만 500/100 으로 cap. 100 이 아닌 500 추천 — 실용성·안전성 균형. 무한 루프 버그 떠도 일 $0.01 수준.
+
+**Referrer 제한 안내 추가**: HTTP referrer 를 GitHub Pages 도메인으로만 제한. API key 유출 시 무한 청구 방지.
+
+**LESSON**:
+1. **포기 결정도 가역적**: 7.3 에서 "포기" 결정했지만 사용자가 우회 성공하니 다시 살림. 사용자 시간 들인 작업 (결제 등록 + API key 발급) 은 활용하는 게 합리적
+2. **Quota cap 권장값을 단순 "100" 으로 안내한 건 너무 단순**: Quota 종류 19개 중 어떤 걸 어떻게 줄일지가 핵심. 처음부터 정확히 안내했어야
+
+**산출물**: context-travel.md §3-3 복원 + Quota cap 표 + Referrer 제한 안내
+
+**다음 세션 작업 확정** (4가지):
+1. 가족 멤버 8명 확장
+2. 호텔 stay_range 처리
+3. Google Places API 통합 (검색=Google, 지도=Mapbox)
+4. 지도 클릭 폴백 (검색 실패 시)
+
+**다음 세션 시작 메시지에 API key 포함**: `AIza...` 형식. LocalStorage `familyOS.googlePlacesKey` 로 저장.
+
+- [완료] Session 7.4 종료
+
+# Session 7.5 — Travel 보강 (3종 묶음)
+
+## 배경
+
+`context-travel.md` §3 에서 확정된 3가지 작업을 한 세션에 처리:
+1. 가족 멤버 8명 확장 (조부모 4명 추가)
+2. 호텔 stay_range 처리 (`stay_start` / `stay_end` 컬럼 추가)
+3. Google Places (New) API 통합 + 지도 클릭 폴백
+
+사용자 사전 작업:
+- Google Cloud 프로젝트 + Places API (New) 활성화
+- Daily quota cap 100/일 + HTTP referrer 제한
+- API key 발급, **메시지엔 노출 안 함 — Mapbox 토큰처럼 LocalStorage 직접 입력 UI로 구현**
+
+## 결정 사항
+
+| 항목 | 결정 |
+|---|---|
+| Google Places key 저장 | `localStorage.familyOS.googlePlacesKey` |
+| Mapbox token | 지도 표시 전용 유지 (검색 분리) |
+| 검색 API | Google Places (New) Autocomplete + Place Details, fieldMask 로 Essentials SKU |
+| sessionToken | Autocomplete + Details 가 같은 token 공유 → 1 session billing |
+| 호텔 stay_range | `places` 시트 끝에 `stay_start`, `stay_end` append (15컬럼) |
+| **`mapbox_id` 컬럼 처리** | 컬럼명 유지하고 Google `id` 저장 — 마이그레이션 회피. 트레이드오프: 기존 Mapbox 시절 데이터와 dedup 매칭 안 됨 |
+| 시트 헤더 마이그레이션 | `ensureSheetWithHeader_` 가 누락 컬럼을 끝에 자동 append. 기존 컬럼 순서 절대 보존 |
+| `addPlace_` / `updatePlace_` | rowMap + 시트 실제 헤더 기반 매핑 (사용자가 컬럼 순서 바꿔도 안전) |
+| 호텔의 `visited_date` | `stay_start` 와 동일하게 자동 저장 (이전 코드 호환) |
+| 지도 클릭 폴백 | 모달 임시 숨김 → crosshair 커서 + sticky 안내 배너 → 클릭 시 좌표 캡쳐 → 모달 재오픈 |
+
+## CODE 변경 요약
+
+### `travel.html` (v0.1.1 → v0.1.2)
+- `FAMILY_MEMBERS` 배열 1줄: 4명 → 8명 (할머니/할아버지/외할머니/외할아버지 추가)
+- footer 버전 표기
+
+### `travel-apps-script.gs`
+- `PLACES_HEADERS` 15컬럼. `stay_start`, `stay_end` 를 `created_at` 뒤(14, 15)에 append
+- `ensureSheetWithHeader_`: 누락 컬럼 자동 add (기존엔 에러). 기존 헤더 순서는 절대 안 바꿈
+- `addPlace_`: rowMap 패턴 + 시트 실제 헤더 기반 row 작성. 호텔 시 `visited_date = stay_start`
+- `updatePlace_`: 시트 실제 헤더 기반. stay_start/stay_end 지원
+- `normalizePlace_`: 응답에 stay_start, stay_end 포함
+
+### `travel-trip.html` (v0.2.0 → v0.2.2)
+
+**상수**
+- `GOOGLE_KEY = 'familyOS.googlePlacesKey'`
+
+**호텔 stay_range 처리**
+- `expandStayRange(start, end)` — 최대 60박 제한
+- `placeMatchesDate(p, dateStr)` — 호텔은 stay range 매칭, 그 외는 visited_date 일치
+- `renderFilterChips`: 호텔 stay 기간 모든 날짜 칩
+- `visiblePlaces`: 날짜 필터에 `placeMatchesDate` 적용
+- `createPinElement`: 호텔이면 `YYYY-MM-DD ~ YYYY-MM-DD`
+- `showOtherPlacePopup`: 동일
+
+**모달 HTML**
+- `stay-range-field` 신규 (display:none 기본)
+- "지도에서 직접 선택" 버튼
+- Google Places API key 입력 모달 (`google-key-modal`)
+
+**모달 JS**
+- `syncVisitedFields(p)`: 호텔/non-호텔 분기
+- `toggleHotelFieldsOnly()`: 카테고리 변경 시 visibility만 토글 (입력값 보존)
+- `readPlaceModalPayload`: stay_start/stay_end + 체크인>체크아웃 검증
+
+**Google Places (New) 통합**
+- `getGoogleKey()` / `setGoogleKey()` + 모달 핸들러
+- `googleSuggest(q)`: POST autocomplete + sessionToken + locationBias (30km)
+- `googleDetails(suggestion)`: GET place/{id} + fieldMask Essentials
+- `renderSearchResults`: 0건/401-403 케이스 처리
+
+**지도 클릭 폴백**
+- `.map-picking` CSS + `.pick-banner` sticky 안내
+- `enterPickMode()` / `cancelPickMode()` / `onPickMapClick(e)`
+- ESC 로 취소 지원
+
+### `backend-spec.md` §3-7
+- `places` 15컬럼 표 갱신
+- v0.2.2 마이그레이션 노트
+- `mapbox_id` 가 Google place_id 저장한다는 명시 + 트레이드오프
+- 호텔 필터 동작 명시
+
+### `worklog.md`
+- 컨벤션 표: Google Places key LocalStorage 키 / 외부 API 갱신
+- Travel 버전 v0.2.2
+- Pending 7번: mapbox_id 마이그레이션 잔재
+
+### `context-travel.md`
+- Session 7.5 완료 섹션
+- 한계 표 갱신
+- 다음 세션 작업 후보로 변경
+- 트러블슈팅에 Google Places 케이스
+- §7 v0.2.2 배포 가이드 신규
+
+## VERIFICATION
+
+- Apps Script: Node.js syntax 검증 통과 (mock GAS globals)
+- travel.html / travel-trip.html: `<script>` 블록 추출 후 `new Function()` 으로 통과
+- Google Places (New) 엔드포인트 공식 docs 확인 (Autocomplete + Details)
+- fieldMask + sessionToken 패턴 공식 가이드와 일치
+
+## LESSON
+
+1. **시트 마이그레이션 안전성**: 새 컬럼은 끝에 append. 기존 컬럼 순서 절대 안 건드림. `addPlace_`/`updatePlace_` 가 상수 인덱스 → 시트 실제 헤더 기반 매핑으로 바뀌니 사용자가 컬럼 순서를 임의로 바꿔도 안전해짐.
+
+2. **API key 클라이언트 노출 트레이드오프**: LocalStorage 평문 저장은 본질적 한계. 방어선은 referrer 제한 + daily quota cap. 가족 사용량은 무료 한도 안. key 노출 자체는 부차적 위험.
+
+3. **`mapbox_id` 컬럼명 유지 결정**: 검색 backend 가 바뀌었지만 컬럼명 유지. 의미 변경은 spec/주석으로 명시. 컬럼 추가는 또 다른 마이그레이션 발생하므로 절제. 트레이드오프(기존 Mapbox 데이터 dedup 실패)는 worklog/spec 에 명확히 기록.
+
+4. **카테고리 토글 시 입력값 보존**: 처음 `syncVisitedFields(null)` 호출 → 입력값 다 초기화 버그. visibility 토글만 분리한 `toggleHotelFieldsOnly()` 따로 만들어 input 보존. 모달 폼은 "초기화 vs 토글" 분리하는 게 좋다.
+
+5. **fieldMask 의 의미**: Google Places (New) 는 응답 필드 마스킹으로 SKU/요금이 결정됨. `id,displayName,formattedAddress,location` 만 요청 → Essentials. full data 요청하면 Enterprise SKU. 비용 최적화 필수.
+
+## COST
+
+| 항목 | 단가 (2026) | 무료 한도/월 | 가족 월 사용 예상 | 실 청구 |
+|---|---|---|---|---|
+| Mapbox map loads | $5/1000 (Free 후) | 50K | 수백 | $0 |
+| Google Places Autocomplete (Essentials) | $2.83/1000 session | ~70K | 수십 | $0 |
+| Google Place Details (Essentials, fieldMask) | $5~7/1000 | ~8K | 수십 | $0 |
+| 안전망 | — | — | — | Daily cap 100, referrer 제한 |
+
+**Claude 토큰 비용** (Anthropic 측): 본 세션은 컨텍스트가 커서 평소 세션 ~2배 추정.
+
+## PENDING (Cross-cutting)
+
+worklog 의 Pending 7번 추가:
+- **Travel mapbox_id → Google place_id 마이그레이션 잔재**: 기존 Mapbox 데이터 dedup 매칭 실패 가능. 별도 컬럼 분리 (예: `provider`, `place_provider_id`) 추후 검토.
+
+기존 Pending 1~6 은 유지.
+
+## 다음 세션 시작 시 사용자 체크리스트
+
+1. Google Cloud Console:
+   - 프로젝트 생성 + Places API (New) 활성화
+   - Quotas → "Places API" → daily 100 ← 청구 방지 필수
+   - Credentials → API key + HTTP referrer 제한
+2. 코드 commit & push: `travel.html`, `travel-trip.html`, `travel-apps-script.gs`, `backend-spec.md`, `worklog.md`, `context-travel.md`
+3. Apps Script 재배포: 첫 doGet 호출 시 `ensureSheets_` 가 stay_start/stay_end 자동 추가
+4. travel-trip 페이지 첫 사용: 검색 → Google key 입력 모달 → AIza... 붙여넣기
+5. 호텔 추가 테스트 / 지도 클릭 폴백 테스트
+
+# Session 7.6 — Travel: Mapbox → Google Maps 전체 교체
+
+> 다음 세션 시작 시 `worklog-archive.md` 에 새 섹션으로 붙여넣을 것.
+
+## 배경
+
+Session 7.5 직후 사용자가 26.5 대만여행을 입력하다 핀-지도 mismatch 발견:
+- 어긋남 거리가 일관성 없이 다 다름 (swap 같은 코드 버그 아님)
+- 시트의 lat/lng 를 Google Maps 검색창에 직접 입력 → 정확한 위치 확인
+- → Mapbox dark-v11 베이스맵의 대만 지역 정확도 부족 확정
+
+사용자 결정: 베이스맵을 Google Maps JavaScript API 로 전체 교체.
+
+## 비용 검증
+
+| 항목 | 사용량 | 단가 | 무료/월 | 청구 |
+|---|---|---|---|---|
+| Maps JavaScript API (Dynamic Maps, Essentials) | 500/월 초기 → 100/월 | $7/1000 | 10,000 | **$0** |
+| Places API (기존, 7.5부터) | 수십 session | $2.83~7/1000 | 70K/8K | $0 |
+
+500 load = 무료 한도 5%. 청구 절대 안 발생. 안전망: Maps 100~300/일, Places 100/일 cap + referrer 제한.
+
+## 결정 사항
+
+| 항목 | 결정 |
+|---|---|
+| LocalStorage key | `familyOS.googlePlacesKey` 재사용. 사용자 Cloud Console 에서 Maps JavaScript API 추가 활성화 |
+| 마커 | `AdvancedMarkerElement` (DOM 기반 → 기존 createPinElement 재사용) |
+| API version | `v=weekly&libraries=marker` |
+| 동적 lib 로드 | key 있을 때만 script 삽입. callback 패턴 |
+| 다크 스타일 | JSON `styles` 배열. **Mapbox dark-v11 만큼 정제 안 됨** (트레이드오프) |
+| Mapbox 의존성 | 전부 제거. `familyOS.mapboxToken` 키만 LocalStorage 에 남겨둠 (롤백 대비) |
+| `mapbox_id` 컬럼명 | 유지 (스키마 호환). 값은 Google place_id |
+
+## CODE 변경 요약
+
+### `travel-trip.html` (v0.2.2 → v0.3.0)
+
+**제거**
+- Mapbox GL JS lib import (CSS + JS)
+- `.mapboxgl-*` CSS 셀렉터들
+- Mapbox token 모달 HTML + 핸들러
+- `MAPBOX_TOKEN_KEY`, `getMapboxToken`, `setMapboxToken`
+- `openTokenModal`, `closeTokenModal`
+- ESC 핸들러의 token-modal 케이스
+- Session 7.5 작업 중 실수로 중복 등록된 두 번째 `google-key-*` 핸들러 블록
+
+**추가**
+- `loadGoogleMaps()`: 동적 script 삽입 + callback 패턴
+- `DARK_MAP_STYLES`: JSON styles (--canvas/--surface/--elevated/--text-tertiary)
+- `state.activeInfoWindow`, `state.pickClickListener`
+- InfoWindow 다크 톤 CSS (`.gm-style .gm-style-iw-*`)
+
+**변경**
+- `initMap()`: async, `google.maps.Map` 초기화, `clickableIcons: false`, idle 후 renderMarkers
+- `renderMarkers`: `AdvancedMarkerElement` 사용. `marker.map = null` 로 제거
+- `showOtherPlacePopup`: `InfoWindow` + `position: {lat, lng}`
+- `fitMapToMarkers`: `LatLngBounds.extend({lat, lng})` + `fitBounds(60)`. maxZoom 효과는 idle 후 cap
+- `createPinElement`: 픽킹 모드 중 마커 클릭 무시
+- `enterPickMode` / `cancelPickMode` / `onPickMapClick`: Google MapMouseEvent (`e.latLng.lat()`)
+- google-key-save 핸들러: 저장 후 지도 없으면 `initMap()` 호출
+- google-key 모달 desc: Maps JavaScript API + Places API (New) 둘 다 활성화 안내
+- footer v0.3.0
+
+### `worklog.md`
+- LocalStorage 키 컨벤션 (googlePlacesKey 가 Maps+Places 공용, mapboxToken deprecated)
+- 외부 API 갱신
+- Travel v0.3.0
+- Pending 8 (튕김 진단) + 9 (다크 스타일 정제) 추가
+
+### `context-travel.md`
+- 헤더에 Session 7.6 명시
+- Session 7.6 완료 섹션
+- 트러블슈팅 갱신 (Mapbox 제거, Google Maps 활성화 누락 / referrer 에러 추가)
+- 코드 위치: `DARK_MAP_STYLES`, `loadGoogleMaps()`
+- §7 배포 가이드 v0.3.0 기준 전면 갱신
+
+## VERIFICATION
+
+- Node.js syntax 검증: 통과 (1077 lines)
+- Mapbox 활성 참조 0 (`mapbox_id` 컬럼명, 주석 외)
+- Google Maps API endpoint / library / version 공식 docs 확인
+
+## LESSON
+
+1. **베이스맵 정확도는 지역마다 다름**. Mapbox 가 글로벌 매끄러워 보여도 동아시아 (특히 대만) 정확도 부족. 사용 지역 검증 필수.
+2. **AdvancedMarkerElement 가 좋은 마이그레이션 경로**. DOM content 기반 → Mapbox element marker 거의 그대로 호환. 차이는 좌표 API ([lng,lat] → {lat,lng}) 와 lifecycle (addTo → marker.map=).
+3. **Cloud-based mapId 가 정석**. JSON styles 는 deprecated 경로. v0.3.0 은 빠른 출시 위해 JSON. 정제 필요하면 mapId 로 마이그레이션 (Pending #9).
+4. **maxZoom 직접 옵션 없음**. Mapbox 한 줄 `fitBounds({maxZoom:15})` 대신 Google 은 `fitBounds + idle + setZoom` cap.
+5. **clickableIcons: false** 누락하면 Google POI 가 우리 마커 위에 클릭 받음.
+6. **중복 핸들러 발견**. Session 7.2 작업 중 실수로 `google-key-save` 핸들러 두 군데 등록. str_replace 후 같은 함수 grep 으로 중복 체크 교훈.
+
+## COST
+
+위 비용 검증 표 참조. 가족 사용량으로 무료 한도 안. Claude 토큰 (Anthropic 측): 평소 세션 ~2.5배.
+
+## v0.3.0 → v0.3.1 hotfix (배포 직후)
+
+**증상**:
+1. "이 페이지에서 Google 지도를 제대로 로드할 수 없습니다" 알림창
+2. 콘솔 "유효한 지도 ID 없이 초기화되어 지도에서 고급 마커를 사용할 수 없습니다" × 29회
+3. 마커 안 그려짐 (지도만 보임)
+
+**원인**: `AdvancedMarkerElement` 는 `mapId` 필수. v0.3.0 에서 `styles` 옵션만 줬고 `mapId` 빠짐.
+
+**해결**:
+- `mapId: 'DEMO_MAP_ID'` 추가 (Google 공식 testing 용)
+- 사용자 자체 mapId 가 LocalStorage `familyOS.googleMapId` 에 있으면 그것 우선
+- `loadGoogleMaps()` URL 에 `loading=async` 추가
+- `styles` 옵션은 코드에 남아 있지만 mapId 있으면 무시 (Google 사양)
+
+**검증**: 알림창 사라짐 + 마커 29개 정확한 위치 표시 + 콘솔 경고 사라짐.
+
+**트레이드오프**: DEMO_MAP_ID 는 라이트 디폴트 스타일. 다크 톤 복구는 사용자 mapId 발급 + Cloud Map Style 정의 필요 (Pending #9 의 작업 내용).
+
+**부수 발견 (우리 코드 무관)**:
+- 콘솔 share-modal.js TypeError: 사용자가 설치한 브라우저 확장 프로그램의 content script. Sources → "Content scripts" 그룹에 확인됨 (NASCA Server DRM, Screenshot Tool 등과 함께). 무시 가능
+
+## PENDING
+
+worklog Cross-cutting Pending:
+- **8. 튕김 현상 진단 진행 중** — `[DIAG]` 로그 박힘. 사용자 보고 대기
+- **9. 다크 지도 스타일 복구** — 사용자 Map ID 발급 + Cloud Map Style 다크 정의 후 LocalStorage `familyOS.googleMapId` 저장. 코드 측 준비 완료
+- **7. mapbox_id → Google place_id 마이그레이션 잔재** — 유지
+
+## 다음 세션 시작 시 사용자 체크리스트
+
+1. **Cloud Console**: 기존 프로젝트 → Maps JavaScript API 활성화 → Quota daily 100~300 → referrer 제한 재확인
+2. **Git push**: `travel-trip.html`, `worklog.md`, `context-travel.md`
+3. **사이트 새로고침**: Mapbox token 모달 더 이상 안 뜸. 기존 Google key 그대로
+4. **시각 확인**: 대만 핀-지도 매칭 정확해짐 ✅. 라이트 톤 (다크 원하면 Pending #9 진행)
+5. **튕김 발생 시**: F12 Console `[DIAG]` 라인 캡쳐
+────────────────────────────────────────────────────────────────────

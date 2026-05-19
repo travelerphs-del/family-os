@@ -1,7 +1,7 @@
 # Context: Travel 대시보드 작업
 
 > Travel 작업 세션 시작 시 이 파일을 첨부할 것.
-> Phase A (Session 6) + Phase B (Session 7) + Session 7.2 (가족 8명 / 호텔 stay_range / Google Places) + Session 7.3 (베이스맵 Mapbox→Google Maps 전체 교체) 완료.
+> Phase A (Session 6) + Phase B (Session 7) + Session 7.2 (가족 8명 / 호텔 stay_range / Google Places) + Session 7.3 (베이스맵 Mapbox→Google Maps 전체 교체 + v0.3.1 mapId hotfix) 완료.
 
 ---
 
@@ -49,7 +49,7 @@
 - 같은 mapbox_id 재방문 dedup
 - 방문일 필터 칩 — fitBounds 자동
 
-### Session 7.2 — Travel 보강 ✅ 완료
+### Session 7.5 — Travel 보강 ✅ 완료
 
 ✅ **가족 멤버 8명** (`travel.html`)
 - `FAMILY_MEMBERS = ['아빠', '엄마', '도비', '로비', '할머니', '할아버지', '외할머니', '외할아버지']`
@@ -74,7 +74,7 @@
 - **지도 클릭 폴백**: "지도에서 직접 선택" 버튼 → 모달 임시 닫고 crosshair 커서 + sticky 안내 배너 → 클릭 시 좌표 캡쳐 → 모달 재오픈 (좌표 채워진 상태). 이름은 사용자 직접 입력. mapbox_id 빈 값
 - ESC 로 픽킹 모드 취소
 
-### Session 7.3 — 베이스맵 Mapbox→Google Maps 전체 교체 ✅ 완료
+### Session 7.6 — 베이스맵 Mapbox→Google Maps 전체 교체 ✅ 완료
 
 **배경**: Session 7.2 후 사용자 대만여행 입력 → 핀-지도 mismatch 발견. 시트의 lat/lng 를 Google Maps 에 직접 입력하면 정확. → Mapbox dark-v11 베이스맵의 대만 지역 정확도 부족 확정. 베이스맵 전체 교체 결정.
 
@@ -93,11 +93,30 @@
 
 ✅ 비용: 가족 사용량 500/월 (초기) → 100/월. Maps JavaScript API 무료 한도 10,000/월. 실 청구 $0/월.
 
-**부수 효과 (Session 7.2 hotfix)**:
+**부수 효과 (Session 7.5 hotfix)**:
 - 모든 모달 button 에 `type="button"` 명시 (form 없는 환경에서도 표준 명시)
 - 타일 클릭에 `setTimeout` navigate (가끔 첫 클릭 안 먹는 현상 안전망)
 - `savePlace` 분리 (저장 성공 시에만 모달 닫고 loadAll. loadAll 실패해도 navigate 안 일어나게)
 - 진단 로그 `[DIAG]` 박힘 (튕김 원인 별도 추적용)
+
+### Session 7.6 v0.3.0 → v0.3.1 hotfix
+
+**배경**: 배포 직후 사용자 보고:
+1. "이 페이지에서 Google 지도를 제대로 로드할 수 없습니다" 알림창
+2. 콘솔에 "유효한 지도 ID 없이 초기화되어 지도에서 고급 마커를 사용할 수 없습니다" 메시지 29회 (= 마커 개수)
+3. 마커가 안 보임. 지도만 보임
+
+**원인**: `AdvancedMarkerElement` 는 `mapId` 필수. v0.3.0 에서 `mapId` 누락 + `styles` 옵션만 줌. Google 이 마커 렌더링 실패하면서 알림창까지 띄움.
+
+**해결 (v0.3.1)**:
+- `initMap()` 에 `mapId: 'DEMO_MAP_ID'` 추가 (Google 공식 testing 용. production 권장 X 지만 가족 사용 범위에선 OK)
+- 사용자 자체 mapId 가 LocalStorage `familyOS.googleMapId` 에 있으면 그것을 우선 사용
+- `loadGoogleMaps()` 의 URL 에 `loading=async` 추가 (suboptimal performance 경고 해결)
+- `styles` 옵션은 코드에 남아있지만 `mapId` 가 있으면 무시됨 (Google 사양)
+
+**트레이드오프**: DEMO_MAP_ID 는 디폴트 라이트 스타일. 다크 톤 복구하려면 사용자가 Cloud Console 에서 자체 mapId 발급 + Map Style 다크 정의 → LocalStorage 저장. → Pending #9 로 등록
+
+**검증**: 핀-지도 매칭 정확. 알림창 사라짐. 콘솔 경고 사라짐.
 
 ### 시트 스키마 (v0.2.2)
 
@@ -128,7 +147,7 @@
 
 ## 3. 다음 세션 작업 — 사용자 결정 필요
 
-Session 7.2 로 이전 우선순위 3가지 작업 모두 완료. 새 작업은 사용자 사용 후 보고에 따라 결정.
+Session 7.5 로 이전 우선순위 3가지 작업 모두 완료. 새 작업은 사용자 사용 후 보고에 따라 결정.
 
 후보 (위 §2 표 우선순위 순):
 - Travel↔Expense 비용 표기 자동화 (메인 허브 결합 캐싱)
@@ -156,6 +175,10 @@ Session 7.2 로 이전 우선순위 3가지 작업 모두 완료. 새 작업은 
 | 지도 클릭 폴백 안 됨 | crosshair 커서 안 뜸 → CSS 적용 확인. ESC 로 취소 후 재시도 |
 | 시트에 stay_start/stay_end 컬럼 없음 | 첫 doGet/doPost 호출 시 `ensureSheets_` 가 자동 추가. 안 되면 수동으로 14·15번 컬럼에 헤더만 입력 |
 | 페이지 튕김 (드물게) | F12 Console 의 `[DIAG]` 로그 캡쳐. 진단용 로그가 v0.2.2 hotfix 로 박혀있음 |
+| 콘솔에 share-modal.js 또는 다른 외부 .js 의 TypeError | 사용자가 설치한 브라우저 확장 프로그램의 content script. 우리 페이지 코드와 무관. Sources → "Content scripts" 그룹에 확인. 무시하거나 해당 확장 비활성화 |
+| 콘솔에 "Tracking Prevention blocked access to storage..." | Edge 브라우저의 추적 차단. 단순 경고. 무시 가능 |
+| 라이트(밝은) 지도 톤 | v0.3.1 의 DEMO_MAP_ID 가 디폴트 라이트. 다크 톤 원하면 Cloud Console 에서 자체 Map ID + Map Style 만든 후 LocalStorage `familyOS.googleMapId` 에 저장 |
+| "이 페이지에서 Google 지도를 제대로 로드할 수 없습니다" 알림창 | v0.3.1 부터 mapId 추가로 해결. 만약 다시 발생하면 빨간 콘솔 에러 (Google Maps JavaScript API error: ...) 확인 — BillingNotEnabled / InvalidKey / RefererNotAllowed / ApiNotActivated 중 하나 |
 
 ---
 
@@ -189,25 +212,43 @@ Session 7.2 로 이전 우선순위 3가지 작업 모두 완료. 새 작업은 
 
 ---
 
-## 7. v0.3.0 배포 가이드 (사용자용)
+## 7. v0.3.1 배포 가이드 (사용자용)
+
+### 적용 완료 사항 (v0.3.1 기준)
 
 이 버전을 GitHub Pages 에 올린 직후 다음 순서로 점검:
 
-1. **Google Cloud Console - 기존 프로젝트에 Maps JavaScript API 추가 활성화**:
-   - APIs & Services → Library → "Maps JavaScript API" 활성화 (Places API 와 같은 프로젝트)
-   - APIs & Services → Quotas → "Maps JavaScript API" daily limit **100~300** 설정 (가족 사용량 예상 500/월 → 일 평균 17. 300/일은 안전한 cap)
-   - 기존 API key 의 HTTP referrer 제한이 GitHub Pages 도메인 포함하는지 재확인
-   - **API key 는 같은 것 재사용**. 사용자가 key 다시 입력할 필요 없음 (LocalStorage `familyOS.googlePlacesKey`)
-2. **Apps Script 재배포 (변경 없음, Session 7.2 와 동일)** — 이미 7.2 에 배포돼 있으면 skip
-3. **travel-trip.html 첫 접속**:
-   - 지도 로드 → Mapbox 의 token 모달 더 이상 안 뜸
-   - 만약 "Google Maps 로드 실패" 메시지: API key 에 Maps JavaScript API 활성화 누락 또는 referrer 제한
-   - 검색은 이미 v0.2.2 부터 Google
-4. **시각적 변경 확인**:
-   - 다크 톤 지도는 Mapbox dark-v11 만큼 미려하지 않을 수 있음 (Google JSON styles 초기 구현)
-   - 도로/도시 라벨 폰트는 Google 기본
-   - 대만 지역 핀-지도 매칭 정확해진 것 확인
-5. **Mapbox 정리 (선택)**:
-   - LocalStorage `familyOS.mapboxToken` 자동 안 지워짐. 더 이상 사용 안 함
-   - Mapbox 계정 자체는 무료라 그대로 둬도 청구 안 됨
-   - 깔끔 정리하려면 F12 → Application → Local Storage 에서 `familyOS.mapboxToken` 삭제
+1. **Google Cloud Console**:
+   - 기존 프로젝트에 **Maps JavaScript API** 활성화 (Places API 와 같은 프로젝트)
+   - Quotas → "Maps JavaScript API" daily limit **100~300** 설정
+   - API key 의 HTTP referrer 제한 GitHub Pages 도메인 포함
+   - API key 는 같은 것 재사용 (LocalStorage `familyOS.googlePlacesKey`)
+2. **Apps Script 재배포** — 변경 없음. Session 7.2 와 동일이면 skip
+3. **travel-trip.html 첫 접속 검증**:
+   - 지도 로드. Mapbox token 모달 더 이상 안 뜸
+   - 핀이 정확한 위치에 박힘 (대만 정확도 OK)
+   - 알림창 안 뜸
+   - 콘솔에 "유효한 지도 ID 없이..." 메시지 안 보임
+4. **무시 가능한 경고**:
+   - "Tracking Prevention blocked access to storage" — Edge 추적 차단
+   - 외부 확장 프로그램(share-modal.js 등) 의 TypeError — 우리 코드 무관
+
+### 다크 톤 복구 (선택 사항, Pending #9)
+
+v0.3.1 은 `DEMO_MAP_ID` 사용 → Google 디폴트 라이트 스타일. 다크 톤 복구하려면:
+
+1. **Cloud Console** → "Map Management" (또는 검색: "Map Styles")
+2. "Create Map ID" → Map Type: **JavaScript**, Vector 선택 → ID 발급 받음 (`abc123def...`)
+3. "Map Styles" → "Create new style" → 다크 톤 직접 디자인 (또는 import) → 위 mapId 에 연결
+4. 발급된 mapId 를 LocalStorage 에 저장:
+   - travel-trip.html 열고 F12 → Console:
+     ```js
+     localStorage.setItem('familyOS.googleMapId', '발급받은_mapId')
+     ```
+5. 새로고침 → 다크 톤 적용
+
+### Mapbox 정리 (선택)
+
+- LocalStorage `familyOS.mapboxToken` 자동 안 지워짐. 더 이상 사용 안 함
+- Mapbox 계정 자체는 무료라 그대로 둬도 청구 안 됨
+- 깔끔 정리: F12 → Application → Local Storage → `familyOS.mapboxToken` 삭제

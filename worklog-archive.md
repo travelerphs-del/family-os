@@ -2114,4 +2114,189 @@ worklog Cross-cutting Pending:
 - **Travel ↔ Expense 비용 매칭** (worklog #1) — 다음 Expense 세션에서. 구현 방식은 사전 합의 완료: Expense Apps Script `?mode=trip_summary&trip_id=` 엔드포인트 + Travel 페이지에서 카드 한 줄로 표시 (참가 멤버 다음에 "전체 비용 + 카테고리 별 %")
 - **튕김 원인 추적** (worklog #8) — 진단 로그 영속화 완료. 사용자가 다음 튕김 발생 시 설정 모달 → "진단 로그 복사" → 보고 받아야 원인 추적 가능
 - **Multi-city trip 지원** (worklog #2) — 데이터 모델 보강 필요. 우선순위 낮음
+
+## Session 7.6 — Travel 인터랙션 개편 + 진단 로그 영속화 + 아이콘 (v0.3.2)
+
+### 배경
+
+사용자 보고 종합:
+1. **튕김 현상 지속**: PC 브라우저에서 travel-trip 페이지가 가끔 닫힘. Session 7.3 의 `console.log [DIAG]` 진단은 페이지가 죽으면 같이 사라져 캡쳐 불가
+2. **마커 클릭 UX 개선 요구**: 클릭 시 모달이 화면 전체를 덮어 지도 컨텍스트 손실. 더 자연스러운 split 레이아웃 원함
+3. **날짜 필터 후 방문지 목록 부재**: 그 날짜의 어떤 장소를 갔는지 한눈에 안 보임
+4. **아이콘 어색함**: restaurant (포크+칼?), park (낙엽수?), sight (사진관/카메라?) 아이콘이 일반적이지 않음
+5. **카테고리 부족**: 백화점 / 마사지샵 같은 자주 가는 곳 카테고리 없음
+
+### 폐기된 옵션 (사용자 결정)
+
+- **다크 지도 톤 복구** (Pending #9) — 사용자가 "라이트 톤이 어차피 가족만 쓰는 거 어색하지 않다"로 결정, 폐기
+- **mapbox_id 마이그레이션** — 사용자가 Mapbox 시절 place 추가한 적 없음 확인. 자동으로 해결됨, 폐기
+- **Google Photos 자동 표시** — 2025-03 API 정책 변경으로 Library API 사용자 라이브러리 접근 불가. 사용자가 "내가 구글포토 열면 되지" 로 결정, 폐기
+- **Expense ↔ Travel 비용 매칭** — 다음 Expense 세션에서 처리하기로 결정 (구현 방식은 본 세션 사전 합의에서 정리: Expense Apps Script `?mode=trip_summary&trip_id=` 엔드포인트 + Travel 페이지에서 호출)
+
+### 결정 (이번 세션 범위)
+
+1. **진단 로그를 localStorage ring buffer 로 교체** (`familyOS.diag.travel`)
+2. **Split 레이아웃 도입** — 데스크탑은 가로 분할, 모바일은 세로 스택
+3. **아이콘 SVG path 갱신** — restaurant / park / sight 교체
+4. **카테고리 2개 신규** — department (백화점) / massage (마사지)
+
+### CODE — travel-trip.html
+
+**진단 로깅 모듈 전면 교체**:
+- `DIAG_KEY = 'familyOS.diag.travel'`, `DIAG_MAX = 200` (ring buffer)
+- `diagLog(event, detail)`: localStorage 누적 + console 출력 둘 다
+- 기록 이벤트: page_loaded / window_error / unhandled_rejection / beforeunload / pagehide / popstate / filter_chip_click / layout_mode_change / side_close_click / side_tile_click / open_add_place / open_edit_place / close_place_modal / save_place_(start|ok|error) / delete_place_(start|ok|error) / save_place_loadall_error / enter_pick_mode / cancel_pick_mode / pick_map_click / esc_pressed
+- 모든 click 은 메모리에 lastClickInfo 1건만 → 언로드/에러 시 함께 기록 (이전엔 모든 클릭을 console 에 쏟아 추적 어려움)
+- 설정 모달 inject UI: "로그 복사" / "로그 초기화" 버튼 (index.html 백업/복원과 동일 패턴)
+
+**Split 레이아웃**:
+- `state.layoutMode: 'full' | 'date-side' | 'edit-side'`
+- HTML: `.map-section` 단독 → `<div class="split-wrap">` 안에 `.map-section + .split-side`
+- CSS: `.split-wrap.mode-date .map-section { flex: 1 1 75% }` / `.mode-edit { flex: 1 1 50% }` / 모바일은 `flex-direction: column`
+- `setLayoutMode(mode)`: 클래스 토글 + 50ms 후 `google.maps.event.trigger(map, 'resize')` (컨테이너 리사이즈 후 지도 다시 그리기)
+- `renderDateSide()`: 사이드에 그 날짜의 방문지 타일 (.side-tile) 리스트. 클릭하면 → openEditPlaceModal (또는 회색 핀이면 showOtherPlacePopup + 줌인)
+- `zoomToMarkerWithRadius(lat, lng, 1)`: 위도 보정 (`cos(lat)`) ±1km 박스를 fitBounds(0) 으로 적용
+- `moveFormToSide()` / `moveFormBackToModal()`: 기존 `#place-modal > .modal` 노드를 사이드 패널 안으로 reparent. `.as-side` 클래스로 padding/max-width 조정 + 닫기 X 버튼 inject. 닫을 때 다시 backdrop 안으로 reparent (ID 중복 방지)
+
+**핸들러 변경**:
+- 필터 칩 클릭: 활성 칩 다시 클릭하면 'all' 로 토글. 'all'/'planned' 면 `setLayoutMode('full')`, 날짜면 `'date-side'`
+- 마커 클릭 (openEditPlaceModal): `setLayoutMode('edit-side')` + `moveFormToSide()` + `zoomToMarkerWithRadius(p.lat, p.lng, 1)`
+- 신규 추가 (openAddPlaceModal): `setLayoutMode('edit-side')` + `moveFormToSide()`. 줌인 안 함 (마커 없음)
+- closePlaceModal: `moveFormBackToModal()` + 이전 filter 가 날짜면 'date-side' 복귀, 아니면 'full'
+- ESC: layoutMode 단계적 해제 (edit-side → date-side → full)
+- 픽킹 모드: 사이드 패널 임시 숨김 (body.map-picking CSS), 지도 전체 활용
+
+**아이콘 SVG path 교체 (catIconPath)**:
+- restaurant: 포크(3갈래) + 스푼(타원) 세로 나란히
+- park: 큰 나무 1 + 작은 나무 2 + 바닥선
+- sight: 입장권 (직사각형 + 가운데 perforation 3개)
+- department (신규): 평지붕 빌딩 + 창문 4개 + 입구
+- massage (신규): 동그란 얼굴 + 살짝 감긴 눈 + 옅은 미소
+
+**카테고리 메타 (CATEGORIES 배열)** 12개 순서:
+`hotel / restaurant / cafe / mart / shop / department / beach / park / themepark / sight / massage / other`
+(department 는 mart 옆, massage 는 sight 옆. 사용자 합의)
+
+### CODE — travel-apps-script.gs
+
+`CATEGORIES` 배열을 위 순서대로 12개로 확장. 다른 변경 없음 (검증 로직 `CATEGORIES.indexOf` 가 그대로 작동).
+
+### CODE — backend-spec.md
+
+§3-7 places 시트 `category` enum 행 갱신:
+```
+| `category` | enum | `hotel` / `restaurant` / `cafe` / `mart` / `shop` / `department` / `beach` / `park` / `themepark` / `sight` / `massage` / `other` |
+```
+
+### VERIFICATION (작업자 자체)
+
+- node --check 통과 (script 블록 syntax 무결성)
+- HTML 파일 라인 수 1752 → 2234 (+482 라인)
+- 신규 함수 호출 그래프 47회 (setLayoutMode / renderDateSide / zoomToMarkerWithRadius / moveFormToSide / moveFormBackToModal / diagLog)
+- 5개 카테고리 아이콘 미리보기 widget 으로 사용자 사전 확인 (작업 들어가기 전)
+
+### 배포 가이드 (사용자용)
+
+1. travel-trip.html 교체 → GitHub Pages 푸시
+2. travel-apps-script.gs 교체 → Apps Script 편집기 붙여넣기 → "배포 관리" → 기존 배포 편집 → "새 버전" 선택 → 배포. **URL 은 그대로 유지** (사용자가 LocalStorage 재입력 안 해도 됨)
+3. backend-spec.md 는 참고 문서, 사용자 작업 불필요
+4. 페이지 로드 후 검증:
+   - 마커 클릭 → 50:50 split (편집 폼 우측, 마커 중심 ±1km 줌)
+   - 날짜 칩 클릭 → 75:25 split (방문지 타일 우측)
+   - 활성 날짜 칩 다시 클릭 또는 ESC → full 복귀
+   - 설정 톱니 → 모달 하단 "진단 로그" 섹션 확인 (현재 N건 표시)
+5. 사이드 폼에서 카테고리 그리드 → 12개 중 department/massage 보이는지 확인
+
+### LESSON
+
+- **DEMO_MAP_ID 의 라이트 톤 유지** — 다크 톤 mapId 만드는 비용 (Cloud Console 작업 + AdvancedMarkerElement 와의 호환) 보다 라이트 톤 유지 가치가 큼. 가족 전용이라 일관성보다 가독성 우선
+- **모달 → 사이드 reparent 패턴** — ID 충돌 없이 같은 폼을 두 위치에서 재활용하는 가장 작은 변경. fillPlaceModal/savePlace/deletePlace 함수 시그니처 유지. 단점: backdrop 의 `.modal-actions` selector 가 모달과 사이드 양쪽에서 동일하게 매칭되므로 추후 settings 모달 inject UI 등 다른 동적 inject 패턴과 충돌 가능 (현재 inject 는 `.modal-backdrop.open .modal` 셀렉터로 backdrop 의존하므로 OK)
+- **진단 로그 localStorage 영속화** — 페이지 죽음에도 살아남는 게 핵심. console.log 만으로는 정보가 같이 사라짐. ring buffer 사이즈는 200 (대략 1~2주 정상 사용 분량) 적당
+- **fitBounds 위도 보정** — 1km 박스의 경도 폭은 `cos(latitude)` 에 비례. 적도(서울 약 0.71, 도쿄 약 0.80)에서 무시하면 박스가 직사각형이 됨. 보정 코드 5줄로 충분
+- **CSS `as-side` override** — `.modal` 의 max-width/padding/animation/border 를 모두 `!important` 로 끔. 다른 곳에서 `.modal` 클래스를 재사용하지 않는다는 가정 하에 안전
+
+### COST
+
+- 코드 변경만, API 호출 추가 없음. $0
+- LocalStorage 사용량 증가: 200건 × 평균 200B ≈ 40KB (한도 5~10MB 중 일부)
+- Claude 비용은 사용자가 직접 챙길 부분 (이 세션은 작업 분량 중-대 — 대시보드 1개 큰 개편)
+
+### PENDING (이 세션 종료 시)
+
+- **Travel ↔ Expense 비용 매칭** (worklog #1) — 다음 Expense 세션에서. 구현 방식은 사전 합의 완료: Expense Apps Script `?mode=trip_summary&trip_id=` 엔드포인트 + Travel 페이지에서 카드 한 줄로 표시 (참가 멤버 다음에 "전체 비용 + 카테고리 별 %")
+- **튕김 원인 추적** (worklog #8) — 진단 로그 영속화 완료. 사용자가 다음 튕김 발생 시 설정 모달 → "진단 로그 복사" → 보고 받아야 원인 추적 가능
+- **Multi-city trip 지원** (worklog #2) — 데이터 모델 보강 필요. 우선순위 낮음
+
+
+---
+
+## Session 7.6 — hotfix-1, hotfix-2 (같은 날 같은 세션 내 추가 수정)
+
+### hotfix-1: 사이드 콘텐츠 누적 문제
+
+**증상**: 날짜 클릭 후 우측 타일 클릭 시 편집 폼이 안 보이는 것처럼 느껴짐.
+
+**원인**: `moveFormToSide()` 가 사이드의 기존 콘텐츠 (.side-head, .side-list) 를 비우지 않고 `appendChild` 만 함. 사이드에 [.side-head, .side-list, .modal.as-side] 3개가 누적되어 폼이 아래로 밀렸음.
+
+**수정**:
+- `clearSide()` 헬퍼 신규: 사이드 안에 모달이 있으면 backdrop 으로 안전 복귀 후 사이드 비움
+- `setLayoutMode('full')` 진입 시 `clearSide()` 자동 호출
+- `moveFormToSide()` 진입 시 사이드의 비-모달 자식 제거 (Array.from + forEach 패턴)
+- 진단 로그 2건 추가: `marker_click` (어떤 마커인지), `move_form_to_side` (사이드 자식 수)
+
+### hotfix-2: 모달 노드 DOM 손실로 인한 TypeError
+
+**증상**: 편집 폼이 사이드에 떠있는 상태에서 날짜 필터 칩을 누른 뒤 마커를 클릭하면 `Uncaught TypeError: Cannot set properties of null (setting 'textContent')` at line 1667. 이후 모든 마커 클릭이 같은 자리에서 죽고, 페이지 새로고침까지 복구 불가.
+
+**진단 (사용자 로그 기반)**:
+시간선:
+```
+edit-side 상태 (모달이 사이드 안)
+→ filter_chip_click → layout_mode_change(edit-side → date-side)
+  ↳ setLayoutMode('date-side') 안에서 clearSide() 안 함
+     (mode==='full' 일 때만 호출하도록 hotfix-1 에서 만들었음)
+  ↳ renderDateSide() 호출 → side.innerHTML = '...' 로 통째 교체
+  ↳ 사이드 안에 있던 모달 노드가 DOM 에서 영구히 제거됨
+→ 다음 marker_click → fillPlaceModal
+  ↳ document.getElementById('place-modal-title') === null
+  ↳ null.textContent = ... → TypeError
+```
+
+**원인 정확히**: hotfix-1 의 `clearSide()` 함수 자체는 모달 복귀를 올바르게 처리하지만, `setLayoutMode` 가 `mode === 'full'` 케이스에서만 호출했음. `date-side` 진입 시에는 호출 안 되어, 그 뒤에 따라오는 `renderDateSide()` 의 innerHTML 통째 교체가 사이드 안 모달을 날렸음.
+
+**수정**:
+- `setLayoutMode` 의 `if (mode === 'full')` → `if (mode !== 'edit-side')` 로 변경 (한 줄)
+- 결과: edit-side 외 모든 모드(date-side / full) 진입 시 clearSide 호출. 모달이 사이드에 있으면 안전하게 backdrop 으로 복귀 후 사이드 비움. renderDateSide 의 innerHTML 교체는 안전한 상태에서 발생.
+- `fillPlaceModal` 에 null 가드 추가: `place-modal-title` 못 찾으면 진단 로그 (`fill_place_modal_no_title`) + alert 안내 + 일찍 종료. 페이지 죽지 않고 새로고침으로 복구 가능
+
+**검증한 시퀀스 7개**:
+| 시퀀스 | 동작 |
+|---|---|
+| full → edit-side | 정상 |
+| edit-side → edit-side | 정상 |
+| edit-side → date-side | **hotfix-2 로 해결** |
+| edit-side → full | 정상 |
+| date-side → edit-side | 정상 |
+| date-side → full | 정상 |
+| close (edit-side → date-side or full) | 정상 |
+
+### LESSON (hotfix-2)
+
+- **DOM reparent + innerHTML 교체의 함정**: 같은 컨테이너 안에 reparent 된 노드가 있는데 그 컨테이너에 `innerHTML = '...'` 하면 reparent 된 노드는 영구 제거. 다른 곳에서 그 노드를 ID 로 참조해도 null. clearSide 같은 보호 함수가 있어도 호출 분기를 빠뜨리면 무용지물.
+- **조건문 분기의 비대칭**: `mode === 'full'` 같은 narrow 매칭보다 `mode !== 'edit-side'` 같은 negative 매칭이 더 안전한 케이스. 이번처럼 "edit-side 만 예외, 나머지는 다 같은 처리" 가 의도였으면 negative 매칭이 직접적.
+- **사용자 진단 로그의 가치**: 사용자가 보고한 로그 한 번으로 시간선 + 호출 그래프 + 실패 지점 정확히 특정. console.log 만 박았으면 시간 동기화 안 되고 페이지 재시작 시점에서 컨텍스트 잃었을 것. localStorage ring buffer 도입한 게 정확히 이 케이스에서 회수됨.
+- **null 가드는 진단 도구**: hotfix-2 의 fillPlaceModal null 가드는 이번 버그를 막지는 못함 (이번엔 setLayoutMode 수정으로 해결). 하지만 미래에 다른 경로로 또 null 이 오면 페이지가 죽지 않고 알려주게 됨 — 진단 로그가 따로 잡힘.
+
+### COST (hotfix-1 + hotfix-2)
+
+- 코드 변경만, API 호출 추가 없음. $0
+- 추가 진단 로그 이벤트: marker_click, move_form_to_side, fill_place_modal_no_title 3종
+
+### PENDING (이 세션 최종 종료 시)
+
+- **Travel ↔ Expense 비용 매칭** — 다음 세션 즉시 작업. `context-expense-trip-link.md` 에 합의안 + 결정 사항 정리됨
+- **Multi-city trip 지원** — 우선순위 낮음
+- 다른 모든 Travel 이슈는 이번 세션에서 해소됨
+
+
 ────────────────────────────────────────────────────────────────────

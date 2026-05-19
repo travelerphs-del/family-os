@@ -60,20 +60,17 @@ family-os/
 | Expense | 배포됨 | OAuth 폐기 (doPost 통일). 안정 |
 | Health | 배포됨 | **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
-| Travel | **v0.3.2** | Phase A+B + Session 7.2 + 7.3 + 7.6. 가족 8명. 호텔 stay_range. Google Places (New) 검색. **베이스맵 Google Maps + AdvancedMarkerElement + mapId**. **신규 아이콘 3개 교체 (restaurant/park/sight) + 카테고리 2개 추가 (department/massage). Split 레이아웃 (마커 클릭=50:50 편집사이드+1km 줌, 날짜 필터=75:25 방문지 사이드). localStorage ring buffer 진단 로그 (200건, 설정 모달에서 복사 가능).** 다크 톤은 사용자 mapId 발급 후 적용 가능 (Pending #9).
+| Travel | **v0.3.2** | Phase A+B + Session 7.2 + 7.3 + 7.6. 가족 8명. 호텔 stay_range. Google Places (New) 검색. 베이스맵 Google Maps + AdvancedMarkerElement + mapId. 신규 아이콘 3개 교체 (restaurant/park/sight) + 카테고리 2개 추가 (department/massage). Split 레이아웃 (마커 클릭=50:50 편집 사이드+1km 줌, 날짜 필터=75:25 방문지 사이드). localStorage ring buffer 진단 로그. **hotfix-2: setLayoutMode가 edit-side 외 모든 모드 진입 시 clearSide 호출하여 사이드 안 모달이 renderDateSide 의 innerHTML 교체로 사라지는 문제 해결.** 다크 톤 폐기 (사용자 결정으로 라이트 톤 유지). |
 
 ## Cross-cutting Pending
 
-1. **Travel ↔ Expense 비용 표기 자동화** — Phase B 는 현재 수동 입력. Expense Apps Script 에 `?mode=trip_summary&trip_id=` 엔드포인트 추가 + Travel 페이지에서 호출 + 여행 멤버 다음 카드에 표시. 다음 Expense 세션에서 처리 예정 (사용자 요청)
-2. **Multi-city trip 지원** — 현재 모델은 trip=1도시 가정. 사용자가 "샌프란시스코, LA" 식으로 입력 시 부분 동작. trip 분할 또는 데이터 모델 보강 검토
+1. **Travel ↔ Expense 비용 표기 자동화** — **다음 세션 즉시 작업**. Expense Apps Script 에 `?mode=trip_summary&trip_id=` 엔드포인트 추가 + travel-trip.html 의 여행 멤버 다음 카드에 "전체 비용 + 카테고리 별 %" 표시. 사용자가 Expense 거래 메모에 `#tokyo-2026` 식으로 태그한 거래를 카테고리별로 집계. 자세한 합의안은 `context-expense-trip-link.md` 참고
+2. **Multi-city trip 지원** — 현재 모델은 trip=1도시 가정. trip 분할 또는 데이터 모델 보강. 우선순위 낮음
 3. **Wealth 대수정** — daily snapshot 복구 + 전체금액/주가 오차 + 올해 수익 계산 + 추가 기능 → 다음 Wealth 세션 (`context-wealth.md` 참조)
 4. **Health 기능 추가** — 아이들 운동 스케줄 입출력 → 다음 Health 세션 (`context-health.md` 참조)
 5. **LocalStorage 영속성 진단 결과** — Session 5.2 의 자동 배너/콘솔 로그 사용자 보고 미수령
 6. **Future P004 마이그레이션 완료 후** — `parseEokFromText` fallback 제거 가능
-7. **Travel mapbox_id 잔재** (v0.2.2) — 폐기됨. 사용자 확인 결과 Mapbox 시절에는 place 추가 안 함. 모든 mapbox_id 컬럼 값은 Google `id`. 향후 컬럼명 정리는 별도 (호환성 위해 유지)
-8. **Travel 튕김 현상 진단** — v0.3.2 부터 localStorage ring buffer 진단 로그 도입. 튕김 후 다시 들어와 설정 모달 → "진단 로그 복사" → 보고하면 원인 추적 가능
-9. **Travel 다크 지도 스타일 복구** — 사용자 결정으로 폐기. 다크 배경 + 라이트 지도 톤 유지 (사용자가 그대로가 낫다고 함)
-10. **Google Photos 연동** — 폐기. Library API 2025-03 정책 변경으로 자동 표시 불가. 사용자가 별도 창에서 직접 확인하기로 결정
+7. **Travel 튕김 현상** — Session 7.6 의 진단 로그가 원인 추적함: 사실 튕김이 아니라 fillPlaceModal 의 textContent null 에러였음. v0.3.2 hotfix-2 로 해결. 진단 로그 모듈은 그대로 유지 (다른 잠재 이슈 추적용)
 
 ## 세션 종료 시 worklog 업데이트 규칙
 

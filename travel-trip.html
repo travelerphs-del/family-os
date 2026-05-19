@@ -1422,8 +1422,9 @@
     wrap.classList.remove('mode-date', 'mode-edit');
     if (mode === 'date-side') wrap.classList.add('mode-date');
     else if (mode === 'edit-side') wrap.classList.add('mode-edit');
-    // full 모드로 가면 사이드 안 보이지만 DOM은 남아 누적 위험. 비워서 다음 진입 청정.
-    if (mode === 'full') clearSide();
+    // edit-side 외 모드로 가면 사이드 안 모달은 안전하게 backdrop으로 복귀 후 사이드 비움.
+    // (date-side 로 갈 때 renderDateSide 가 innerHTML 통째 교체하므로, 그 전에 모달을 빼내야 함)
+    if (mode !== 'edit-side') clearSide();
     diagLog('layout_mode_change', { from: prev, to: mode });
     // Google Maps 는 컨테이너 리사이즈 후 트리거 필요
     if (state.map) {
@@ -1664,7 +1665,15 @@
 
   function fillPlaceModal(p) {
     const isEdit = state.modal.mode === 'edit';
-    document.getElementById('place-modal-title').textContent = isEdit ? '방문장소 편집' : '방문장소 추가';
+    // 모달 노드 무결성 가드 (v0.3.2 hotfix-2):
+    // 사이드/backdrop 어디에 있든 ID로 찾을 수 있어야 함. null 이면 DOM 에서 사라진 것 — 진단 후 일찍 종료.
+    const titleEl = document.getElementById('place-modal-title');
+    if (!titleEl) {
+      diagLog('fill_place_modal_no_title', { layout_mode: state.layoutMode });
+      alert('내부 오류: 편집 폼을 찾지 못했어요. 페이지를 새로고침하세요.');
+      return;
+    }
+    titleEl.textContent = isEdit ? '방문장소 편집' : '방문장소 추가';
     document.getElementById('place-modal-desc').textContent = isEdit
       ? '필요한 항목만 수정한 뒤 저장하세요.'
       : '카테고리를 고르고 장소를 검색하세요.';

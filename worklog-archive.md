@@ -2298,5 +2298,225 @@ edit-side 상태 (모달이 사이드 안)
 - **Multi-city trip 지원** — 우선순위 낮음
 - 다른 모든 Travel 이슈는 이번 세션에서 해소됨
 
+## Session 8 — Expense ↔ Travel 비용 연동 (2026-05-19)
+
+### 배경
+
+- Session 6 에서 Travel 대시보드 추가 시 "Travel ↔ Expense 메모 태깅" 컨벤션을 정해뒀음 (`backend-spec.md` §3-8).
+- 다만 trip 페이지 안에 비용 표기를 어떻게 할지는 Phase B 로 미뤘었음. 옵션 A (Expense API 호출) / B (수동 입력) / C (표기 안 함).
+- 이번 세션에서 옵션 A 로 결정. travel-trip.html 의 trip-head 영역에 "여행 전체 비용 + 서브카테고리별 비중" 한 줄 추가.
+- 사전 합의 문서: `context-expense-trip-link.md` (Session 7.6 종료 시점 작성).
+
+### 결정 사항
+
+| 항목 | 결정 |
+|---|---|
+| Expense 카테고리 구조 | 가설 A 맞음. `category` (대분류) + `subcategory` (소분류) 두 컬럼. 사용자가 import 시 "국내여행", "국외여행" 을 category 로 사용 |
+| 환율 처리 범위 | KRW/VND 만 환산 (기존 `toKRW()` 그대로). 사용자 카드사가 모든 외화를 KRW 로 변환 제공해서 다통화 확장 불필요 — 한국 신용카드 사용자 환경 |
+| 매칭 패턴 | 단어 경계 정규식. `(?:^|[^A-Za-z0-9_-])tripId(?:$|[^A-Za-z0-9_-])`. `#` 선택사항 |
+| 카테고리 필터 | X. memo 매칭만 사용. trip_id 충돌 방지는 사용자 책임 |
+| 표시 위치 | trip-head 의 `.trip-meta` 다음 줄. 별도 카드 X. 한 줄로 totalKRW + chips |
+| 데이터 없을 때 동작 | row 자체 숨김 (transaction_count===0). 에러는 console.warn 만 |
+| Expense URL 미설정 | 조용히 skip. UI 영향 X |
+
+### CODE
+
+#### Expense Apps Script (`expense-apps-script.gs`)
+
+**1. `doGet` 분기 추가**: `?mode=trip_summary&trip_id=X` 처리.
+
+**2. `buildTripSummaryPayload_(tripId)` 함수 신규** (line 306):
+
+```javascript
+function buildTripSummaryPayload_(tripId) {
+  const transactions = readTransactions_();
+  const fxRate = getFxRateCached_();
+  const toKRW = function (t) {
+    if (t.currency === 'KRW') return t.amount;
+    if (t.currency === 'VND') return t.amount / fxRate.rate;
+    return 0;
+  };
+  // 단어 경계 매칭
+  const escaped = String(tripId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(?:^|[^A-Za-z0-9_-])' + escaped + '(?:$|[^A-Za-z0-9_-])');
+  const matched = transactions.filter(t => t.memo && re.test(t.memo));
+  // ... subcategory 합산, pct 계산, 정렬
+}
+```
+
+응답 포맷 (`backend-spec.md` §3-9 표준):
+```json
+{
+  "dashboard": "expense",
+  "trip_id": "tokyo-2026",
+  "total_krw": 4523000,
+  "transaction_count": 47,
+  "unsupported_currency_count": 0,
+  "by_subcategory": [
+    { "name": "항공", "amount_krw": 1800000, "pct": 39.8 },
+    ...
+  ],
+  "updated_at": "2026-05-19T..."
+}
+```
+
+**3. `debug_trip_summary()` 헬퍼 추가** — Apps Script 편집기에서 직접 실행 가능.
+
+#### travel-trip.html
+
+**1. 상수 추가** (line 890):
+```javascript
+const EXPENSE_ID = 'expense';  // FamilyOS.getWebAppUrl(EXPENSE_ID) 로 호출
+```
+
+**2. state 필드** (line 1013):
+```javascript
+tripExpense: null,
+```
+
+**3. `loadAll()` 끝에서 비동기 trigger** (line 1075):
+```javascript
+if (state.status === 'ok') fetchTripExpense();
+```
+
+**4. `fetchTripExpense()` 함수 신규** (line 1082):
+- LocalStorage 에서 Expense URL 읽기 → 없으면 skip
+- GET `?mode=trip_summary&trip_id=X&_=cachebust`
+- 성공 시 state.tripExpense 채우고 `renderTripExpense()` 호출
+- 실패는 console.warn 만 (UI 변화 X)
+
+**5. `renderTripExpense()` 함수 신규** (line 1180):
+- transaction_count === 0 이면 빈 string (row 숨김)
+- 상위 6개 subcategory 까지 칩 표시, 나머지는 "기타 N건" 칩 하나로 묶음
+- unsupported_currency_count > 0 이면 ⚠ N건 미환산 배지
+
+**6. CSS** (line 137~191): `.trip-expense` 와 자식 클래스들. 기존 `.cat-chip` 톤 답습, 모바일에서 폰트 축소.
+
+#### backend-spec.md
+
+- 상단 v0.4 (Session 8) 변경 로그 추가
+- §1 mode 설명에 trip_summary 한 줄
+- §3-9 신규 — `?mode=trip_summary` 전체 표준 (요청/응답/매칭정책/환산정책/에러)
+- §8 변경 이력 표 v0.4 행 추가
+
+### VERIFICATION
+
+- 코드 작성만 했고 실제 배포 검증은 사용자 측에서. 다음 단계:
+  1. `expense-apps-script.gs` 를 Apps Script 편집기에 붙여넣고 새 버전 배포 (기존 Web App URL 유지됨)
+  2. Apps Script 편집기에서 `debug_trip_summary` 직접 실행 → trip_id 를 실제 값으로 바꿔서 응답 형식 눈으로 확인
+  3. `travel-trip.html` 을 GitHub Pages 에 푸시
+  4. trip 페이지 열고 다음 확인:
+     - Expense URL 설정 안 된 상태 → 비용 row 안 보임 (정상)
+     - Expense URL 설정됨 + 매칭 거래 없음 → row 안 보임 (정상)
+     - Expense URL 설정됨 + 매칭 거래 있음 → totalKRW + 칩 표시
+     - 카드사 currency 가 모두 KRW 면 `unsupported_currency_count === 0` 이어야 함
+     - F12 콘솔에 `[travel-trip] expense fetch failed` 가 보이면 fetch 실패 — Expense Web App URL 또는 배포 권한 확인
+
+### LESSON
+
+- **Cross-dashboard 호출 첫 사례**. "본인 시트만 읽음" 원칙은 유지 (Travel 은 Expense 시트를 직접 안 봄. Expense 의 API 만 호출). 메인 허브 외 다른 곳에서 다른 대시보드 URL 을 LocalStorage 에서 읽는 패턴은 이번이 처음 — 이 방식이 깔끔하게 동작했기 때문에 추후 다른 cross 표기 (예: Future 진행률을 Wealth 페이지에서 직접 표시) 에도 같은 패턴 사용 가능.
+- **단어 경계 매칭의 함정**: JS `\b` 는 `tokyo-2026-extended` 도 매칭해버림 (`-` 가 word boundary). 따라서 `[^A-Za-z0-9_-]` lookahead/lookbehind 식 매칭이 필요. lookbehind 는 V8 Apps Script 에서 동작하나 호환성 위해 `(?:^|[^...])` non-capturing group 으로 처리.
+- **데이터 0 일 때 row 자체 숨김** vs **"비용 데이터 없음" 빈 상태 표시** 사이 선택: 후자는 사용자에게 "내가 메모 태깅을 안 했나?" 자각 시키는 효과가 있지만, 매번 모든 trip 페이지에 회색 빈 박스가 뜨면 시각적 노이즈. 전자(숨김) 선택. 만약 사용자가 "왜 비용이 안 보이나" 라고 묻기 시작하면 후자로 전환.
+
+### COST
+
+- Anthropic API: 사용 안 함. 토큰 비용 X.
+- Apps Script: 무료 한도 (일 20,000 GET). 사용자 환경에서 trip 페이지 로드 빈도가 일 50~100회 수준이면 무난.
+- 외부 API: 환율 API (open.er-api.com) 6시간 캐시 그대로. 추가 호출 없음.
+- Google Maps: 변경 없음.
+
+### PENDING
+
+- 사용자 GitHub Pages 푸시 + Apps Script 재배포 후 동작 확인 보고
+- (제안) Expense 거래 입력 모달에 "어느 여행?" 드롭다운 추가 — 사용자가 trip_id 수동 박는 부담 줄이기. 별도 세션
+- (제안) `unsupported_currency_count > 0` 케이스가 실제로 발생하는지 사용자 확인 — 0 이 정상. 0 이 아니면 시트 currency 컬럼에 비표준 값이 들어가는 거니까 데이터 정리 필요
+- (참고) 메인 허브에는 이 연동 영향 없음. 메인의 Travel 카드는 여전히 `?mode=summary` 만 호출
+
+---
+
+## Session 8.1 — 날짜별 비용 row 사이드바 추가 (2026-05-19)
+
+### 배경
+
+- Session 8 첫 배포 후 사용자가 `taipei-2026` 으로 동작 확인 완료 (78건, ₩6,768,761, 6개 서브카테고리, `unsupported_currency_count: 0`).
+- 곧바로 추가 요구: trip 페이지에서 filter chip 으로 특정 일자를 선택하면 오른쪽에 그날 방문지 목록이 뜨는데, 그 위에 같은 형식의 비용 row 를 추가하고 싶다.
+
+### 결정 사항
+
+| 항목 | 결정 |
+|---|---|
+| 백엔드 호출 방식 | trip 전체 데이터 한 번에 받고 프론트에서 필터링. 매번 fetch X. |
+| 응답 확장 | `trip_summary` 응답에 raw `transactions[]` 배열 추가. `{date, amount_krw, subcategory}` 3필드만 (memo/merchant 제외 — 사이즈 + 프라이버시). |
+| 컴포넌트 재사용 | 기존 `renderTripExpense` 의 HTML 빌드 로직을 `buildExpenseRowHtml(d)` 로 추출. trip-head 와 split-side 양쪽에서 동일 컴포넌트 사용. |
+| 날짜 집계 | 프론트에서 `buildDateExpenseData(dateStr)` 가 transactions 를 필터/합산. trip-head 의 `d` 와 동일한 형식으로 반환. |
+| unsupported_currency_count | 사이드바 row 는 항상 0 으로 (trip 전체에서 검증된 값이라 부분 케이스에 굳이 경고 반복할 필요 X). |
+| 사이드바 row 디자인 | trip-head 와 동일 (`.trip-expense` CSS 재사용). 좁은 공간이라 칩이 wrap 될 수 있으나 flex-wrap 으로 자동 처리. 컴팩트 변형은 사용자 피드백 후 결정. |
+
+### CODE
+
+#### `expense-apps-script.gs`
+
+`buildTripSummaryPayload_` 의 응답에 `transactions: txOut` 필드 추가:
+
+```javascript
+const txOut = matched.map(t => ({
+  date:        t.date || '',
+  amount_krw:  Math.round(toKRW(t)),
+  subcategory: (t.subcategory && String(t.subcategory).trim()) || '기타'
+}));
+```
+
+memo / merchant / person / card / source / currency 모두 제외.
+
+#### `travel-trip.html`
+
+**1. `renderTripExpense` 분리**:
+- HTML 빌드 부분을 `buildExpenseRowHtml(d)` 함수로 추출
+- `renderTripExpense` 는 mount 찾기 + 빈 데이터 처리 + 호출만 담당
+
+**2. `buildDateExpenseData(dateStr)` 신규**:
+- `state.tripExpense.transactions` 에서 `date === dateStr` 인 거래만 필터
+- subcategory 단위 합산, pct 계산, 내림차순 정렬
+- trip-head 의 `d` 와 같은 형식 반환 (`{total_krw, transaction_count, by_subcategory, unsupported_currency_count: 0}`)
+- 데이터 0 건이면 `transaction_count: 0` 으로 반환 → `buildExpenseRowHtml` 이 빈 string 반환 → 자동으로 row 숨김
+
+**3. `renderDateSide` 안 한 줄 추가**:
+
+```javascript
+side.innerHTML = `
+  <div class="side-head">...</div>
+  ${buildExpenseRowHtml(buildDateExpenseData(dateStr))}
+  <div class="side-list">${listHtml}</div>
+`;
+```
+
+#### `backend-spec.md`
+
+- §3-9 응답 포맷에 `transactions: [...]` 예시 추가
+- 필드 규칙에 `transactions` 항목 추가 (3필드만, raw 거래, 100건 미만 가정)
+- v0.4 변경 로그 "부분 확장" 으로 보강
+
+### VERIFICATION
+
+사용자 푸시 후 확인 포인트:
+1. trip 페이지 첫 진입 (filter=all): trip-head 영역에 비용 row 그대로 유지
+2. filter chip 으로 특정 날짜 클릭: 오른쪽 사이드바에 ① side-head (날짜 + N곳) ② 비용 row (총액 + 칩) ③ 방문지 목록 순으로 표시
+3. 그 날짜에 매칭된 거래가 0 건이면 비용 row 가 안 보여야 함 (방문지 목록만)
+4. `close-x` 닫기 → trip-head 비용 row 는 그대로 (state.tripExpense 변화 X)
+
+### LESSON
+
+- **컴포넌트 추출의 가성비**: Session 8 초안에서 HTML 빌드 부분을 분리해뒀더라면 이 추가는 30라인 안에 끝났을 일. 지금은 함수 추출 + 사이드 호출 = 2번에 걸친 변경. 다음에 비슷한 row 컴포넌트 만들 땐 처음부터 builder 함수 분리하기.
+- **백엔드 raw 배열 vs 매번 fetch**: 100건 미만 trip 가정으론 raw 가 압도적으로 깔끔. 향후 사용자가 trip 당 500+ 거래 케이스 (장기여행) 만들기 시작하면 응답 사이즈 검토 필요. 대안: pagination, 또는 `?date=YYYY-MM-DD` 파라미터로 서버 측 필터링.
+
+### COST
+
+- Apps Script: 호출 횟수 변화 0. 응답 사이즈 약 +4KB (78건 × ~50바이트). 무시 가능.
+- Anthropic API: 사용 X.
+
+### PENDING
+
+- 사용자 GitHub Pages 푸시 + Apps Script 재배포 (Session 8 에서 또 한 번)
+- 사이드바에서 비용 row 가 시각적으로 어색하면 (border / 폰트 / 칩 사이즈) 조정 필요할 수 있음 — 사용자 피드백 후 결정
 
 ────────────────────────────────────────────────────────────────────

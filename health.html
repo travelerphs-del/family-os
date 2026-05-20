@@ -1616,6 +1616,9 @@ function renderRecentItemHtml(sheet, row) {
   let icon, iconCls, title, detail = '';
   let clickable = false, recordId = '';
   let chartNumBadge = '';
+  // 클릭 시 어느 디테일 뷰로 갈지. 기본은 자기 자신 sheet이지만,
+  // progress_note는 parent_type에 따라 home_clinic/hospital_report 로 라우팅.
+  let clickableSheet = sheet;
 
   switch (sheet) {
     case 'hospital_report':
@@ -1638,11 +1641,21 @@ function renderRecentItemHtml(sheet, row) {
       icon = 'PN'; iconCls = 'progress';
       title = `경과기록${row.day_number ? ' #' + row.day_number : ''} (${row.parent_record_id || ''})`;
       detail = row.assessment || row.plan || '';
-      // PN 클릭 시 부모 HC 팝업 열기 (parent_record_id 있을 때만)
+      // PN 클릭 시 부모 진료 (home 또는 hospital) 팝업 열기
       if (row.parent_record_id) {
         clickable = true;
         recordId = row.parent_record_id;
         chartNumBadge = `<span class="chart-num">차트 ${row.parent_record_id}</span>`;
+        // parent_type 으로 라우팅 결정. 빈 값이면 record_id prefix 로 추측 (HR-* / HC-*)
+        const ptype = (row.parent_type || '').toString().toLowerCase();
+        if (ptype === 'hospital') {
+          clickableSheet = 'hospital_report';
+        } else if (ptype === 'home') {
+          clickableSheet = 'home_clinic';
+        } else {
+          clickableSheet = String(row.parent_record_id).startsWith('HR-')
+            ? 'hospital_report' : 'home_clinic';
+        }
       }
       break;
     case 'medication':
@@ -1704,7 +1717,7 @@ function renderRecentItemHtml(sheet, row) {
   }
 
   return `
-    <div class="recent-item ${clickable ? 'clickable' : ''}" ${clickable ? `data-record-id="${escapeHtml(recordId)}" data-sheet="${escapeHtml(sheet)}"` : ''}>
+    <div class="recent-item ${clickable ? 'clickable' : ''}" ${clickable ? `data-record-id="${escapeHtml(recordId)}" data-sheet="${escapeHtml(clickableSheet)}"` : ''}>
       <div class="icon ${iconCls}">${icon}</div>
       <div class="body">
         <div class="head-row">
@@ -1728,7 +1741,7 @@ function attachRecentHandlers() {
       if (sheet === 'hospital_report') {
         openHospitalReportDetail(recordId);
       } else {
-        // home_clinic, progress_note (parent_record_id 로 HC 열기)
+        // home_clinic (또는 progress_note → parent_type='home')
         openHomeClinicDetail(recordId);
       }
     });
@@ -2889,7 +2902,7 @@ function showToast(kind, msg) {
 }
 
 /* ─── 부팅 ───────────────────────────────────── */
-console.log('%c[health] build: 2026-05-20 photo-thumb-placeholder', 'color:#34D399;font-weight:600');
+console.log('%c[health] build: 2026-05-20 pn-routing-by-parent-type', 'color:#34D399;font-weight:600');
 refresh();
 FamilyOS.registerServiceWorker();
 </script>

@@ -1611,6 +1611,9 @@ function renderRecentItemHtml(sheet, row) {
       icon = 'H'; iconCls = 'hospital';
       title = `${row.hospital || ''}${row.department ? ' · ' + row.department : ''}`;
       detail = row.chief_complaint || '';
+      clickable = true;
+      recordId = row.record_id || '';
+      chartNumBadge = row.record_id ? `<span class="chart-num">차트 ${row.record_id}</span>` : '';
       break;
     case 'home_clinic':
       icon = 'HC'; iconCls = 'home';
@@ -1690,7 +1693,7 @@ function renderRecentItemHtml(sheet, row) {
   }
 
   return `
-    <div class="recent-item ${clickable ? 'clickable' : ''}" ${clickable ? `data-record-id="${escapeHtml(recordId)}"` : ''}>
+    <div class="recent-item ${clickable ? 'clickable' : ''}" ${clickable ? `data-record-id="${escapeHtml(recordId)}" data-sheet="${escapeHtml(sheet)}"` : ''}>
       <div class="icon ${iconCls}">${icon}</div>
       <div class="body">
         <div class="head-row">
@@ -1709,7 +1712,14 @@ function renderRecentItemHtml(sheet, row) {
 function attachRecentHandlers() {
   document.querySelectorAll('.recent-item.clickable').forEach(el => {
     el.addEventListener('click', () => {
-      openHomeClinicDetail(el.dataset.recordId);
+      const sheet = el.dataset.sheet;
+      const recordId = el.dataset.recordId;
+      if (sheet === 'hospital_report') {
+        openHospitalReportDetail(recordId);
+      } else {
+        // home_clinic, progress_note (parent_record_id 로 HC 열기)
+        openHomeClinicDetail(recordId);
+      }
     });
   });
 }
@@ -1914,7 +1924,71 @@ function openHomeClinicDetail(recordId) {
   submitBtn.textContent = '+ 경과 기록 추가';
   submitBtn.onclick = () => {
     closeHModal();
-    setTimeout(() => openForm('progress', row.member_id, recordId), 100);
+    setTimeout(() => openForm('progress', row.member_id, recordId, 'home'), 100);
+  };
+  document.getElementById('h-modal-cancel').textContent = '닫기';
+
+  openHModal();
+}
+
+/* hospital_report 상세 보기 — home_clinic 패턴과 동일하되 병원/진료과 헤더만 다름 */
+function openHospitalReportDetail(recordId) {
+  if (!recordId) return;
+  const row = (state.sheets.hospital_report || []).find(r => r.record_id === recordId);
+  if (!row) return;
+
+  const m = state.members.find(x => x.member_id === row.member_id);
+  const who = m ? (m.name || MEMBER_LABELS[row.member_id]) : row.member_id;
+
+  // 연결된 progress_note들 (parent_type='hospital')
+  const pns = (state.sheets.progress_note || [])
+    .filter(p => p.parent_record_id === recordId)
+    .sort((a, b) => String(a.note_date).localeCompare(String(b.note_date)));
+
+  // 사진
+  const ids = row.photo_drive_ids
+    ? String(row.photo_drive_ids).split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  const hospLabel = [row.hospital, row.department].filter(Boolean).join(' · ');
+
+  document.getElementById('h-modal-title').textContent = `병원진료 — ${row.visit_date || ''}`;
+  document.getElementById('h-modal-back').style.display = 'none';
+  document.getElementById('h-modal-foot').style.display = 'flex';
+  document.getElementById('h-modal-body').innerHTML = `
+    <div style="font-size:11px;color:var(--text-quiet);font-family:var(--font-mono);margin-bottom:var(--s4)">
+      ${escapeHtml(who)} · 차트 ${escapeHtml(recordId)}${hospLabel ? ' · ' + escapeHtml(hospLabel) : ''}
+    </div>
+    ${row.chief_complaint ? `<div class="hc-detail-section"><h4>C/C — 주증상</h4><div class="content">${escapeHtml(row.chief_complaint)}</div></div>` : ''}
+    ${row.present_illness ? `<div class="hc-detail-section"><h4>P/I — 현병력</h4><div class="content">${escapeHtml(row.present_illness)}</div></div>` : ''}
+    ${row.assessment_plan ? `<div class="hc-detail-section"><h4>A/P — 진단·계획</h4><div class="content">${escapeHtml(row.assessment_plan)}</div></div>` : ''}
+    ${ids.length > 0 ? `<div class="hc-detail-section"><h4>증상 사진 (${ids.length})</h4><div class="recent-photos">${
+      ids.map(id => `<img class="recent-photo" style="width:100px;height:100px" src="https://drive.google.com/thumbnail?id=${escapeHtml(id)}&sz=w300" onclick="window.open('https://drive.google.com/file/d/${escapeHtml(id)}/view', '_blank')" alt="사진">`).join('')
+    }</div></div>` : ''}
+    <div class="hc-detail-section">
+      <h4>경과 기록 (${pns.length}건)</h4>
+      ${pns.length === 0 ? `<div style="font-size:12px;color:var(--text-quiet)">아직 경과 기록 없음</div>` :
+        pns.map(p => `
+          <div class="pn-card">
+            <div class="pn-card-head">
+              <span class="date">${escapeHtml(formatYMD(p.note_date) || '')}</span>
+              ${p.day_number ? `<span class="day">${escapeHtml(p.day_number)}</span>` : ''}
+            </div>
+            <div class="pn-body">
+              ${p.assessment ? `<div><b>A:</b> ${escapeHtml(p.assessment)}</div>` : ''}
+              ${p.plan ? `<div><b>P:</b> ${escapeHtml(p.plan)}</div>` : ''}
+            </div>
+          </div>
+        `).join('')
+      }
+    </div>
+  `;
+  // submit 버튼 → progress note 추가 (parent_type='hospital' 기본값)
+  const submitBtn = document.getElementById('h-modal-submit');
+  submitBtn.textContent = '+ 경과 기록 추가';
+  submitBtn.onclick = () => {
+    closeHModal();
+    setTimeout(() => openForm('progress', row.member_id, recordId, 'hospital'), 100);
   };
   document.getElementById('h-modal-cancel').textContent = '닫기';
 
@@ -2062,7 +2136,7 @@ function openCategoryPicker() {
   openHModal();
 }
 
-function openForm(catId, defaultMember, parentRecordId) {
+function openForm(catId, defaultMember, parentRecordId, parentType) {
   const cat = CATEGORIES.find(c => c.id === catId);
   if (!cat) return;
   state.currentCategory = cat;
@@ -2200,8 +2274,8 @@ function openForm(catId, defaultMember, parentRecordId) {
           <input type="text" class="form-input" name="parent_record_id" value="${escapeHtml(parentRecordId || '')}" placeholder="예: HC-20260415-001" required></div>
         <div><label class="form-label">원래 진료 유형</label>
           <select class="form-select" name="parent_type">
-            <option value="home">Home</option>
-            <option value="hospital">Hospital</option>
+            <option value="home"${parentType === 'home' ? ' selected' : ''}>Home</option>
+            <option value="hospital"${parentType === 'hospital' ? ' selected' : ''}>Hospital</option>
           </select>
         </div>
       </div>
@@ -2482,6 +2556,7 @@ window.removePhoto = removePhoto;
 
 async function uploadPendingPhotos() {
   const ids = [];
+  const errors = [];
   for (let i = 0; i < state.pendingPhotos.length; i++) {
     const p = state.pendingPhotos[i];
     try {
@@ -2491,10 +2566,18 @@ async function uploadPendingPhotos() {
         filename: 'hc_' + Date.now() + '_' + i + '.jpg',
         mimetype: 'image/jpeg'
       });
-      if (r.ok && r.file_id) ids.push(r.file_id);
-    } catch (e) { console.error('Photo upload error:', e); }
+      console.log('[photo upload]', i, r);
+      if (r.ok && r.file_id) {
+        ids.push(r.file_id);
+      } else {
+        errors.push(r.error || '응답에 file_id 없음');
+      }
+    } catch (e) {
+      console.error('[photo upload] exception:', e);
+      errors.push(e.message);
+    }
   }
-  return ids.join(',');
+  return { ids: ids.join(','), errors: errors };
 }
 
 /* ─── 폼 제출 ─────────────────────────────────── */
@@ -2593,7 +2676,21 @@ async function submitForm() {
     // home_clinic / hospital_report: 사진 먼저 업로드
     if ((cat.id === 'home' || cat.id === 'hospital') && state.pendingPhotos.length > 0) {
       submitBtn.textContent = '사진 업로드 중…';
-      const photoIds = await uploadPendingPhotos();
+      const { ids: photoIds, errors } = await uploadPendingPhotos();
+      const total = state.pendingPhotos.length;
+      const ok = photoIds ? photoIds.split(',').length : 0;
+      if (ok === 0 && total > 0) {
+        // 전부 실패 — 본문 저장 중단
+        showToast('error', '사진 업로드 실패 (' + (errors[0] || 'unknown') + '). 콘솔 확인 후 다시 시도하세요.');
+        state.isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = '저장';
+        return;
+      }
+      if (errors.length > 0) {
+        // 일부 실패 — 사용자에게 알림 후 진행
+        showToast('error', '사진 ' + errors.length + '/' + total + '장 업로드 실패. 저장은 진행합니다.');
+      }
       data.photo_drive_ids = photoIds;
     }
 
@@ -2765,6 +2862,7 @@ function showToast(kind, msg) {
 }
 
 /* ─── 부팅 ───────────────────────────────────── */
+console.log('%c[health] build: 2026-05-20 hospital-photo-fix', 'color:#34D399;font-weight:600');
 refresh();
 FamilyOS.registerServiceWorker();
 </script>

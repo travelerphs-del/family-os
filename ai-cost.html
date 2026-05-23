@@ -1,0 +1,785 @@
+<!--
+════════════════════════════════════════════════════════════════════
+Family OS — AI Cost Dashboard
+════════════════════════════════════════════════════════════════════
+DASHBOARD_ID = 'ai-cost' (common.js의 DASHBOARDS에는 미등록 - 단독 페이지)
+시그니처 컬러: Cyan #22D3EE
+데이터 소스: Apps Script (Gmail → Claude Haiku 4.5 → Sheets)
+백엔드 spec: backend-spec.md §3-10 (v0.5에서 추가)
+════════════════════════════════════════════════════════════════════
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0B0F">
+<title>AI Cost — Family OS</title>
+
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link rel="stylesheet" href="./design-tokens.css">
+
+<!-- Chart.js (월별 차트용) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+/* ─── ai-cost 시그니처 컬러 (cyan) ─────────────────────────── */
+:root {
+  --acc-ai-cost:      #22D3EE;
+  --acc-ai-cost-soft: rgba(34, 211, 238, 0.16);
+  /* 이 페이지에서는 accent를 cyan으로 override (헤더 점 등 일관성) */
+  --accent:       var(--acc-ai-cost);
+  --accent-soft:  var(--acc-ai-cost-soft);
+  --border-active: rgba(34, 211, 238, 0.5);
+}
+
+/* ─── 공통 레이아웃 (dashboard-template과 동일) ─────────────── */
+body {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  overflow-x: hidden;
+}
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--s6);
+}
+@media (max-width: 767px) { .app { padding: 0 var(--s4); } }
+
+header.hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s6) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--s7);
+}
+@media (max-width: 767px) {
+  header.hdr { padding: var(--s4) 0; margin-bottom: var(--s5); }
+}
+.brand { display: flex; align-items: baseline; gap: var(--s3); }
+.brand-title {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 24px; letter-spacing: -0.01em; color: var(--text-primary);
+}
+.brand-sub {
+  font-size: 12px; color: var(--text-quiet);
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+@media (max-width: 480px) {
+  .brand-title { font-size: 20px; }
+  .brand-sub { display: none; }
+}
+.hdr-actions { display: flex; gap: var(--s2); align-items: center; }
+.icon-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); color: var(--text-tertiary);
+  transition: all var(--t-fast);
+}
+.icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+.last-sync {
+  font-size: 11px; color: var(--text-quiet); font-family: var(--font-mono);
+  padding-right: var(--s2);
+}
+@media (max-width: 480px) { .last-sync { display: none; } }
+
+footer.ftr {
+  padding: var(--s5) 0 var(--s8);
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-quiet);
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--s2);
+}
+footer.ftr .ftr-r { font-family: var(--font-mono); }
+
+/* ─── 모달 (common.js와 짝) ───────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 11, 15, 0.7);
+  backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 100; padding: var(--s4);
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg); padding: var(--s6);
+  width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+  animation: modalIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-title { font-family: var(--font-display); font-size: 20px; font-weight: 500; margin-bottom: var(--s2); }
+.modal-desc { font-size: 12px; color: var(--text-tertiary); line-height: 1.6; margin-bottom: var(--s5); }
+.modal-field { margin-bottom: var(--s4); }
+.modal-label {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: var(--s2);
+}
+.modal-input {
+  width: 100%; background: var(--canvas);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 12px; font-size: 12px; color: var(--text-primary);
+  font-family: var(--font-mono); transition: border-color var(--t-fast);
+}
+.modal-input:focus { border-color: var(--accent); }
+.modal-input::placeholder { color: var(--text-quiet); }
+.modal-actions { display: flex; gap: var(--s2); justify-content: flex-end; margin-top: var(--s5); }
+.btn {
+  padding: 10px 18px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500;
+  transition: all var(--t-fast); border: 1px solid transparent;
+}
+.btn-primary { background: var(--accent); color: var(--canvas); }
+.btn-primary:hover { background: #67E8F9; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+.btn-ghost:hover { border-color: var(--border-hi); color: var(--text-primary); }
+
+/* ─── 빈 상태 ───────────────────────────────────────────── */
+.state-empty {
+  padding: var(--s8) var(--s5);
+  color: var(--text-quiet); font-size: 13px;
+  display: flex; flex-direction: column; gap: var(--s2);
+  align-items: center; text-align: center;
+}
+.state-empty .ico {
+  width: 32px; height: 32px; border-radius: var(--r-md);
+  background: var(--elevated);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: var(--s2); color: var(--text-tertiary);
+}
+.state-empty .msg { color: var(--text-tertiary); font-size: 12px; }
+.state-empty button {
+  font-size: 12px; color: var(--accent);
+  padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: transparent;
+  margin-top: var(--s2); transition: all var(--t-fast); cursor: pointer;
+}
+.state-empty button:hover { border-color: var(--accent); background: var(--elevated); }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--elevated-2);
+  border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.gain { color: var(--gain); }
+.loss { color: var(--loss); }
+.muted { color: var(--text-quiet); }
+
+/* ════════════════════════════════════════════════════════════
+   대시보드 고유 스타일
+   ════════════════════════════════════════════════════════════ */
+
+/* 통화 토글 */
+.aicost-currency-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  margin-bottom: var(--s5);
+}
+.aicost-currency-toggle button {
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  transition: all var(--t-fast);
+}
+.aicost-currency-toggle button.active {
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+/* 카드 그리드 */
+.aicost-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s4);
+  margin-bottom: var(--s7);
+}
+@media (max-width: 900px) { .aicost-cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .aicost-cards { grid-template-columns: 1fr; } }
+
+.aicost-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s5);
+  position: relative;
+  overflow: hidden;
+}
+.aicost-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 48px; height: 2px;
+  background: var(--accent);
+}
+.aicost-card .label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--s3);
+}
+.aicost-card .value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.aicost-card .value-hero {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 500;
+}
+.aicost-card .sub {
+  margin-top: var(--s2);
+  font-size: 11px;
+  color: var(--text-quiet);
+  font-family: var(--font-mono);
+}
+
+/* 차트 섹션 */
+.aicost-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s6);
+  margin-bottom: var(--s5);
+}
+.aicost-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--s5);
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.aicost-section-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.aicost-section-hint {
+  font-size: 10px;
+  color: var(--text-quiet);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.aicost-chart-wrap {
+  position: relative;
+  height: 340px;
+}
+@media (max-width: 600px) { .aicost-chart-wrap { height: 280px; } }
+
+/* 매트릭스 테이블 */
+.aicost-matrix-wrap {
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--s6));
+  padding: 0 var(--s6);
+}
+table.aicost-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  min-width: 600px;
+}
+table.aicost-matrix th, table.aicost-matrix td {
+  padding: 10px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.aicost-matrix th {
+  font-weight: 500;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-hi);
+}
+table.aicost-matrix th.svc, table.aicost-matrix td.svc {
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+table.aicost-matrix td.zero { color: var(--text-quiet); opacity: 0.4; }
+table.aicost-matrix tr.total td {
+  border-top: 1px solid var(--border-hi);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+table.aicost-matrix tr.total td.svc {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+/* delta ▲▼ */
+.delta-up { color: var(--loss); }     /* 지출 증가 = 빨강 */
+.delta-down { color: var(--gain); }   /* 지출 감소 = 녹색 */
+.delta-new { color: var(--neutral); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div id="hdr-mount"></div>
+
+  <main id="main-mount">
+    <!-- 데이터 로드 후 renderDashboard()가 채움 -->
+  </main>
+
+  <div id="ftr-mount"></div>
+
+</div>
+
+<div id="modal-mount"></div>
+
+<script src="./common.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════
+ * AI Cost 대시보드
+ * ════════════════════════════════════════════════════════════ */
+
+const DASHBOARD_ID = 'ai-cost';
+
+// common.js의 DASHBOARDS에 미등록 → fallback meta
+const meta = FamilyOS.getDashboardMeta(DASHBOARD_ID) || {
+  id: DASHBOARD_ID,
+  label: 'AI Cost',
+  kr: 'AI 비용',
+  accent: 'var(--acc-ai-cost)'
+};
+
+/* ─── 헤더/푸터/모달 마운트 ────────────────────────────── */
+document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
+  title: meta.label,
+  sub: meta.kr
+});
+document.getElementById('ftr-mount').innerHTML = FamilyOS.renderFooterHTML({
+  left: 'Family OS · ' + meta.label,
+  right: 'v0.1.0'
+});
+document.getElementById('modal-mount').innerHTML = FamilyOS.renderSettingsModalHTML({
+  fields: [{ id: DASHBOARD_ID, label: meta.label + ' (' + meta.kr + ')' }],
+  title: meta.label + ' Web App URL 설정',
+  desc: '이 대시보드의 Apps Script Web App URL을 입력하세요. 이 정보는 이 기기 브라우저에만 저장됩니다.'
+});
+FamilyOS.attachSettingsModal({
+  fieldIds: [DASHBOARD_ID],
+  onSave: refresh
+});
+
+document.getElementById('fos-btn-refresh')?.addEventListener('click', refresh);
+
+document.getElementById('main-mount').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-fos-action]');
+  if (!btn) return;
+  const action = btn.dataset.fosAction;
+  if (action === 'open-settings') {
+    document.getElementById('fos-btn-settings')?.click();
+  } else if (action === 'retry') {
+    refresh();
+  }
+});
+
+/* ─── 상태 ─────────────────────────────────────────── */
+let RAW = null;
+let CURRENCY = 'KRW';  // family-os 컨벤션상 KRW 기본
+let chartInstance = null;
+
+/* ─── 데이터 로드 ──────────────────────────────────── */
+async function refresh() {
+  const mount = document.getElementById('main-mount');
+
+  if (!FamilyOS.getWebAppUrl(DASHBOARD_ID)) {
+    mount.innerHTML = FamilyOS.renderUnsetStateHTML();
+    FamilyOS.setLastSync('—');
+    return;
+  }
+
+  mount.innerHTML = FamilyOS.renderLoadingStateHTML();
+  FamilyOS.setLastSync('동기화 중…');
+
+  try {
+    const data = await FamilyOS.fetchDashboardData(DASHBOARD_ID, 'full');
+    RAW = data;
+    renderDashboard(data);
+    FamilyOS.setSyncedNow();
+  } catch (err) {
+    console.error('[ai-cost] fetch failed:', err);
+    const msg = err.message === 'UNSET' ? 'URL 미설정' : err.message;
+    mount.innerHTML = FamilyOS.renderErrorStateHTML(msg, { retryId: DASHBOARD_ID });
+    FamilyOS.setLastSync('동기화 실패');
+  }
+}
+
+/* ─── 렌더링 ────────────────────────────────────── */
+function renderDashboard(data) {
+  const mount = document.getElementById('main-mount');
+  const records = (data && data.records) || [];
+
+  if (records.length === 0) {
+    mount.innerHTML = `
+      <div class="state-empty">
+        <div class="ico">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        <div class="msg">아직 수집된 청구 내역이 없어요.</div>
+        <div class="msg" style="font-size:10px;">Apps Script에서 testRun()을 실행해보세요.</div>
+      </div>`;
+    return;
+  }
+
+  const stats = computeStats(records);
+
+  mount.innerHTML = `
+    <div class="aicost-currency-toggle" role="group" aria-label="통화 토글">
+      <button id="btn-krw" class="${CURRENCY === 'KRW' ? 'active' : ''}">KRW</button>
+      <button id="btn-usd" class="${CURRENCY === 'USD' ? 'active' : ''}">USD</button>
+    </div>
+
+    <div class="aicost-cards">
+      ${cardHtml('전체 누적', fmtPrimary(stats.allTime), stats.recordsCount + '건')}
+      ${cardHtml(`올해 누적 (${stats.currentYear})`, fmtPrimary(stats.thisYear), null)}
+      ${cardHtml('이번 달', fmtPrimary(stats.thisMonth), `${stats.currentYear}-${pad(stats.currentMonth)}`, true)}
+      ${trendCardHtml(stats.deltaPercent, stats.lastMonth)}
+    </div>
+
+    <section class="aicost-section">
+      <div class="aicost-section-head">
+        <h2 class="aicost-section-title">Monthly Spend</h2>
+        <span class="aicost-section-hint">최근 12개월 · 서비스별 누적 · ▲▼ 전월대비</span>
+      </div>
+      <div class="aicost-chart-wrap">
+        <canvas id="aicostChart"></canvas>
+      </div>
+    </section>
+
+    <section class="aicost-section">
+      <div class="aicost-section-head">
+        <h2 class="aicost-section-title">Service × Month</h2>
+        <span class="aicost-section-hint">서비스별 월간 추이</span>
+      </div>
+      <div class="aicost-matrix-wrap">
+        ${matrixHtml(stats)}
+      </div>
+    </section>
+  `;
+
+  document.getElementById('btn-krw').addEventListener('click', () => switchCurrency('KRW'));
+  document.getElementById('btn-usd').addEventListener('click', () => switchCurrency('USD'));
+
+  drawChart(stats);
+}
+
+function switchCurrency(c) {
+  if (c === CURRENCY) return;
+  CURRENCY = c;
+  if (RAW) renderDashboard(RAW);
+}
+
+/* ─── 통계 ────────────────────────────────────── */
+function computeStats(records) {
+  const now = new Date();
+  const cy = now.getFullYear();
+  const cm = now.getMonth() + 1;
+  const lm = cm === 1 ? { y: cy - 1, m: 12 } : { y: cy, m: cm - 1 };
+  const lmKey = `${lm.y}-${pad(lm.m)}`;
+  const cmKey = `${cy}-${pad(cm)}`;
+
+  const monthly = {}; // 'YYYY-MM' → { service → amount }
+  let allTime = 0;
+  let thisYear = 0;
+  let thisMonth = 0;
+  let lastMonth = 0;
+
+  records.forEach(r => {
+    const amt = (CURRENCY === 'USD') ? Number(r.amount_usd) : Number(r.amount_krw);
+    if (isNaN(amt)) return;
+    const d = new Date(r.billed_at);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const key = `${y}-${pad(m)}`;
+    const svc = r.service || 'Other';
+
+    if (!monthly[key]) monthly[key] = {};
+    monthly[key][svc] = (monthly[key][svc] || 0) + amt;
+
+    allTime += amt;
+    if (y === cy) thisYear += amt;
+    if (key === cmKey) thisMonth += amt;
+    if (key === lmKey) lastMonth += amt;
+  });
+
+  let deltaPercent = null;
+  if (lastMonth > 0) {
+    deltaPercent = ((thisMonth - lastMonth) / lastMonth) * 100;
+  } else if (thisMonth > 0) {
+    deltaPercent = Infinity;
+  }
+
+  // 최근 12개월
+  const months12 = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(cy, cm - 1 - i, 1);
+    months12.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+  }
+
+  const services = new Set();
+  Object.values(monthly).forEach(svcMap =>
+    Object.keys(svcMap).forEach(s => services.add(s)));
+  const serviceList = Array.from(services).sort();
+
+  const monthTotals = months12.map(k =>
+    Object.values(monthly[k] || {}).reduce((a, b) => a + b, 0));
+
+  return {
+    allTime, thisYear, thisMonth, lastMonth, deltaPercent,
+    currentYear: cy, currentMonth: cm,
+    months12, monthly, serviceList, monthTotals,
+    recordsCount: records.length
+  };
+}
+
+/* ─── 포맷 ────────────────────────────────────── */
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtPrimary(n) {
+  if (n === null || isNaN(n)) return '—';
+  if (CURRENCY === 'USD') {
+    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return '₩' + Math.round(n).toLocaleString('ko-KR');
+}
+function fmtShort(n) {
+  if (CURRENCY === 'USD') return '$' + n.toFixed(1);
+  if (n >= 10000) return Math.round(n / 1000) + 'k';
+  return Math.round(n).toLocaleString('ko-KR');
+}
+function fmtDelta(p) {
+  if (!isFinite(p)) return '신규';
+  const sign = p >= 0 ? '▲' : '▼';
+  return `${sign} ${Math.abs(p).toFixed(1)}%`;
+}
+
+/* ─── 카드 HTML ───────────────────────────────── */
+function cardHtml(label, value, sub, isHero) {
+  return `
+    <div class="aicost-card">
+      <div class="label">${label}</div>
+      <div class="value ${isHero ? 'value-hero serif' : ''}">${value}</div>
+      ${sub ? `<div class="sub">${sub}</div>` : ''}
+    </div>`;
+}
+
+function trendCardHtml(deltaPct, lastMonthAmt) {
+  if (deltaPct === null) {
+    return `
+      <div class="aicost-card">
+        <div class="label">전월 대비</div>
+        <div class="value muted">—</div>
+        <div class="sub">전월 데이터 없음</div>
+      </div>`;
+  }
+  const cls = isFinite(deltaPct)
+    ? (deltaPct >= 0 ? 'delta-up' : 'delta-down')
+    : 'delta-new';
+  return `
+    <div class="aicost-card">
+      <div class="label">전월 대비</div>
+      <div class="value ${cls}">${fmtDelta(deltaPct)}</div>
+      <div class="sub">전월 ${fmtPrimary(lastMonthAmt)}</div>
+    </div>`;
+}
+
+/* ─── 매트릭스 테이블 ─────────────────────────── */
+function matrixHtml(stats) {
+  const { months12, serviceList, monthly, monthTotals } = stats;
+  let html = '<table class="aicost-matrix"><thead><tr><th class="svc">Service</th>';
+  months12.forEach(m => {
+    const [y, mm] = m.split('-');
+    html += `<th>${y.slice(2)}.${mm}</th>`;
+  });
+  html += '<th>합계</th></tr></thead><tbody>';
+
+  serviceList.forEach(svc => {
+    html += `<tr><td class="svc">${FamilyOS.escapeHtml(svc)}</td>`;
+    let total = 0;
+    months12.forEach(m => {
+      const v = (monthly[m] && monthly[m][svc]) || 0;
+      total += v;
+      html += `<td class="${v === 0 ? 'zero' : ''}">${v === 0 ? '·' : fmtShort(v)}</td>`;
+    });
+    html += `<td>${fmtShort(total)}</td></tr>`;
+  });
+
+  html += '<tr class="total"><td class="svc">Total</td>';
+  let grand = 0;
+  monthTotals.forEach(v => {
+    grand += v;
+    html += `<td>${v === 0 ? '·' : fmtShort(v)}</td>`;
+  });
+  html += `<td>${fmtShort(grand)}</td></tr>`;
+  html += '</tbody></table>';
+  return html;
+}
+
+/* ─── 차트 ────────────────────────────────────── */
+function drawChart(stats) {
+  if (chartInstance) chartInstance.destroy();
+
+  const ctx = document.getElementById('aicostChart').getContext('2d');
+  const labels = stats.months12.map(m => {
+    const [y, mm] = m.split('-');
+    return `${y.slice(2)}.${mm}`;
+  });
+
+  // 서비스별 색상 (디자인 토큰 호환 톤)
+  const palette = {
+    'Anthropic':  '#FB923C',  // 주황
+    'OpenAI':     '#34D399',  // 민트
+    'Google':     '#60A5FA',  // 파랑
+    'Midjourney': '#C084FC',  // 라벤더
+    'ElevenLabs': '#F472B6',  // 핑크
+    'HeyGen':     '#22D3EE',  // cyan (시그니처)
+    'Kling':      '#FBBF24',  // 노랑
+    'Sync.so':    '#94A3B8',  // 슬레이트
+    'Other':      '#6B7280'   // 회색
+  };
+
+  const datasets = stats.serviceList.map(svc => ({
+    label: svc,
+    data: stats.months12.map(m => (stats.monthly[m] && stats.monthly[m][svc]) || 0),
+    backgroundColor: palette[svc] || '#6B7280',
+    borderWidth: 0,
+    stack: 'spend',
+    borderRadius: 2
+  }));
+
+  const totals = stats.monthTotals;
+  const deltas = totals.map((v, i) => {
+    if (i === 0) return null;
+    const prev = totals[i - 1];
+    if (prev === 0) return v > 0 ? Infinity : null;
+    return ((v - prev) / prev) * 100;
+  });
+
+  const deltaLabelPlugin = {
+    id: 'deltaLabel',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      ctx.save();
+      ctx.font = '500 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      totals.forEach((total, i) => {
+        if (total === 0) return;
+        const d = deltas[i];
+        let text = '';
+        let color = '#A1A1AA';
+        if (d === null) return;
+        if (!isFinite(d)) { text = '신규'; color = '#FCD34D'; }
+        else {
+          const sign = d >= 0 ? '▲' : '▼';
+          text = `${sign}${Math.abs(d).toFixed(0)}%`;
+          color = d >= 0 ? '#FB7185' : '#4ADE80';
+        }
+        if (!text) return;
+        const px = x.getPixelForValue(i);
+        const py = y.getPixelForValue(total) - 6;
+        ctx.fillStyle = color;
+        ctx.fillText(text, px, py);
+      });
+      ctx.restore();
+    }
+  };
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    plugins: [deltaLabelPlugin],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 28 } },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            font: { family: 'JetBrains Mono', size: 11 },
+            color: '#A1A1AA',
+            boxWidth: 10, boxHeight: 10, padding: 12
+          }
+        },
+        tooltip: {
+          backgroundColor: '#131419',
+          borderColor: 'rgba(255,255,255,0.18)',
+          borderWidth: 1,
+          titleFont: { family: 'JetBrains Mono', size: 12 },
+          bodyFont: { family: 'JetBrains Mono', size: 11 },
+          padding: 10,
+          callbacks: {
+            label: (item) => `${item.dataset.label}: ${fmtPrimary(item.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: {
+            font: { family: 'JetBrains Mono', size: 11 },
+            color: '#A1A1AA'
+          }
+        },
+        y: {
+          stacked: true,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          border: { display: false },
+          ticks: {
+            font: { family: 'JetBrains Mono', size: 10 },
+            color: '#A1A1AA',
+            callback: (v) => CURRENCY === 'USD' ? '$' + v : '₩' + (v / 1000).toFixed(0) + 'k'
+          }
+        }
+      }
+    }
+  });
+}
+
+/* ─── 부팅 ─────────────────────────────────────── */
+refresh();
+FamilyOS.registerServiceWorker();
+</script>
+
+</body>
+</html>

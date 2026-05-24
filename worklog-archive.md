@@ -2590,4 +2590,106 @@ side.innerHTML = `
 - `worklog-archive.md` 에 본 섹션 append (텍스트로 제공)
 - `worklog.md` 슬림 업데이트
 - `context-security.md` 업데이트 (3-1/3-3 완료 마킹, 3-2 시급도 재평가, 변경 이력)
+
+# Session 10 — Health Dashboard 진료 검색 기능 추가
+
+## 배경
+- 사용자 요청: hospital_report 와 home_clinic 에 검색 기능 추가
+- 요구사항:
+  1. 키워드 기반 검색
+  2. 기간 검색
+  3. 검색 인덱스에서 progress_note 제외
+  4. 결과의 original report 클릭 시 딸린 progress_note 모두 노출
+
+## 결정 사항 (사용자와 확인)
+
+| 항목 | 결정 |
+|---|---|
+| 검색 진입점 | 헤더 우측 🔍 버튼 (모든 뷰에서 접근) |
+| 멤버 필터 | 모달은 항상 '전체'로 시작. 모달 안에서 멤버 선택 |
+| 키워드/기간 UX | 한 모달 안에 탭 두 개 (`키워드` / `기간`). 두 모드를 명확히 분리. |
+| 키워드 검색 필드 | C/C (`chief_complaint`), P/I (`present_illness`), A/P (`assessment_plan`) 만 |
+| 검색 범위 | 시트 전체 (state.sheets 캐시 이용, 별도 옵션 없음) |
+| 백엔드 변경 | 없음. mode=full 응답에 필요한 시트가 이미 다 들어 있음 |
+
+## 구현
+
+### 파일 변경
+- **health.html** 만 수정 (1 파일, ~290줄 추가)
+- health-apps-script.gs **변경 없음**
+
+### CSS 추가 (h-modal-foot 직후)
+새 클래스 — 기존 .h-modal 패턴 그대로 차용해 톤 통일:
+- `.search-icon-btn` — 헤더 검색 버튼 (common.js 의 .icon-btn 과 동일 스펙)
+- `.search-modal-backdrop` / `.search-modal` / `.search-modal-head` / `.search-modal-controls` / `.search-modal-body`
+- `.search-member-chips` + `.search-chip` (active 상태는 acc-health 강조)
+- `.search-mode-tabs` + `.search-mode-tab` (segmented control 패턴, active 는 골드 대신 acc-health)
+- `.search-input` (date input 에 `color-scheme: dark` 적용)
+- `.search-result-item` + 서브 클래스들 (badge, date, member, chart-num, title, detail, pn-badge)
+
+### HTML 추가 (#h-modal-backdrop 뒤)
+```html
+<div class="search-modal-backdrop" id="search-modal-backdrop">
+  <div class="search-modal">
+    <head>제목 · 닫기 ×</head>
+    <controls>
+      [멤버 칩들 — 동적 생성]
+      [모드 탭: 키워드 | 기간]
+      [인풋 영역 — 모드별 교체]
+    </controls>
+    <body id="search-modal-body">[결과 또는 hint]</body>
+  </div>
+</div>
+```
+
+### JS 추가 (h-modal 핸들러 직후)
+- `searchState` 객체 (mode / keyword / dateStart / dateEnd / memberFilter)
+- `injectSearchButtonIntoHeader()` — common.js 의 `#hdr-mount .hdr-actions` 에 SVG 돋보기 버튼을 동적 삽입 (새로고침 버튼 앞에). common.js 는 건드리지 않음 → 다른 대시보드에 영향 없음
+- `openSearchModal()` / `closeSearchModal()` — 열 때 항상 `searchState` 를 초기 상태로 리셋
+- `renderSearchMemberChips()` — state.members 기반, '전체' + 가족 멤버 칩
+- 모드 탭 클릭 핸들러 — 모드 전환 시 인풋 값 리셋
+- `renderSearchInputArea()` — 키워드 모드는 text 인풋, 기간 모드는 date 두 개 + 가운데 `~`
+- `executeSearch()`:
+  - 키워드 모드: `chief_complaint`/`present_illness`/`assessment_plan` 셋 중 하나라도 부분 매칭 (대소문자 무시)
+  - 기간 모드: hospital 은 `visit_date`, home 은 `date` 컬럼 기준 범위 체크
+  - 멤버 필터 적용
+  - 최신순 정렬 (날짜 desc)
+- `renderSearchResults()` — 결과 리스트. 빈 상태 메시지를 모드별로 분기. 결과 카드 클릭 → `closeSearchModal()` 후 `openHospitalReportDetail` / `openHomeClinicDetail` 호출
+- `renderSearchResultItem()` — 카드 한 장. 자식 PN 개수도 같이 배지로 표시 (재진료 이력 있는 기록을 한눈에)
+
+### 요구사항 충족 매핑
+- **1. 키워드 검색** → `executeSearch()` keyword 모드
+- **2. 기간 검색** → `executeSearch()` period 모드 (별도 탭)
+- **3. PN 검색 인덱스 제외** → 키워드 매칭 대상 필드를 `chief_complaint`/`present_illness`/`assessment_plan` 셋으로 한정. progress_note 시트는 검색 루프에서 아예 순회 안 함
+- **4. 클릭 시 PN 노출** → 기존 `openHospitalReportDetail` / `openHomeClinicDetail` 가 이미 `parent_record_id` 로 자식 PN 을 모아 표시하는 로직 보유. 검색 결과 클릭이 그쪽으로 라우팅되므로 자동 충족
+
+## 검증
+
+- [x] JS 문법 — `node --check` 통과 (84,435자 단일 스크립트)
+- [x] 식별자 의존성 — `MEMBER_ORDER` / `MEMBER_LABELS` / `MEMBER_COLOR_VAR` / `state` / `escapeHtml` / `closeHModal` / `openHospitalReportDetail` / `openHomeClinicDetail` 모두 외부 정의 존재 + hoist 또는 사용 시점에 정의 완료
+- [x] CSS 디자인 토큰만 사용. 하드코딩 hex 없음 (badge 의 `rgba(239, 68, 68, 0.16)` 만 예외 — hospital 배지용. acc-health-soft 와 충돌 방지)
+- [ ] **실제 브라우저 동작 확인 필요** — 사용자가 배포 후 확인
+
+### 사용자 확인 체크리스트 (배포 후)
+1. 헤더 우측에 돋보기 아이콘이 새로고침 버튼 옆에 보이는지
+2. 클릭 시 검색 모달이 슬라이드업으로 뜨는지
+3. 멤버 칩 클릭하면 결과가 즉시 필터되는지
+4. 키워드 입력 → 150ms 디바운스 후 결과가 뜨는지
+5. 기간 탭 → 시작일만, 종료일만, 둘 다 — 각 조합이 정상 동작하는지
+6. 결과 카드 클릭 → 기존 진료 상세 모달이 뜨고 그 안에 PN 이 다 나오는지
+7. ESC 키로 검색 모달이 먼저 닫히고, 안 열려 있으면 h-modal 이 닫히는지
+
+## LESSON
+
+- **common.js 미수정**: 헤더 액션바에 새 버튼을 추가하는 가장 깔끔한 방법은 health.html 측에서 hdr-mount DOM 을 직접 조작해 끼워넣는 것. common.js 의 renderHeaderHTML 슬롯을 늘리면 다른 대시보드 4개에 영향이 가서 회귀 위험.
+- **기간 검색의 의미**: 처음엔 "검색어 + 기간 조합 필터" 로 잘못 이해했는데, 사용자가 정정 — "그 기간에 입력된 전부 보기" 였음. UX 가 완전히 달라짐 (단일 검색바 + 보조 필터 vs 두 가지 모드 분리). 의미 검증을 한 번 더 받았어야 함.
+- **progress_note 처리의 자연스러움**: 검색 인덱스에서는 빼되 detail 모달에서는 자동 노출되는 동작이 기존 코드 구조 덕에 코드 한 줄 더 안 짜고도 충족됨. 디자인이 일관되면 후속 기능 추가가 거의 공짜.
+
+## COST
+
+- 외부 API 호출: **0** (Mapbox/Google Places/Maps/Nominatim 모두 무관)
+- Claude API 호출: **0**
+- 백엔드 (Apps Script) 변경: **없음** (배포 재실행 불필요)
+- 추가 비용: **0**
+
 ────────────────────────────────────────────────────────────────────

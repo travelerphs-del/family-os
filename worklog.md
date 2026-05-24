@@ -58,7 +58,7 @@ family-os/
 | 메인 허브 `index.html` | v0.1.0 + 5.2 + 5.3 + 6 | 5번째 카드 Travel 포함 (가로 전체 span) |
 | Wealth | 배포됨 | **수정 예정**: daily snapshot 미작동, MoM/YoY 동일값, 전체금액 오차, 주가 미세 오차, 올해 수익 계산 변경, 추가 기능 |
 | Expense | 배포됨 + Session 8 | `?mode=trip_summary&trip_id=X` 엔드포인트 추가. travel-trip 이 직접 호출하여 여행별 비용/서브카테고리% 표시. 단어 경계 매칭, KRW/VND 만 환산 |
-| Health | 배포됨 + Session 9 | **Session 9**: Hospital report 사진 첨부 (최대 10장, 2048px/q0.9). Drive 공유를 ANYONE_WITH_LINK → 부부 둘 Gmail 명시 viewer 로 전환 (옵션 γ). home_clinic 도 같은 정책 통일. **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
+| Health | 배포됨 + Session 9 + 10 | ... **Session 10**: 진료 검색 모달 추가 (헤더 🔍). 키워드(C/C·P/I·A/P) / 기간 2모드. 멤버 필터. 백엔드 변경 X. **기능 추가 예정**: 아이들 1주일 운동 스케줄 |
 | Future | v0.1.1 | 외부 시트 의존 끊음, `마일스톤_금액` 컬럼 활용 |
 | Travel | **v0.3.1 + Session 8** | Phase A+B + Session 7.2 + 7.3. 가족 8명. 호텔 stay_range. Google Places (New) 검색. **베이스맵 Google Maps + AdvancedMarkerElement + mapId** (대만 정확도 + 알림창 해결). 다크 톤은 사용자 mapId 발급 후 적용 가능 (Pending #9). 지도 클릭 폴백. PC 튕김 진단 로그 (Pending #8). **Session 8**: trip-head 영역에 여행 비용 row 표시 + **날짜 필터 클릭 시 사이드바에도 해당 일자 비용 row 표시** (Expense `trip_summary` 호출 1회로 trip 전체 + 날짜별 다 처리). |
 

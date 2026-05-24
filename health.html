@@ -667,6 +667,234 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
   display: flex; gap: var(--s2); justify-content: flex-end;
 }
 
+/* ─── 검색 모달 (Session 10 — hospital_report + home_clinic) ───── */
+.search-icon-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); color: var(--text-tertiary);
+  transition: all var(--t-fast);
+  background: transparent; border: none; cursor: pointer;
+}
+.search-icon-btn:hover { background: var(--elevated); color: var(--text-primary); }
+.search-icon-btn svg { display: block; }
+
+.search-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 11, 15, 0.7);
+  backdrop-filter: blur(8px);
+  display: none; align-items: flex-end; justify-content: center;
+  z-index: 210;
+}
+.search-modal-backdrop.open { display: flex; }
+@media (min-width: 768px) {
+  .search-modal-backdrop { align-items: center; padding: var(--s4); }
+}
+.search-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  width: 100%; max-width: 680px;
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+  animation: modalSlideUp var(--t-sheet) cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (min-width: 768px) {
+  .search-modal { border-radius: var(--r-lg); }
+}
+.search-modal-head {
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.search-modal-title {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 500;
+  color: var(--text-primary);
+}
+.search-modal-close {
+  font-size: 24px; line-height: 1;
+  color: var(--text-quiet);
+  background: transparent; border: none; cursor: pointer;
+  padding: 4px 8px;
+}
+.search-modal-close:hover { color: var(--text-primary); }
+.search-modal-controls {
+  padding: var(--s4) var(--s5) 0;
+  display: flex; flex-direction: column; gap: var(--s3);
+  flex-shrink: 0;
+}
+.search-modal-body {
+  padding: var(--s3) var(--s5) var(--s5);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* 멤버 칩 줄 */
+.search-member-chips {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.search-chip {
+  padding: 5px 11px;
+  font-size: 12px; color: var(--text-tertiary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.search-chip:hover { color: var(--text-primary); border-color: var(--border-hi); }
+.search-chip.active {
+  color: var(--text-primary);
+  background: var(--acc-health-soft);
+  border-color: var(--acc-health);
+}
+.search-chip .mdot {
+  width: 7px; height: 7px; border-radius: 50%;
+}
+
+/* 모드 탭 */
+.search-mode-tabs {
+  display: flex; gap: 2px;
+  background: var(--elevated);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  width: fit-content;
+}
+.search-mode-tab {
+  padding: 6px 14px;
+  font-size: 12px; font-weight: 500;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.search-mode-tab:hover { color: var(--text-primary); }
+.search-mode-tab.active {
+  background: var(--acc-health);
+  color: var(--canvas);
+}
+
+/* 인풋 영역 */
+.search-input-row {
+  display: flex; gap: var(--s2);
+  align-items: center;
+}
+.search-input {
+  flex: 1;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  transition: border-color var(--t-fast);
+}
+.search-input:focus { border-color: var(--acc-health); outline: none; }
+.search-input::placeholder { color: var(--text-quiet); }
+.search-input[type="date"] {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color-scheme: dark;
+}
+.search-date-sep {
+  color: var(--text-quiet);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* 결과 */
+.search-hint {
+  padding: var(--s7) var(--s4);
+  color: var(--text-quiet);
+  font-size: 13px;
+  text-align: center;
+}
+.search-count {
+  font-size: 11px;
+  color: var(--text-quiet);
+  font-family: var(--font-mono);
+  margin-bottom: var(--s3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.search-result-item {
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s2);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.search-result-item:hover {
+  border-color: var(--acc-health);
+  background: var(--elevated-2);
+}
+.sr-head {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+.sr-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.sr-badge-hospital {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+.sr-badge-home {
+  background: rgba(52, 211, 153, 0.16);
+  color: #6ee7b7;
+}
+.sr-date {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+.sr-member {
+  font-size: 11px;
+  font-weight: 500;
+}
+.sr-chart-num {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-quiet);
+}
+.sr-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.sr-detail {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sr-pn-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--acc-future);
+  background: var(--acc-future-soft);
+  border-radius: var(--r-full);
+}
+
 /* 카테고리 picker */
 .cat-list {
   display: grid;
@@ -1073,6 +1301,33 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
   </div>
 </div>
 
+<!-- 검색 모달 (Session 10 — hospital_report + home_clinic) -->
+<div class="search-modal-backdrop" id="search-modal-backdrop">
+  <div class="search-modal">
+    <div class="search-modal-head">
+      <div class="search-modal-title">진료 검색</div>
+      <button class="search-modal-close" id="search-modal-close" aria-label="닫기">×</button>
+    </div>
+    <div class="search-modal-controls">
+      <!-- 멤버 칩 -->
+      <div class="search-member-chips" id="search-member-chips"></div>
+      <!-- 모드 탭 -->
+      <div class="search-mode-tabs">
+        <button class="search-mode-tab active" data-mode="keyword">키워드</button>
+        <button class="search-mode-tab" data-mode="period">기간</button>
+      </div>
+      <!-- 인풋 (모드별) -->
+      <div class="search-input-row" id="search-input-row">
+        <input type="text" class="search-input" id="search-keyword-input"
+               placeholder="C/C · P/I · A/P 안에서 검색…" autocomplete="off">
+      </div>
+    </div>
+    <div class="search-modal-body" id="search-modal-body">
+      <div class="search-hint">키워드를 입력하면 결과가 표시됩니다.</div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast">
   <span id="toast-msg"></span>
@@ -1170,9 +1425,314 @@ document.getElementById('h-modal-backdrop').addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    const searchBd = document.getElementById('search-modal-backdrop');
+    if (searchBd && searchBd.classList.contains('open')) { closeSearchModal(); return; }
     const bd = document.getElementById('h-modal-backdrop');
     if (bd.classList.contains('open')) closeHModal();
   }
+});
+
+/* ════════════════════════════════════════════════════════
+ * 검색 (Session 10)
+ * - 대상 시트: hospital_report + home_clinic 만
+ * - 키워드: C/C · P/I · A/P 부분 매칭 (progress_note 제외)
+ * - 기간: hospital_report.visit_date / home_clinic.date 범위
+ * - 결과 클릭 → 기존 detail 모달 (PN은 detail 안에서 자동 노출)
+ * ════════════════════════════════════════════════════════ */
+
+const searchState = {
+  mode: 'keyword',     // 'keyword' | 'period'
+  keyword: '',
+  dateStart: '',
+  dateEnd: '',
+  memberFilter: 'all'  // 'all' | 'dad' | 'mom' | 'robi' | 'dobi'
+};
+
+/* 헤더 우측에 🔍 버튼 동적 삽입 (common.js 의 renderHeaderHTML 결과를 건드리지 않고) */
+function injectSearchButtonIntoHeader() {
+  const actions = document.querySelector('#hdr-mount .hdr-actions');
+  if (!actions) return;
+  if (document.getElementById('btn-open-search')) return;  // 중복 방지
+
+  const btn = document.createElement('button');
+  btn.id = 'btn-open-search';
+  btn.className = 'search-icon-btn';
+  btn.title = '진료 검색';
+  btn.setAttribute('aria-label', '진료 검색');
+  btn.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"></circle>
+      <line x1="20" y1="20" x2="16.5" y2="16.5"></line>
+    </svg>
+  `;
+  // 새로고침 버튼 앞에 삽입 (시각적으로 검색 → 새로고침 → 설정 순)
+  const refreshBtn = actions.querySelector('#fos-btn-refresh');
+  if (refreshBtn) actions.insertBefore(btn, refreshBtn);
+  else actions.insertBefore(btn, actions.firstChild);
+
+  btn.addEventListener('click', openSearchModal);
+}
+// 부팅 직후 헤더에 끼워넣기 (renderHeaderHTML 가 이미 실행된 상태)
+injectSearchButtonIntoHeader();
+
+function openSearchModal() {
+  // 항상 '전체' + 키워드 모드로 초기화 (사용자 정책)
+  searchState.mode = 'keyword';
+  searchState.keyword = '';
+  searchState.dateStart = '';
+  searchState.dateEnd = '';
+  searchState.memberFilter = 'all';
+
+  renderSearchMemberChips();
+  renderSearchInputArea();
+  renderSearchResults([], 'initial');
+
+  document.getElementById('search-modal-backdrop').classList.add('open');
+  setTimeout(() => document.getElementById('search-keyword-input')?.focus(), 80);
+}
+
+function closeSearchModal() {
+  document.getElementById('search-modal-backdrop').classList.remove('open');
+}
+
+/* 멤버 칩 렌더 (state.members 기반, 순서 = MEMBER_ORDER + family) */
+function renderSearchMemberChips() {
+  const wrap = document.getElementById('search-member-chips');
+  const order = state.members
+    .map(m => m.member_id)
+    .filter(id => MEMBER_ORDER.includes(id))
+    .sort((a, b) => MEMBER_ORDER.indexOf(a) - MEMBER_ORDER.indexOf(b));
+
+  const items = [{ id: 'all', label: '전체', color: null }];
+  order.forEach(id => {
+    const m = state.members.find(x => x.member_id === id);
+    items.push({
+      id,
+      label: MEMBER_LABELS[id] || (m && m.name) || id,
+      color: MEMBER_COLOR_VAR[id] || null
+    });
+  });
+
+  wrap.innerHTML = items.map(it => `
+    <button class="search-chip ${searchState.memberFilter === it.id ? 'active' : ''}"
+            data-member="${escapeHtml(it.id)}">
+      ${it.color ? `<span class="mdot" style="background:${it.color}"></span>` : ''}
+      ${escapeHtml(it.label)}
+    </button>
+  `).join('');
+
+  wrap.querySelectorAll('.search-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      searchState.memberFilter = btn.dataset.member;
+      wrap.querySelectorAll('.search-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      executeSearch();
+    });
+  });
+}
+
+/* 모드 탭 클릭 핸들러 (정적 DOM 에 한 번만) */
+document.querySelectorAll('#search-modal-backdrop .search-mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+    if (searchState.mode === mode) return;
+    searchState.mode = mode;
+    document.querySelectorAll('#search-modal-backdrop .search-mode-tab')
+      .forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+    // 모드 전환 시 인풋 값 리셋
+    searchState.keyword = '';
+    searchState.dateStart = '';
+    searchState.dateEnd = '';
+    renderSearchInputArea();
+    renderSearchResults([], 'initial');
+  });
+});
+
+/* 인풋 영역 모드별 렌더 */
+function renderSearchInputArea() {
+  const row = document.getElementById('search-input-row');
+  if (searchState.mode === 'keyword') {
+    row.innerHTML = `
+      <input type="text" class="search-input" id="search-keyword-input"
+             placeholder="C/C · P/I · A/P 안에서 검색…" autocomplete="off"
+             value="${escapeHtml(searchState.keyword)}">
+    `;
+    const input = document.getElementById('search-keyword-input');
+    let debounceTimer = null;
+    input.addEventListener('input', () => {
+      searchState.keyword = input.value;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(executeSearch, 150);
+    });
+    setTimeout(() => input.focus(), 30);
+  } else {
+    row.innerHTML = `
+      <input type="date" class="search-input" id="search-date-start"
+             value="${escapeHtml(searchState.dateStart)}" aria-label="시작일">
+      <span class="search-date-sep">~</span>
+      <input type="date" class="search-input" id="search-date-end"
+             value="${escapeHtml(searchState.dateEnd)}" aria-label="종료일">
+    `;
+    document.getElementById('search-date-start').addEventListener('change', (e) => {
+      searchState.dateStart = e.target.value;
+      executeSearch();
+    });
+    document.getElementById('search-date-end').addEventListener('change', (e) => {
+      searchState.dateEnd = e.target.value;
+      executeSearch();
+    });
+  }
+}
+
+/* 실제 검색 */
+function executeSearch() {
+  const hospital = state.sheets.hospital_report || [];
+  const home = state.sheets.home_clinic || [];
+
+  const memberMatch = (row) =>
+    searchState.memberFilter === 'all' || row.member_id === searchState.memberFilter;
+
+  const results = [];
+
+  if (searchState.mode === 'keyword') {
+    const kw = (searchState.keyword || '').trim().toLowerCase();
+    if (!kw) {
+      renderSearchResults([], 'initial');
+      return;
+    }
+    const fieldMatch = (row) => {
+      const fields = [row.chief_complaint, row.present_illness, row.assessment_plan];
+      return fields.some(f => f && String(f).toLowerCase().includes(kw));
+    };
+    hospital.forEach(r => {
+      if (memberMatch(r) && fieldMatch(r)) results.push({ sheet: 'hospital_report', row: r });
+    });
+    home.forEach(r => {
+      if (memberMatch(r) && fieldMatch(r)) results.push({ sheet: 'home_clinic', row: r });
+    });
+  } else {
+    // 기간 모드
+    const s = (searchState.dateStart || '').trim();
+    const e = (searchState.dateEnd || '').trim();
+    if (!s && !e) {
+      renderSearchResults([], 'initial');
+      return;
+    }
+    if (s && e && s > e) {
+      renderSearchResults([], 'invalid_range');
+      return;
+    }
+    const dateMatch = (row, dateField) => {
+      const d = String(row[dateField] || '').slice(0, 10);
+      if (!d) return false;
+      if (s && d < s) return false;
+      if (e && d > e) return false;
+      return true;
+    };
+    hospital.forEach(r => {
+      if (memberMatch(r) && dateMatch(r, 'visit_date')) results.push({ sheet: 'hospital_report', row: r });
+    });
+    home.forEach(r => {
+      if (memberMatch(r) && dateMatch(r, 'date')) results.push({ sheet: 'home_clinic', row: r });
+    });
+  }
+
+  // 최신순 정렬 (날짜 desc)
+  results.sort((a, b) => {
+    const da = String(a.sheet === 'hospital_report' ? a.row.visit_date : a.row.date || '').slice(0, 10);
+    const db = String(b.sheet === 'hospital_report' ? b.row.visit_date : b.row.date || '').slice(0, 10);
+    return db.localeCompare(da);
+  });
+
+  renderSearchResults(results, 'ok');
+}
+
+/* 결과 렌더 */
+function renderSearchResults(results, status) {
+  const body = document.getElementById('search-modal-body');
+
+  if (status === 'initial') {
+    const msg = searchState.mode === 'keyword'
+      ? '키워드를 입력하면 결과가 표시됩니다.'
+      : '시작일과 종료일 중 하나 이상을 선택하세요.';
+    body.innerHTML = `<div class="search-hint">${escapeHtml(msg)}</div>`;
+    return;
+  }
+  if (status === 'invalid_range') {
+    body.innerHTML = `<div class="search-hint">시작일이 종료일보다 늦습니다.</div>`;
+    return;
+  }
+  if (!results || results.length === 0) {
+    body.innerHTML = `<div class="search-hint">검색 결과가 없습니다.</div>`;
+    return;
+  }
+
+  const itemsHtml = results.map(({ sheet, row }) => renderSearchResultItem(sheet, row)).join('');
+  body.innerHTML = `
+    <div class="search-count">${results.length}건</div>
+    ${itemsHtml}
+  `;
+
+  body.querySelectorAll('.search-result-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const sheet = item.dataset.sheet;
+      const rid = item.dataset.recordId;
+      if (!rid) return;
+      closeSearchModal();
+      // backdrop close 애니메이션 끝난 뒤 detail 열기 (z-index 같지만 깔끔하게)
+      setTimeout(() => {
+        if (sheet === 'hospital_report') openHospitalReportDetail(rid);
+        else if (sheet === 'home_clinic') openHomeClinicDetail(rid);
+      }, 120);
+    });
+  });
+}
+
+function renderSearchResultItem(sheet, row) {
+  const m = state.members.find(x => x.member_id === row.member_id);
+  const who = m ? (MEMBER_LABELS[row.member_id] || m.name) : (row.member_id || '');
+  const isHospital = sheet === 'hospital_report';
+  const date = isHospital ? row.visit_date : row.date;
+  const ymd = String(date || '').slice(0, 10);
+
+  const title = isHospital
+    ? ([row.hospital, row.department].filter(Boolean).join(' · ') || '병원진료')
+    : (row.chief_complaint || '가정진료');
+
+  // 본문 미리보기: C/C 가 title 과 중복이 아니면 C/C, 아니면 P/I 또는 A/P
+  let detail = '';
+  if (isHospital) {
+    detail = row.chief_complaint || row.present_illness || row.assessment_plan || '';
+  } else {
+    detail = row.present_illness || row.assessment_plan || '';
+  }
+
+  // 자식 PN 개수 표시
+  const pnCount = (state.sheets.progress_note || [])
+    .filter(p => p.parent_record_id === row.record_id).length;
+
+  return `
+    <div class="search-result-item"
+         data-sheet="${escapeHtml(sheet)}"
+         data-record-id="${escapeHtml(row.record_id || '')}">
+      <div class="sr-head">
+        <span class="sr-badge sr-badge-${isHospital ? 'hospital' : 'home'}">${isHospital ? 'H' : 'HC'}</span>
+        <span class="sr-date">${escapeHtml(ymd || '날짜 없음')}</span>
+        <span class="sr-member" style="color:${MEMBER_COLOR_VAR[row.member_id] || 'var(--text-tertiary)'}">${escapeHtml(who)}</span>
+        ${row.record_id ? `<span class="sr-chart-num">${escapeHtml(row.record_id)}</span>` : ''}
+      </div>
+      <div class="sr-title">${escapeHtml(title)}</div>
+      ${detail ? `<div class="sr-detail">${escapeHtml(detail)}</div>` : ''}
+      ${pnCount > 0 ? `<span class="sr-pn-badge">경과 ${pnCount}건</span>` : ''}
+    </div>
+  `;
+}
+
+/* 검색 모달 닫기 핸들러 */
+document.getElementById('search-modal-close').addEventListener('click', closeSearchModal);
+document.getElementById('search-modal-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'search-modal-backdrop') closeSearchModal();
 });
 
 /* ─── 데이터 로드 ──────────────────────────────────── */

@@ -990,96 +990,19 @@
     document.body.insertBefore(banner, document.body.firstChild);
   }
 
-  /* ─── 모달에 백업/복원 기능 추가 ──────────────────────
-   * common.js의 모달은 그대로 두고, 모달이 열릴 때 추가 영역을 동적으로 삽입.
+  /* ─── 백업/복원 UI 제거 (Session 7.8 보안 후속 3-1) ─────
+   * 이전 버전: 설정 모달이 열릴 때 5개 URL을 Base64로 묶어 textarea에
+   *   노출하는 injectBackupUI()가 있었음.
+   * 제거 이유:
+   *   - 사용자가 실제로 사용한 적 없음
+   *   - Base64는 인코딩일 뿐 → 외부(메모/이메일/카톡)에 붙여두면
+   *     사실상 평문과 동일. 그 외부 저장소 침해 시 가족 데이터 전체 노출
+   *   - LocalStorage 영속화 실패 (URL이 사라지는 상황) 도 한 번도 발생 안 함
+   *   → 안 쓰는 기능이 평문 노출 위험만 만들고 있어 단순 제거
+   * 영속화 실패가 향후 발생하면:
+   *   storageDiag IIFE 가 자동으로 콘솔/배너 경고를 띄움 (위 코드).
+   *   사용자는 설정 모달에서 5개 URL을 다시 입력 (현재도 그렇게 동작).
    */
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('#fos-btn-settings');
-    if (!btn) return;
-    setTimeout(injectBackupUI, 50);  // 모달 열린 후
-  });
-
-  function injectBackupUI() {
-    const modal = document.querySelector('.modal-backdrop.open .modal');
-    if (!modal) return;
-    if (modal.querySelector('#fos-backup-block')) return;  // 이미 있으면 skip
-
-    // URL 입력 필드들 다음, 액션 버튼들 앞에 끼워넣기
-    const actions = modal.querySelector('.modal-actions');
-    if (!actions) return;
-
-    const block = document.createElement('div');
-    block.id = 'fos-backup-block';
-    block.style.cssText = 'margin-top: var(--s5); padding-top: var(--s4); '
-      + 'border-top: 1px dashed var(--border);';
-    block.innerHTML = `
-      <div style="font-size:11px;color:var(--text-secondary);
-                  text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--s2);">
-        백업 / 복원
-      </div>
-      <div style="font-size:11px;color:var(--text-quiet);line-height:1.6;margin-bottom:var(--s3);">
-        4개 URL을 한 줄로 묶어 백업합니다. URL이 사라졌을 때 붙여넣고
-        <strong style="color:var(--text-secondary);">복원</strong> 버튼을 누르면 즉시 복구됩니다.
-      </div>
-      <textarea id="fos-backup-text" class="modal-input"
-        style="width:100%;height:72px;resize:vertical;font-size:10px;line-height:1.4;"
-        placeholder="여기에 백업 코드가 자동으로 채워집니다. 다른 곳(메모장/메일)에 복사해 두세요."></textarea>
-      <div style="display:flex;gap:var(--s2);margin-top:var(--s2);">
-        <button type="button" class="btn btn-ghost" id="fos-backup-copy"
-          style="font-size:11px;padding:6px 12px;">복사</button>
-        <button type="button" class="btn btn-ghost" id="fos-backup-restore"
-          style="font-size:11px;padding:6px 12px;">복원</button>
-      </div>
-    `;
-    actions.parentNode.insertBefore(block, actions);
-
-    // 백업 코드 자동 생성 (현재 입력 필드 값들 우선, 없으면 LocalStorage)
-    const backup = {};
-    DASHBOARDS.forEach(d => {
-      const input = modal.querySelector('#fos-url-' + d.id);
-      const v = (input && input.value.trim()) || FamilyOS.getWebAppUrl(d.id);
-      if (v) backup[d.id] = v;
-    });
-    const text = modal.querySelector('#fos-backup-text');
-    text.value = btoa(unescape(encodeURIComponent(JSON.stringify(backup))));
-
-    modal.querySelector('#fos-backup-copy').onclick = async () => {
-      try {
-        await navigator.clipboard.writeText(text.value);
-        const btn = modal.querySelector('#fos-backup-copy');
-        const orig = btn.textContent;
-        btn.textContent = '복사됨 ✓';
-        setTimeout(() => { btn.textContent = orig; }, 1500);
-      } catch (e) {
-        text.select();
-        document.execCommand('copy');
-      }
-    };
-
-    modal.querySelector('#fos-backup-restore').onclick = () => {
-      const raw = text.value.trim();
-      if (!raw) {
-        alert('백업 코드를 먼저 붙여넣으세요.');
-        return;
-      }
-      try {
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(raw))));
-        let restored = 0;
-        DASHBOARDS.forEach(d => {
-          if (decoded[d.id]) {
-            const input = modal.querySelector('#fos-url-' + d.id);
-            if (input) {
-              input.value = decoded[d.id];
-              restored++;
-            }
-          }
-        });
-        alert(restored + '개 URL이 입력란에 복원되었습니다. "저장" 버튼을 눌러 적용하세요.');
-      } catch (e) {
-        alert('백업 코드 형식이 올바르지 않습니다.\n' + e.message);
-      }
-    };
-  }
   </script>
 </body>
 </html>

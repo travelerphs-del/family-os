@@ -2519,4 +2519,75 @@ side.innerHTML = `
 - 사용자 GitHub Pages 푸시 + Apps Script 재배포 (Session 8 에서 또 한 번)
 - 사이드바에서 비용 row 가 시각적으로 어색하면 (border / 폰트 / 칩 사이즈) 조정 필요할 수 있음 — 사용자 피드백 후 결정
 
+
+## Session 7.8 — 보안 후속 작업 1차 (백업 UI 제거 + Travel XSS 점검)
+
+### 배경
+- Session 7.7 의 보안 점검 결과 `context-security.md` 에 6개 코드 백로그 정리됨.
+- 본 세션은 그 중 3-1, 3-3 진행. 3-2 는 시급도 재평가 후 보류 결정.
+
+### 결정
+
+**3-1. 백업 코드 처리 → 옵션 B (기능 제거)**
+- 근거 1: 사용자가 `index.html` 의 백업/복원 UI 를 한 번도 사용한 적 없음.
+- 근거 2: LocalStorage 영속화 실패 (storageDiag 배너) 도 한 번도 발생 안 함 → 백업 기능 자체의 존재 이유가 약함.
+- 근거 3: 옵션 A (AES-GCM 강화) 는 UX 비용 + 비밀번호 분실 시 백업 자체 무용지물이 되는 역설이 있음. 효과 대비 비합리.
+- → injectBackupUI 함수 + 호출 이벤트 리스너 통째 제거.
+
+**3-2. Apps Script doPost Origin 검증 → 시급도 하향, 보류**
+- context-security.md 초기 작성 시 🔴 시급 으로 표시했으나 위협 모델 재검토 결과 **효과 대비 작업량이 과함**.
+- 실제 위협:
+  - 다른 사이트가 CSRF 로 내 Apps Script 호출 → URL 을 모르면 불가능
+  - URL 이 새면 body 에 가짜 origin 박는 것만으로 Origin 검증 우회 가능
+- 결국 본질적 방어는 URL 비밀성 유지 (그리고 시트 소유 계정의 2FA). Origin 검증은 자동화 봇만 막는 보조 장치.
+- 작업량 (5개 .gs 수정 + common.js + travel-trip.html) 대비 보호 효과 낮음 → 후순위.
+
+**3-3. Travel XSS 점검 → 누락 없음**
+- travel.html 의 innerHTML 호출 16개 + travel-trip.html 의 21개 전수 검토.
+- 사용자 입력값 (display_name, trip_id, city, country_code, members, place name, address, rating_text, subcategory name 등) 이 들어가는 모든 지점에 `FamilyOS.escapeHtml(...)` 적용 확인.
+- 두 파일 모두 `const { escapeHtml } = FamilyOS;` 로 가져옴. common.js 의 escapeHtml 정의는 & < > " ' 5개 글자 처리 → 안전.
+- context-security.md 가 우려한 "**시트 입력값 → XSS → LocalStorage URL 5개 + Google API key 탈취**" 시나리오는 현 코드에선 실현 불가.
+
+**잠재 이슈 (XSS 아님, 보강 보류)**
+- `'★'.repeat(p.rating_star)` 3군데 (travel-trip.html 1517, 1557, 1631).
+- 시트의 rating_star 가 비정상 값 (음수 → RangeError, 거대 숫자 → DoS) 일 때 렌더 문제 가능.
+- XSS 가 아니라 시트 데이터 무결성 문제. 시트는 사용자 본인이 통제하므로 실질 위협 0.
+- → 보강 안 함. 향후 발견 시 한 줄 패치: `'★'.repeat(Math.max(0, Math.min(5, Number(p.rating_star) || 0)))`.
+
+### CODE
+
+**index.html**: 1085 → 1008 줄 (−77 줄)
+- 제거: `injectBackupUI()` 함수 (78 줄) + 호출 이벤트 리스너 (5 줄)
+- 추가: 제거 사유 주석 13 줄 (Session 7.8 흔적 + storageDiag 안전망 유지 명시)
+- storageDiag IIFE 는 그대로 유지 → LocalStorage 영속화 실패 시 자동 콘솔/배너 경고는 계속 동작.
+
+### VERIFICATION
+- `grep -n "backup\|injectBackupUI" index.html` → 제거 사유 주석 한 줄만 매치 (코드 잔재 없음).
+- 파일 끝 `</script></body></html>` 정상 구조 유지.
+- 행 수 검증: 1085 → 1008. 정확히 −77.
+
+### LESSON
+- **context-security.md 시급도 표시 신뢰 금지.** 7.7 작성 시 effort/effect 분석 없이 직관으로 🔴/🟡/🟢 라벨 매김. 7.8 에서 3-2 의 효과 한계 (Origin 헤더 우회 가능 + URL 비밀성이 본질) 를 재검토하니 우선순위 정정 필요했음.
+- **다음 보안 점검 때는** 각 항목에 (1) 막을 수 있는 위협 시나리오, (2) 우회 가능 여부, (3) 작업량을 함께 적어야 의사결정 가능. 단순 시급도 라벨만으론 misleading.
+- **"안 쓰는 기능 = 평문 노출 위험"** 패턴 확인. 사용자가 한 번도 안 쓴 백업 UI 가 잠재 평문 노출원 (Base64 인코딩 ≈ 평문) 으로 작동. 미사용 기능은 강화보다 제거가 정답인 경우 많음.
+
+### COST
+- 첨부 파일: 입력 ~7,000 줄 (index.html + context-security.md + worklog.md + travel.html + travel-trip.html)
+- 토큰 사용 추정: ~50K (대부분 두 Travel 파일 점검 시 view 호출)
+- 산출 코드 변경: 77 줄 제거, 13 줄 추가 (실 net −64 줄)
+
+### PENDING (Session 7.8 → 7.9 인계)
+| ID | 항목 | 시급도 (재평가) |
+|---|---|---|
+| 3-2 | Apps Script doPost Origin 검증 | 🟡 보조 (URL 비밀성이 본질) |
+| 3-4 | Travel deleteTrip soft delete + 휴지통 | 🟡 중간 (실수 복구 가치) |
+| 3-5 | Apps Script 입력 길이/타입 검증 | 🟢 낮음 |
+| 3-6 | worklog 가족 별명 마스킹 (`도비/로비` → `son1/son2`) | 🟢 낮음 (이미 git history 에 commit 됨, 향후 commit 만 보호) |
+| rating clamp | travel-trip.html `★`.repeat 3군데 clamp | 🟢 매우 낮음 (XSS 아님, 시트 통제) |
+
+### 산출물
+- `index.html` (수정본, outputs 에 제공됨)
+- `worklog-archive.md` 에 본 섹션 append (텍스트로 제공)
+- `worklog.md` 슬림 업데이트
+- `context-security.md` 업데이트 (3-1/3-3 완료 마킹, 3-2 시급도 재평가, 변경 이력)
 ────────────────────────────────────────────────────────────────────

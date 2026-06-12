@@ -1625,6 +1625,9 @@ async function parseAll() {
     if (F.sn || F.so) {
       st.innerHTML = '<div class="spinner"></div> SHB 파싱 중…';
       const r = await parseSHB(F.sn, F.so);
+      if (r.length === 0) {
+        throw new Error('SHB 파일을 읽었지만 거래를 한 건도 찾지 못했습니다. 빈 파일이거나 양식이 예상과 다를 수 있어요.');
+      }
       parsed = parsed.concat(r);
     }
     if (F.hc.length) {
@@ -1648,40 +1651,58 @@ async function parseAll() {
   }
 }
 
-/* SHB: 신 + 구 파일 병합 (기존 로직 그대로 이식) */
-async function parseSHB(newFile, oldFile) {
+/* SHB 파일 1개를 읽어 양식 자동 판별 + 행 추출.
+ * 어느 칸에 넣었든, 파일 안의 헤더를 보고 '신(상세)/구(단순)'을 스스로 판별한다.
+ *   - new(상세): Trx.Date / Debit / Credit 등이 있는 양식
+ *   - old(단순): Amount + Reference 가 있는 양식
+ * 헤더 위에 메타행이 있어도 대응 (findIndex 로 헤더행 탐색). */
+async function readSHBFile(file) {
+  const ab = await file.arrayBuffer();
+  const wb = XLSX.read(ab, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+  let hi = raw.findIndex(r => r && r.some(c => {
+    const s = String(c).toLowerCase();
+    return s.includes('trx.') || s.includes('amount') || s.includes('debit') || s.includes('service name');
+  }));
+  if (hi === -1) hi = 0;
+  const hdr = raw[hi].map(c => String(c || '').trim());
+  const low = hdr.map(h => h.toLowerCase());
+  const isNew = low.some(h => h.includes('trx.') || h.includes('debit') || h.includes('credit'));
+  const isOld = low.some(h => h.includes('amount')) && low.some(h => h.includes('reference'));
+  const fmt = isNew ? 'new' : (isOld ? 'old' : 'unknown');
+  const rows = raw.slice(hi + 1).map(r => {
+    const o = {};
+    hdr.forEach((h, i) => { o[h] = String(r[i] || '').trim(); });
+    return o;
+  });
+  return { fmt, rows, fileName: (file && file.name) || '이름없음' };
+}
+
+/* SHB: 신 + 구 파일 병합.
+ * (병합 로직은 기존 그대로. 앞단에 '칸 자동 판별'만 추가해서 거꾸로 넣어도 바로잡음) */
+async function parseSHB(fileA, fileB) {
   const txs = [];
   let newRows = [], oldRows = [];
 
-  if (newFile) {
-    const ab = await newFile.arrayBuffer();
-    const wb = XLSX.read(ab, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
-    let hi = raw.findIndex(r => r && r.some(c => String(c).includes('Trx.') || String(c).toLowerCase().includes('date')));
-    if (hi === -1) hi = 0;
-    const hdr = raw[hi].map(c => String(c || '').trim());
-    newRows = raw.slice(hi + 1).map(r => {
-      const o = {};
-      hdr.forEach((h, i) => { o[h] = String(r[i] || '').trim(); });
-      return o;
-    });
-  }
+  // ── 칸 자동 판별: 넣은 칸 순서와 무관하게 파일 양식으로 제자리 배치 ──
+  const read = [];
+  for (const f of [fileA, fileB]) { if (f) read.push(await readSHBFile(f)); }
+  const news = read.filter(r => r.fmt === 'new');
+  const olds = read.filter(r => r.fmt === 'old');
+  const unknowns = read.filter(r => r.fmt === 'unknown');
 
-  if (oldFile) {
-    const ab = await oldFile.arrayBuffer();
-    const wb = XLSX.read(ab, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
-    let hi = raw.findIndex(r => r && r.some(c => String(c).includes('Amount')));
-    if (hi === -1) hi = 0;
-    const hdr = raw[hi].map(c => String(c || '').trim());
-    oldRows = raw.slice(hi + 1).map(r => {
-      const o = {};
-      hdr.forEach((h, i) => { o[h] = String(r[i] || '').trim(); });
-      return o;
-    });
+  if (unknowns.length) {
+    throw new Error('SHB 양식을 알아볼 수 없는 파일이 있습니다 (' +
+      unknowns.map(u => u.fileName).join(', ') +
+      '). 신한은행에서 받은 엑셀이 맞는지 확인해주세요.');
   }
+  if (news.length > 1 || olds.length > 1) {
+    throw new Error('같은 양식의 SHB 파일을 두 개 올리신 것 같습니다. ' +
+      '"날짜 있는 파일" 1개 + "금액만 있는 파일" 1개로 올려주세요.');
+  }
+  if (news.length) newRows = news[0].rows;
+  if (olds.length) oldRows = olds[0].rows;
 
   const col = (rows, test) => rows.length ? Object.keys(rows[0]).find(k => test(k.toLowerCase())) : null;
   const cDate   = col(newRows, k => k.includes('date') || k.includes('날짜'));
@@ -1765,7 +1786,8 @@ async function parseSHB(newFile, oldFile) {
       });
     });
   } else if (!newRows.length && oldRows.length) {
-    const fileMonth = oldFile ? oldFile.name.match(/(\d{4})(\d{2})\d{2}/) : null;
+    const oldName = (olds[0] && olds[0].fileName) || '';
+    const fileMonth = oldName.match(/(\d{4})(\d{2})\d{2}/);
     const fm = fileMonth ? (fileMonth[1] + '-' + fileMonth[2] + '-01') : '2026-05-01';
     oldRows.forEach((r, i) => {
       const amount = pn(r[cAmt]);

@@ -1027,6 +1027,58 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
 }
 .mn-field.error .mn-error-msg { display: block; }
 
+/* ── 건강검진 폼 (Session 11) ── */
+.ck-hint {
+  font-size: 11px; color: var(--text-quiet);
+  font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px;
+}
+.ck-grid {
+  display: flex; flex-wrap: wrap; gap: var(--s2);
+  margin-top: var(--s2);
+}
+.ck-exam, .ck-blood { display: flex; flex-direction: column; }
+.ck-chip {
+  font-size: 12px; color: var(--text-secondary);
+  padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: var(--r-full); background: var(--elevated);
+  transition: all var(--t-fast); cursor: pointer; white-space: nowrap;
+}
+.ck-chip:hover { border-color: var(--border-hi); color: var(--text-primary); }
+.ck-exam.on .ck-chip, .ck-blood.on .ck-chip {
+  border-color: var(--acc-health); color: var(--acc-health);
+  background: var(--acc-health-soft, rgba(52,211,153,0.16));
+}
+/* 펼쳐진 칩은 한 줄 전체 차지 */
+.ck-exam.on, .ck-blood.on {
+  width: 100%;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: var(--s3);
+}
+.ck-exam.on .ck-chip, .ck-blood.on .ck-chip { align-self: flex-start; }
+.ck-exam-detail {
+  display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2);
+}
+.ck-result-pick { display: flex; gap: 6px; }
+.ck-res-btn {
+  font-size: 12px; color: var(--text-tertiary);
+  padding: 5px 14px; border: 1px solid var(--border);
+  border-radius: var(--r-full); background: transparent; cursor: pointer;
+  transition: all var(--t-fast);
+}
+.ck-res-btn.active[data-value="normal"] {
+  border-color: var(--gain); color: var(--gain); background: var(--gain-soft);
+}
+.ck-res-btn.active[data-value="abnormal"] {
+  border-color: var(--loss); color: var(--loss); background: var(--loss-soft);
+}
+.ck-finding { font-size: 13px; }
+.ck-blood-detail {
+  display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2);
+}
+.ck-blood-detail .ck-value { max-width: 140px; }
+.ck-unit { font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+
 /* 사진 업로드 */
 .photo-strip {
   display: flex; gap: var(--s2);
@@ -1376,8 +1428,69 @@ const CATEGORIES = [
   { id: 'vaccination', name: 'Vaccination',     desc: '예방접종 이력',                        sheet: 'vaccination',      icon: 'VA' },
   { id: 'condition',   name: 'Condition',       desc: '보유질환 추가',                        sheet: 'conditions',       icon: 'C' },
   { id: 'allergy',     name: 'Allergy',         desc: '알레르기 추가',                        sheet: 'allergies',        icon: 'A' },
+  { id: 'checkup',     name: '건강검진',         desc: '종합검진 — 선택검사 + 혈액검사 + 복부초음파', sheet: 'healthcheck',  icon: '🩺' },
   { id: 'momsnote',    name: "Mom's Note",      desc: '증상·대상자·기타 — 4가지 필수 입력',  sheet: 'symptom',          icon: '📝' },
 ];
+
+/* ════════════════════════════════════════════════════════
+ * 건강검진 (Session 11) — 상수 정의
+ * BLOOD_ITEMS 의 ref(참고치)는 Part 2 트렌드 그래프 음영에도 그대로 재사용.
+ * 참고치는 표준 성인 기준(병원마다 상이) — 수정하려면 이 표만 고치면 됨.
+ *   ref 형식: { low, high }  (low/high 가 null 이면 그쪽 경계 없음)
+ *   성별 다르면: { M:{low,high}, F:{low,high} }
+ * ════════════════════════════════════════════════════════ */
+
+// 선택검진 항목 (12)
+const CHECKUP_EXAMS = [
+  'Brain MRI', '경동맥초음파', '갑상선초음파', '유방초음파',
+  '위내시경', '폐CT', '관상동맥CT', '복부MRI',
+  '경추MRI', '요추MRI', '대장내시경', '전립선초음파'
+];
+
+// 혈액검사 항목 (30) — 단위 + 참고치
+const BLOOD_ITEMS = [
+  { key: 'WBC',          unit: '10³/µL',  ref: { low: 4.0,  high: 10.0 } },
+  { key: 'Hb',           unit: 'g/dL',    ref: { M: { low: 13.0, high: 17.0 }, F: { low: 12.0, high: 16.0 } } },
+  { key: 'Plt',          unit: '10³/µL',  ref: { low: 150,  high: 400 } },
+  { key: 'AST',          unit: 'U/L',     ref: { low: 0,    high: 40 } },
+  { key: 'ALT',          unit: 'U/L',     ref: { low: 0,    high: 40 } },
+  { key: 'GGT',          unit: 'U/L',     ref: { M: { low: 11, high: 63 }, F: { low: 8, high: 35 } } },
+  { key: 'Total protein',unit: 'g/dL',    ref: { low: 6.0,  high: 8.0 } },
+  { key: 'Albumin',      unit: 'g/dL',    ref: { low: 3.5,  high: 5.2 } },
+  { key: 'Globulin',     unit: 'g/dL',    ref: { low: 2.0,  high: 3.5 } },
+  { key: 'T-Bil',        unit: 'mg/dL',   ref: { low: 0.2,  high: 1.2 } },
+  { key: 'ID-Bil',       unit: 'mg/dL',   ref: { low: 0.1,  high: 0.8 } },
+  { key: 'D-Bil',        unit: 'mg/dL',   ref: { low: 0.0,  high: 0.4 } },
+  { key: 'T-chol',       unit: 'mg/dL',   ref: { low: null, high: 200 } },
+  { key: 'TG',           unit: 'mg/dL',   ref: { low: null, high: 150 } },
+  { key: 'LDL',          unit: 'mg/dL',   ref: { low: null, high: 130 } },
+  { key: 'HDL',          unit: 'mg/dL',   ref: { M: { low: 40, high: null }, F: { low: 50, high: null } } },
+  { key: 'Glucose',      unit: 'mg/dL',   ref: { low: 70,   high: 100 } },
+  { key: 'HbA1c',        unit: '%',       ref: { low: 4.0,  high: 5.7 } },
+  { key: 'TSH',          unit: 'µIU/mL',  ref: { low: 0.4,  high: 4.0 } },
+  { key: 'FT4',          unit: 'ng/dL',   ref: { low: 0.7,  high: 1.8 } },
+  { key: 'BUN',          unit: 'mg/dL',   ref: { low: 8,    high: 20 } },
+  { key: 'Cr',           unit: 'mg/dL',   ref: { M: { low: 0.7, high: 1.3 }, F: { low: 0.5, high: 1.1 } } },
+  { key: 'Uric acid',    unit: 'mg/dL',   ref: { M: { low: 3.4, high: 7.0 }, F: { low: 2.4, high: 6.0 } } },
+  { key: 'RF',           unit: 'IU/mL',   ref: { low: null, high: 14 } },
+  { key: 'AFP',          unit: 'ng/mL',   ref: { low: null, high: 7 } },
+  { key: 'CEA',          unit: 'ng/mL',   ref: { low: null, high: 5 } },
+  { key: 'PSA',          unit: 'ng/mL',   ref: { low: null, high: 4 } },
+  { key: 'CA19-9',       unit: 'U/mL',    ref: { low: null, high: 37 } },
+  { key: 'NSE',          unit: 'ng/mL',   ref: { low: null, high: 16.3 } },
+  { key: 'Cyfra 21-1',   unit: 'ng/mL',   ref: { low: null, high: 3.3 } }
+];
+const BLOOD_ITEM_MAP = {};
+BLOOD_ITEMS.forEach(b => { BLOOD_ITEM_MAP[b.key] = b; });
+
+/* 멤버 성별에 맞는 참고치 {low,high} 반환 (성별 미상이면 M 기준) */
+function refRangeFor(itemKey, gender) {
+  const it = BLOOD_ITEM_MAP[itemKey];
+  if (!it || !it.ref) return null;
+  const r = it.ref;
+  if (r.M || r.F) return (gender === 'F') ? r.F : r.M;
+  return r;
+}
 
 /* ─── 부팅 ───────────────────────────────────────── */
 document.getElementById('hdr-mount').innerHTML = FamilyOS.renderHeaderHTML({
@@ -3023,8 +3136,87 @@ function openForm(catId, defaultMember, parentRecordId, parentType) {
       <input type="hidden" name="category" value="exercise">
       <input type="hidden" name="active" value="TRUE">
     `;
+  } else if (catId === 'checkup') {
+    const examChips = CHECKUP_EXAMS.map(ex => `
+      <div class="ck-exam" data-exam="${escapeHtml(ex)}">
+        <button type="button" class="ck-chip" data-role="exam-toggle">${escapeHtml(ex)}</button>
+        <div class="ck-exam-detail" style="display:none">
+          <div class="ck-result-pick" data-name="result">
+            <button type="button" class="ck-res-btn active" data-value="normal">정상</button>
+            <button type="button" class="ck-res-btn" data-value="abnormal">비정상</button>
+          </div>
+          <input type="text" class="form-input ck-finding" data-name="finding" placeholder="소견 (선택)">
+        </div>
+      </div>
+    `).join('');
+
+    const bloodChips = BLOOD_ITEMS.map(b => `
+      <div class="ck-blood" data-item="${escapeHtml(b.key)}" data-unit="${escapeHtml(b.unit)}">
+        <button type="button" class="ck-chip" data-role="blood-toggle">${escapeHtml(b.key)}</button>
+        <div class="ck-blood-detail" style="display:none">
+          <input type="number" step="any" class="form-input ck-value" data-name="value" placeholder="값">
+          <span class="ck-unit">${escapeHtml(b.unit)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    html = `
+      <div class="form-group"><label class="form-label">누구의 검진?<span class="req">*</span></label>${memberPick}</div>
+      <div class="form-row">
+        <div><label class="form-label">검진일<span class="req">*</span></label>
+          <input type="date" class="form-input" name="check_date" value="${today}" required></div>
+        <div><label class="form-label">검진장소</label>
+          <input type="text" class="form-input" name="place" placeholder="예: OO검진센터"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">선택검진 항목 <span class="ck-hint">탭하면 정상/비정상 + 소견 입력</span></label>
+        <div class="ck-grid">${examChips}</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">혈액검사 <span class="ck-hint">탭하면 값 입력 (정상·비정상 모두 기록 권장)</span></label>
+        <div class="ck-grid">${bloodChips}</div>
+      </div>
+
+      <div class="form-group"><label class="form-label">복부초음파 결과</label>
+        <textarea class="form-textarea" name="abdomen_us" placeholder="예: 경미한 지방간, 담낭용종 5mm"></textarea></div>
+    `;
   }
   document.getElementById('h-modal-body').innerHTML = html;
+  // 건강검진 폼: 칩 토글 (선택검사 정상/비정상 + 혈액 값입력)
+  if (catId === 'checkup') {
+    const ckBody = document.getElementById('h-modal-body');
+    // 선택검사 칩 토글
+    ckBody.querySelectorAll('.ck-exam [data-role="exam-toggle"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wrap = btn.closest('.ck-exam');
+        const on = wrap.classList.toggle('on');
+        wrap.querySelector('.ck-exam-detail').style.display = on ? '' : 'none';
+      });
+    });
+    // 선택검사 정상/비정상 토글
+    ckBody.querySelectorAll('.ck-result-pick').forEach(pick => {
+      pick.addEventListener('click', (e) => {
+        const b = e.target.closest('.ck-res-btn');
+        if (!b) return;
+        pick.querySelectorAll('.ck-res-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+      });
+    });
+    // 혈액 칩 토글
+    ckBody.querySelectorAll('.ck-blood [data-role="blood-toggle"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wrap = btn.closest('.ck-blood');
+        const on = wrap.classList.toggle('on');
+        wrap.querySelector('.ck-blood-detail').style.display = on ? '' : 'none';
+        if (on) {
+          const inp = wrap.querySelector('.ck-value');
+          if (inp) setTimeout(() => inp.focus(), 0);
+        }
+      });
+    });
+  }
   // 멤버 picker 핸들러
   document.getElementById('h-modal-body').querySelectorAll('.mem-pick-btn').forEach(btn => {
     btn.addEventListener('click', () => pickMember(btn));
@@ -3204,6 +3396,70 @@ async function submitForm() {
   // 필수 필드 체크
   if (!data.member_id) {
     showToast('error', '대상자를 선택하세요');
+    return;
+  }
+
+  // ── 건강검진: 부모+자식 다행을 한 번에 저장 (전용 액션) ──
+  if (cat.id === 'checkup') {
+    if (!data.check_date) {
+      showToast('error', '검진일을 선택하세요');
+      return;
+    }
+    // 선택검사 수집 (.ck-exam.on 만)
+    const exams = [];
+    body.querySelectorAll('.ck-exam.on').forEach(w => {
+      const name = w.dataset.exam;
+      const resBtn = w.querySelector('.ck-res-btn.active');
+      const result = resBtn ? resBtn.dataset.value : 'normal';
+      const finding = (w.querySelector('.ck-finding')?.value || '').trim();
+      exams.push({ exam_name: name, result, finding });
+    });
+    // 혈액 수집 (.ck-blood.on 중 값 입력된 것만)
+    const bloods = [];
+    body.querySelectorAll('.ck-blood.on').forEach(w => {
+      const item = w.dataset.item;
+      const unit = w.dataset.unit || '';
+      const value = (w.querySelector('.ck-value')?.value || '').trim();
+      if (value !== '') bloods.push({ item, value, unit });
+    });
+
+    if (exams.length === 0 && bloods.length === 0 &&
+        !(data.abdomen_us && data.abdomen_us.trim())) {
+      showToast('error', '선택검사·혈액검사·복부초음파 중 하나는 입력하세요');
+      return;
+    }
+
+    const payload = {
+      member_id: data.member_id,
+      check_date: data.check_date,
+      place: data.place || '',
+      abdomen_us: data.abdomen_us || '',
+      exams,
+      bloods,
+      client_req_id: 'client-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+    };
+
+    state.isSubmitting = true;
+    const ckBtn = document.getElementById('h-modal-submit');
+    ckBtn.disabled = true;
+    ckBtn.textContent = '저장 중…';
+    try {
+      const r = await apiPost({ action: 'addcheckup', payload });
+      if (r.ok) {
+        showToast('ok', r.duplicate ? '이미 저장된 검진' :
+          ('검진 저장 완료 (선택검사 ' + (r.exam_count || 0) + ' · 혈액 ' + (r.blood_count || 0) + ')'));
+        closeHModal();
+        await refresh();
+      } else {
+        showToast('error', r.error || '저장 실패');
+      }
+    } catch (err) {
+      showToast('error', err.message);
+    } finally {
+      state.isSubmitting = false;
+      ckBtn.disabled = false;
+      ckBtn.textContent = '저장';
+    }
     return;
   }
 

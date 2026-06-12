@@ -1641,6 +1641,20 @@ async function parseAll() {
     const newTx = parsed.filter(t => !exist.has(t.id));
     st.innerHTML = '<div class="spinner"></div> 카테고리 분류 중…';
     S.pending = newTx.map(t => Object.assign({}, t, classify(t.merchant), { isManual: false }));
+
+    // 신규 0건 = 파싱은 됐지만 전부 이미 시트에 입력된 중복.
+    // 검토창(0건 빈 화면)을 열지 않고, 모달을 유지한 채 명확히 안내한다.
+    // (같은 파일을 다시 올렸을 때 '안 들어갔다'고 오해하는 일을 막기 위함)
+    if (S.pending.length === 0) {
+      st.innerHTML = '<div style="line-height:1.6;color:var(--text-secondary);">'
+        + '<span style="color:var(--info);font-weight:600;">ℹ 새로 추가할 거래가 없습니다.</span><br>'
+        + '파싱한 <strong>' + parsed.length + '건</strong>이 모두 이미 입력되어 있어요. '
+        + '(같은 파일을 다시 올리신 것 같습니다.)'
+        + '</div>';
+      document.getElementById('parse-btn').disabled = false;  // 다른 파일로 다시 시도 가능
+      return;  // 검토창 열지 않음
+    }
+
     st.textContent = '✓ ' + parsed.length + '건 파싱 완료 (신규 ' +
       S.pending.length + '건 / 중복 제거 ' + (parsed.length - S.pending.length) + '건)';
     setTimeout(() => { closeM('mod-import'); openReview(); }, 600);

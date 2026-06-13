@@ -603,6 +603,57 @@ footer.ftr .ftr-r { font-family: var(--font-mono); }
   width: 100%;
 }
 
+/* ── 혈액 차트 드롭다운 + 참고치 캡션 (Part 2) ── */
+.chart-tabs { align-items: center; }
+.chart-select {
+  width: auto; max-width: 200px;
+  font-size: 12px; padding: 6px 10px;
+  font-family: var(--font-mono);
+}
+.chart-ref {
+  font-size: 11px; color: var(--text-quiet);
+  font-family: var(--font-mono);
+}
+
+/* ── 선택검진 3년 표 (Part 2) ── */
+.imaging-table-wrap { overflow-x: auto; }
+table.imaging-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+table.imaging-table th, table.imaging-table td {
+  padding: 7px 10px; text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.imaging-table thead th {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-tertiary); font-weight: 600;
+}
+table.imaging-table th.exam-col {
+  text-align: left; color: var(--text-secondary); font-weight: 500;
+  font-family: var(--font-body);
+}
+table.imaging-table td.exam-col {
+  text-align: left; color: var(--text-secondary);
+}
+.img-cell { color: var(--text-quiet); }
+.img-cell.normal { color: var(--text-tertiary); }
+.img-cell.abnormal { color: var(--neutral); font-weight: 600; }
+.img-cell.has-finding {
+  cursor: pointer; text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* 소견 툴팁 (선택검진 표 공용) */
+#img-tip {
+  position: fixed; z-index: 200; max-width: 260px;
+  background: var(--elevated-2); color: var(--text-primary);
+  border: 1px solid var(--border-hi); border-radius: var(--r-sm);
+  padding: 8px 10px; font-size: 12px; line-height: 1.45;
+  box-shadow: var(--shadow-md); display: none;
+  pointer-events: none;
+}
+
 /* ─── 카테고리 picker / 폼 모달 ───────────────────────── */
 .h-modal-backdrop {
   position: fixed; inset: 0;
@@ -2073,6 +2124,8 @@ function renderPersonView(memberId) {
       </section>
     </div>
 
+    ${renderImagingTableHtml(memberId)}
+
     <section class="h-card">
       <div class="h-card-title">최근 기록 — ${escapeHtml(MEMBER_LABELS[memberId])}</div>
       <div id="person-recent"></div>
@@ -2082,6 +2135,7 @@ function renderPersonView(memberId) {
   renderPersonSummary(memberId);
   document.getElementById('person-recent').innerHTML = renderRecentHtml(memberId, 15);
   attachRecentHandlers();
+  attachImagingTooltip();
 }
 
 function renderPersonSummary(memberId) {
@@ -2123,6 +2177,114 @@ function renderPersonSummary(memberId) {
           <span class="r">${escapeHtml(m.frequency || '')}</span>
         </div>
       `).join('');
+}
+
+/* ─── 선택검진(imaging) 최근 3개년 표 (Part 2) ───
+ * 행 = CHECKUP_EXAMS 12개, 열 = 데이터가 있는 최근 3개년 (오름차순).
+ * 셀 = 정상/비정상 (비정상은 강조). 소견(finding) 있으면 점선 + 탭/호버 툴팁.
+ * imaging 데이터가 하나도 없으면 빈 문자열 반환 → 카드 자체를 안 그림. */
+function renderImagingTableHtml(memberId) {
+  const rows = (state.sheets.imaging || [])
+    .filter(r => r.member_id === memberId && r.exam_name);
+  if (rows.length === 0) return '';
+
+  // 연도 추출 (exam_date 앞 4자리). 최근 3개만, 오름차순(왼쪽=과거).
+  const yearsAll = Array.from(new Set(
+    rows.map(r => String(formatYMD(r.exam_date) || '').slice(0, 4))
+        .filter(y => /^\d{4}$/.test(y))
+  )).sort();
+  const years = yearsAll.slice(-3);
+  if (years.length === 0) return '';
+
+  // (검사명, 연도) → 그 해 가장 최신 결과
+  const cell = {};
+  rows.forEach(r => {
+    const ymd = formatYMD(r.exam_date) || '';
+    const y = ymd.slice(0, 4);
+    if (!years.includes(y)) return;
+    const key = r.exam_name + '__' + y;
+    const prev = cell[key];
+    if (!prev || ymd > prev._ymd) {
+      cell[key] = { result: r.result, finding: r.finding, _ymd: ymd };
+    }
+  });
+
+  const headCols = years.map(y => `<th>${escapeHtml(y.slice(2))}</th>`).join('');
+  const bodyRows = CHECKUP_EXAMS.map(ex => {
+    const tds = years.map(y => {
+      const c = cell[ex + '__' + y];
+      if (!c) return `<td><span class="img-cell empty">–</span></td>`;
+      const abn = c.result === 'abnormal';
+      const hasF = !!(c.finding && String(c.finding).trim());
+      const cls = 'img-cell ' + (abn ? 'abnormal' : 'normal') + (hasF ? ' has-finding' : '');
+      const txt = abn ? '비정상' : '정상';
+      const dataAttr = hasF
+        ? ` data-finding="${escapeHtml(String(c.finding).trim())}" data-label="${escapeHtml(ex + ' · ' + y)}" tabindex="0"`
+        : '';
+      return `<td><span class="${cls}"${dataAttr}>${txt}</span></td>`;
+    }).join('');
+    return `<tr><td class="exam-col">${escapeHtml(ex)}</td>${tds}</tr>`;
+  }).join('');
+
+  return `
+    <section class="h-card">
+      <div class="h-card-title">선택검진 추이
+        <span style="font-weight:400;color:var(--text-quiet);text-transform:none;letter-spacing:0;font-family:var(--font-body);">최근 ${years.length}개년 · 점선=소견</span>
+      </div>
+      <div class="imaging-table-wrap">
+        <table class="imaging-table">
+          <thead><tr><th class="exam-col">검사</th>${headCols}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+/* 소견 툴팁 공용 엘리먼트 + 바깥 탭 시 닫기 (한 번만 생성) */
+function ensureImgTip() {
+  let tip = document.getElementById('img-tip');
+  if (tip) return tip;
+  tip = document.createElement('div');
+  tip.id = 'img-tip';
+  document.body.appendChild(tip);
+  // 바깥을 탭/클릭하면 닫힘 (셀 클릭은 stopPropagation 으로 보호)
+  document.addEventListener('click', () => { tip.style.display = 'none'; tip._for = null; });
+  window.addEventListener('scroll', () => { tip.style.display = 'none'; tip._for = null; }, true);
+  return tip;
+}
+
+/* 선택검진 표의 소견 셀에 호버(데스크탑)/탭(모바일) 툴팁 바인딩.
+ * 셀은 렌더마다 새로 생기므로 매 렌더 호출. 문서 리스너는 ensureImgTip 에서 1회만. */
+function attachImagingTooltip() {
+  const cells = document.querySelectorAll('.img-cell.has-finding');
+  if (cells.length === 0) return;
+  const tip = ensureImgTip();
+
+  const place = (el) => {
+    tip.textContent = (el.dataset.label ? el.dataset.label + ' — ' : '') + el.dataset.finding;
+    tip.style.display = 'block';
+    const r = el.getBoundingClientRect();
+    let left = r.left + r.width / 2 - tip.offsetWidth / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tip.offsetWidth - 8));
+    let top = r.top - tip.offsetHeight - 8;
+    if (top < 8) top = r.bottom + 8;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  };
+  const hide = () => { tip.style.display = 'none'; tip._for = null; };
+
+  cells.forEach(el => {
+    el.addEventListener('mouseenter', () => place(el));
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', () => place(el));
+    el.addEventListener('blur', hide);
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();  // 문서 클릭 닫기와 충돌 방지
+      if (tip.style.display === 'block' && tip._for === el) { hide(); }
+      else { place(el); tip._for = el; }
+    });
+  });
 }
 
 /* ─── Task 렌더링 ─────────────────────────────── */
@@ -2699,35 +2861,59 @@ function openHospitalReportDetail(recordId) {
 function renderBloodChart(memberId) {
   const rows = (state.sheets.blood_test || [])
     .filter(r => r.member_id === memberId);
+  const tabsEl = document.getElementById('blood-tabs');
   if (rows.length === 0) {
-    const tabsEl = document.getElementById('blood-tabs');
     if (tabsEl) tabsEl.innerHTML = '<span style="font-size:11px;color:var(--text-quiet)">데이터 없음</span>';
+    if (state.charts.bloodChart) { state.charts.bloodChart.destroy(); state.charts.bloodChart = null; }
     return;
   }
-  // 가용 항목
-  const items = Array.from(new Set(rows.map(r => r.item).filter(Boolean)));
+
+  // 데이터가 있는 항목만 노출. 순서는 BLOOD_ITEMS 정의 순서를 따르고,
+  // 표준 목록에 없는 커스텀/구버전 항목은 뒤에 덧붙임.
+  const present = new Set(rows.map(r => r.item).filter(Boolean));
+  const items = BLOOD_ITEMS.map(b => b.key).filter(k => present.has(k));
+  rows.map(r => r.item).filter(Boolean).forEach(it => { if (!items.includes(it)) items.push(it); });
   if (!items.includes(state.currentChartItem)) state.currentChartItem = items[0];
 
-  const tabsEl = document.getElementById('blood-tabs');
+  const item = state.currentChartItem;
+  const meta = BLOOD_ITEM_MAP[item];
+  const member = state.members.find(x => x.member_id === memberId);
+  const gender = member ? member.gender : null;
+  const ref = refRangeFor(item, gender);
+
+  // 드롭다운 + 참고치 캡션
   if (tabsEl) {
-    tabsEl.innerHTML = items.map(it =>
-      `<button class="chart-tab ${it === state.currentChartItem ? 'active' : ''}" data-item="${escapeHtml(it)}">${escapeHtml(it)}</button>`
+    const opts = items.map(it =>
+      `<option value="${escapeHtml(it)}"${it === item ? ' selected' : ''}>${escapeHtml(it)}</option>`
     ).join('');
-    tabsEl.querySelectorAll('.chart-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.currentChartItem = btn.dataset.item;
-        renderBloodChart(memberId);
-      });
+
+    let refCaption = '';
+    if (ref) {
+      const range = (ref.low != null && ref.high != null) ? `${ref.low}–${ref.high}`
+        : (ref.high != null ? `≤ ${ref.high}`
+        : (ref.low != null ? `≥ ${ref.low}` : ''));
+      // 성별로 참고치가 갈리는 항목이면 어느 성별 기준인지 표기
+      const splitByGender = !!(meta && meta.ref && (meta.ref.M || meta.ref.F));
+      const gtxt = splitByGender ? (gender === 'F' ? ' (여)' : ' (남)') : '';
+      const unit = meta && meta.unit ? ' ' + escapeHtml(meta.unit) : '';
+      if (range) refCaption = `<span class="chart-ref">정상 ${range}${unit}${gtxt}</span>`;
+    }
+
+    tabsEl.innerHTML = `<select class="form-select chart-select" id="blood-select" aria-label="혈액검사 항목 선택">${opts}</select>${refCaption}`;
+    const sel = document.getElementById('blood-select');
+    if (sel) sel.addEventListener('change', () => {
+      state.currentChartItem = sel.value;
+      renderBloodChart(memberId);
     });
   }
 
-  const item = state.currentChartItem;
   const series = rows.filter(r => r.item === item)
     .sort((a, b) => String(a.test_date).localeCompare(String(b.test_date)));
   const labels = series.map(s => formatYMD(s.test_date) || '');
   const data = series.map(s => parseFloat(s.value));
 
-  drawLineChart('blood-chart', 'bloodChart', labels, data, getCss('--m-mom'));
+  // 6번째 인자 ref: 있으면 정상범위 음영 띠를 그림 (vital 차트는 전달 안 하므로 변화 없음)
+  drawLineChart('blood-chart', 'bloodChart', labels, data, getCss('--m-mom'), ref);
 }
 
 function renderVitalChart(memberId) {
@@ -2763,7 +2949,30 @@ function renderVitalChart(memberId) {
   drawLineChart('vital-chart', 'vitalChart', labels, data, getCss('--acc-health'));
 }
 
-function drawLineChart(canvasId, chartKey, labels, data, color) {
+/* 정상범위 음영 띠 플러그인 (참고치가 있는 차트에만 per-chart 로 등록).
+ * options.plugins.refBand.range = {low, high} (한쪽이 null 이면 차트 경계까지). */
+const refBandPlugin = {
+  id: 'refBand',
+  beforeDatasetsDraw(chart, args, opts) {
+    const range = opts && opts.range;
+    if (!range) return;
+    const y = chart.scales.y;
+    if (!y) return;
+    const area = chart.chartArea;
+    const p1 = (range.low  != null) ? y.getPixelForValue(range.low)  : area.bottom;
+    const p2 = (range.high != null) ? y.getPixelForValue(range.high) : area.top;
+    const top = Math.max(Math.min(p1, p2), area.top);
+    const bot = Math.min(Math.max(p1, p2), area.bottom);
+    if (bot <= top) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.fillStyle = opts.color || 'rgba(74,222,128,0.12)';
+    ctx.fillRect(area.left, top, area.right - area.left, bot - top);
+    ctx.restore();
+  }
+};
+
+function drawLineChart(canvasId, chartKey, labels, data, color, refRange) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   if (state.charts[chartKey]) {
@@ -2771,6 +2980,16 @@ function drawLineChart(canvasId, chartKey, labels, data, color) {
   }
   const textColor  = getCss('--text-tertiary');
   const borderColor = getCss('--border');
+
+  // 참고치 띠가 보이도록 y축에 여유 부여 (값이 전부 범위 밖이어도 띠가 보이게)
+  const yScale = {
+    ticks: { color: textColor, font: { size: 10 } },
+    grid: { color: borderColor }
+  };
+  if (refRange) {
+    if (refRange.low  != null) yScale.suggestedMin = refRange.low;
+    if (refRange.high != null) yScale.suggestedMax = refRange.high;
+  }
 
   state.charts[chartKey] = new Chart(canvas, {
     type: 'line',
@@ -2790,18 +3009,21 @@ function drawLineChart(canvasId, chartKey, labels, data, color) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        refBand: refRange
+          ? { range: refRange, color: getCss('--gain-soft') || 'rgba(74,222,128,0.12)' }
+          : false
+      },
       scales: {
         x: {
           ticks: { color: textColor, font: { size: 10 } },
           grid: { color: borderColor }
         },
-        y: {
-          ticks: { color: textColor, font: { size: 10 } },
-          grid: { color: borderColor }
-        }
+        y: yScale
       }
-    }
+    },
+    plugins: refRange ? [refBandPlugin] : []
   });
 }
 

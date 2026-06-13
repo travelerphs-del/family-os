@@ -2426,6 +2426,9 @@ function renderRecentHtml(filterMember, limit) {
    'vaccination', 'symptom'].forEach(sheet => {
     (state.sheets[sheet] || []).forEach(row => {
       if (filterMember && row.member_id !== filterMember) return;
+      // 건강검진에 딸린 자식행(check_id 보유)은 부모 '건강검진' 한 줄로 대표 →
+      // 최근 기록에 개별 노출 안 함. 검진과 무관한 일반 행(check_id 없음)은 그대로 표시.
+      if ((sheet === 'blood_test' || sheet === 'imaging') && row.check_id) return;
       pushItem(sheet, row);
     });
   });
@@ -2509,15 +2512,27 @@ function renderRecentItemHtml(sheet, row) {
       icon = 'BT'; iconCls = 'bloodtest';
       title = `${row.item || ''} ${row.value || ''}${row.unit || ''}${row.flag ? ' (' + row.flag + ')' : ''}`;
       break;
-    case 'healthcheck':
+    case 'healthcheck': {
       icon = 'CK'; iconCls = 'checkup';
-      title = `건강검진 — ${row.hospital || ''}`;
-      detail = row.conclusion_text || '';
+      const place = row.place || row.hospital || '';   // 구버전 컬럼명도 대비
+      title = '건강검진' + (place ? ' — ' + place : '');
+      // 부모 record_id 로 자식(영상/혈액) 개수 집계 → 요약 한 줄
+      const cid = row.record_id;
+      const imgN = (state.sheets.imaging || []).filter(r => r.check_id === cid).length;
+      const btN  = (state.sheets.blood_test || []).filter(r => r.check_id === cid).length;
+      const parts = [];
+      if (imgN) parts.push('선택검사 ' + imgN);
+      if (btN)  parts.push('혈액 ' + btN);
+      if (row.abdomen_us && String(row.abdomen_us).trim()) parts.push('복부초음파');
+      detail = parts.join(' · ') || (row.conclusion_text || '');
       break;
+    }
     case 'imaging':
       icon = 'IM'; iconCls = 'imaging';
-      title = `${row.modality || ''}${row.body_part ? ' · ' + row.body_part : ''}`;
-      detail = row.conclusion_text || '';
+      title = row.exam_name || row.modality || '영상검사';
+      detail = (row.finding && String(row.finding).trim())
+        || (row.result === 'abnormal' ? '비정상' : (row.result === 'normal' ? '정상' : ''))
+        || row.conclusion_text || '';
       break;
     case 'conditions':
       icon = 'C'; iconCls = 'condition';

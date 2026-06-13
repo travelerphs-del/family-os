@@ -1407,6 +1407,7 @@ const state = {
   isSubmitting: false,
   pendingPhotos: [],
   currentCategory: null,
+  modalIsForm: false,   // 입력 폼이 열려 있으면 true. 바깥 탭/Esc 로 닫히지 않게 보호 (Session 11.x)
 };
 
 const MEMBER_ORDER = ['dad', 'mom', 'robi', 'dobi'];
@@ -1534,14 +1535,16 @@ document.getElementById('h-modal-cancel').addEventListener('click', closeHModal)
 document.getElementById('h-modal-back').addEventListener('click', () => openCategoryPicker());
 document.getElementById('h-modal-submit').addEventListener('click', () => submitForm());
 document.getElementById('h-modal-backdrop').addEventListener('click', (e) => {
-  if (e.target.id === 'h-modal-backdrop') closeHModal();
+  // 입력 폼이 열려 있으면 바깥 탭으로 닫지 않음 (실수로 입력값 날아가는 것 방지)
+  if (e.target.id === 'h-modal-backdrop' && !state.modalIsForm) closeHModal();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const searchBd = document.getElementById('search-modal-backdrop');
     if (searchBd && searchBd.classList.contains('open')) { closeSearchModal(); return; }
     const bd = document.getElementById('h-modal-backdrop');
-    if (bd.classList.contains('open')) closeHModal();
+    // 입력 폼일 때는 Esc 로도 닫지 않음 (× / 취소 버튼으로만 닫기)
+    if (bd.classList.contains('open') && !state.modalIsForm) closeHModal();
   }
 });
 
@@ -2810,6 +2813,7 @@ function getCss(name) {
 function openCategoryPicker() {
   state.currentCategory = null;
   state.pendingPhotos = [];
+  state.modalIsForm = false;   // 카테고리 선택 화면은 입력 전이라 바깥 탭으로 닫혀도 무방
   document.getElementById('h-modal-title').textContent = '어떤 기록을 추가할까요?';
   document.getElementById('h-modal-back').style.display = 'none';
   document.getElementById('h-modal-foot').style.display = 'none';
@@ -2838,6 +2842,7 @@ function openForm(catId, defaultMember, parentRecordId, parentType) {
   if (!cat) return;
   state.currentCategory = cat;
   state.pendingPhotos = [];
+  state.modalIsForm = true;   // 입력 폼: 바깥 탭/Esc 로 닫히지 않게 보호
 
   document.getElementById('h-modal-title').textContent = cat.name;
   document.getElementById('h-modal-back').style.display = 'inline-block';
@@ -3704,6 +3709,7 @@ function openHModal() {
 function closeHModal() {
   document.getElementById('h-modal-backdrop').classList.remove('open');
   state.pendingPhotos = [];
+  state.modalIsForm = false;
 }
 
 /* ─── Toast ───────────────────────────────────── */
